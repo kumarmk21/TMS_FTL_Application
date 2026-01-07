@@ -24,6 +24,7 @@ import { VendorMaster } from '../pages/VendorMaster';
 import { CompanyMaster } from '../pages/CompanyMaster';
 import { CustomerGSTMaster } from '../pages/CustomerGSTMaster';
 import { DocTypeMaster } from '../pages/DocTypeMaster';
+import StatusMaster from '../pages/StatusMaster';
 import { OrderEnquiry } from '../pages/OrderEnquiry';
 import { Dashboard } from '../pages/Dashboard';
 import { LREntry } from '../pages/LREntry';
@@ -54,6 +55,7 @@ const menuItems: MenuItem[] = [
       { id: 'vendor-master', label: 'Vendor Master' },
       { id: 'company-master', label: 'Company Master' },
       { id: 'doc-type-master', label: 'Doc Type Master' },
+      { id: 'status-master', label: 'Status Master' },
       { id: 'lr-master', label: 'LR Master' },
     ],
   },
@@ -160,6 +162,8 @@ export function Layout() {
         return <CompanyMaster />;
       case 'doc-type-master':
         return <DocTypeMaster />;
+      case 'status-master':
+        return <StatusMaster />;
       case 'customer-enquiry':
         return <OrderEnquiry />;
       case 'lr-entry':
