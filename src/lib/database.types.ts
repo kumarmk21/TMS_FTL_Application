@@ -162,3 +162,10 @@ export interface Branch {
   created_at: string;
   updated_at: string;
 }
+
+export interface DocType {
+  id: string;
+  doc_type: string;
+  created_at: string;
+  created_by: string;
+}

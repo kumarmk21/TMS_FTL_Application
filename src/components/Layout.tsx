@@ -23,6 +23,7 @@ import { CustomerMaster } from '../pages/CustomerMaster';
 import { VendorMaster } from '../pages/VendorMaster';
 import { CompanyMaster } from '../pages/CompanyMaster';
 import { CustomerGSTMaster } from '../pages/CustomerGSTMaster';
+import { DocTypeMaster } from '../pages/DocTypeMaster';
 import { OrderEnquiry } from '../pages/OrderEnquiry';
 import { Dashboard } from '../pages/Dashboard';
 import { LREntry } from '../pages/LREntry';
@@ -52,6 +53,7 @@ const menuItems: MenuItem[] = [
       { id: 'customer-gst-master', label: 'Customer GST Master' },
       { id: 'vendor-master', label: 'Vendor Master' },
       { id: 'company-master', label: 'Company Master' },
+      { id: 'doc-type-master', label: 'Doc Type Master' },
       { id: 'lr-master', label: 'LR Master' },
     ],
   },
@@ -156,6 +158,8 @@ export function Layout() {
         return <VendorMaster />;
       case 'company-master':
         return <CompanyMaster />;
+      case 'doc-type-master':
+        return <DocTypeMaster />;
       case 'customer-enquiry':
         return <OrderEnquiry />;
       case 'lr-entry':
