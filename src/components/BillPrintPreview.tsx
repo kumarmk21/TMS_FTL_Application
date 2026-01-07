@@ -1,0 +1,299 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { X, Printer } from 'lucide-react';
+
+interface CompanyDetails {
+  logo_url: string | null;
+  company_name: string;
+  company_tagline: string | null;
+  company_address: string | null;
+  pin_code: string | null;
+  cin: string | null;
+  gstin: string | null;
+  contact_number: string | null;
+  email: string | null;
+  website: string | null;
+  branch_id: string | null;
+  state_id: string | null;
+  msme_no: string | null;
+  pan: string | null;
+}
+
+interface BillDetails {
+  bill_id: string;
+  lr_bill_number: string;
+  lr_bill_date: string;
+  billing_party_name: string;
+  billing_party_code: string;
+  bill_to_address: string | null;
+  bill_to_gstin: string | null;
+  bill_to_state: string | null;
+  bill_amount: number;
+  sub_total: number | null;
+  credit_days: number | null;
+  lr_bill_due_date: string | null;
+}
+
+interface BillPrintPreviewProps {
+  billId: string;
+  onClose: () => void;
+}
+
+export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
+  const [company, setCompany] = useState<CompanyDetails | null>(null);
+  const [bill, setBill] = useState<BillDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchBillData();
+  }, [billId]);
+
+  const fetchBillData = async () => {
+    try {
+      const [companyResult, billResult] = await Promise.all([
+        supabase.from('company_master').select('*').limit(1).maybeSingle(),
+        supabase
+          .from('lr_bill')
+          .select('*')
+          .eq('bill_id', billId)
+          .maybeSingle()
+      ]);
+
+      if (companyResult.error) throw companyResult.error;
+      if (billResult.error) throw billResult.error;
+
+      setCompany(companyResult.data);
+      setBill(billResult.data);
+    } catch (error) {
+      console.error('Error fetching bill data:', error);
+      alert('Error loading bill data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('en-IN');
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-8">
+          <p>Loading bill details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between print:hidden">
+          <h2 className="text-xl font-semibold text-gray-800">Bill Preview</h2>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-8 bill-print-content">
+          <div className="bg-white" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto' }}>
+            <div className="space-y-6">
+              <div className="border-b-2 border-gray-300 pb-6">
+                <div className="flex items-start justify-between mb-4">
+                  {company?.logo_url && (
+                    <img
+                      src={company.logo_url}
+                      alt={company.company_name}
+                      className="h-20 w-auto object-contain"
+                    />
+                  )}
+                  <div className="text-right">
+                    <h1 className="text-3xl font-bold text-gray-900">{company?.company_name}</h1>
+                    {company?.company_tagline && (
+                      <p className="text-sm text-gray-600 italic mt-1">{company.company_tagline}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">Address:</span>{' '}
+                      {company?.company_address || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">PIN Code:</span>{' '}
+                      {company?.pin_code || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">Contact:</span>{' '}
+                      {company?.contact_number || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">Email:</span>{' '}
+                      {company?.email || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">Website:</span>{' '}
+                      {company?.website || '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">GSTIN:</span>{' '}
+                      {company?.gstin || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">CIN:</span>{' '}
+                      {company?.cin || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">PAN:</span>{' '}
+                      {company?.pan || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">MSME No:</span>{' '}
+                      {company?.msme_no || '-'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">TAX INVOICE</h2>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="border border-gray-300 p-4 rounded">
+                  <h3 className="font-semibold text-gray-900 mb-3">Bill Details</h3>
+                  <p className="text-sm text-gray-700 mb-1">
+                    <span className="font-medium">Bill Number:</span>{' '}
+                    {bill?.lr_bill_number || '-'}
+                  </p>
+                  <p className="text-sm text-gray-700 mb-1">
+                    <span className="font-medium">Bill Date:</span>{' '}
+                    {formatDate(bill?.lr_bill_date || null)}
+                  </p>
+                  <p className="text-sm text-gray-700 mb-1">
+                    <span className="font-medium">Due Date:</span>{' '}
+                    {formatDate(bill?.lr_bill_due_date || null)}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">Credit Days:</span>{' '}
+                    {bill?.credit_days || '-'}
+                  </p>
+                </div>
+
+                <div className="border border-gray-300 p-4 rounded">
+                  <h3 className="font-semibold text-gray-900 mb-3">Bill To</h3>
+                  <p className="text-sm font-semibold text-gray-900 mb-1">
+                    {bill?.billing_party_name || '-'}
+                  </p>
+                  <p className="text-sm text-gray-700 mb-1">
+                    {bill?.bill_to_address || '-'}
+                  </p>
+                  <p className="text-sm text-gray-700 mb-1">
+                    <span className="font-medium">State:</span>{' '}
+                    {bill?.bill_to_state || '-'}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">GSTIN:</span>{' '}
+                    {bill?.bill_to_gstin || '-'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border border-gray-300 rounded overflow-hidden mb-6">
+                <table className="min-w-full">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-300">
+                        Description
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 border-b border-gray-300">
+                        Amount (₹)
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-b border-gray-200">
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        Transportation Charges
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                        {(bill?.sub_total || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end mb-6">
+                <div className="w-80 border border-gray-300 rounded overflow-hidden">
+                  <div className="bg-gray-100 px-4 py-3 flex justify-between items-center">
+                    <span className="font-semibold text-gray-900">Total Amount</span>
+                    <span className="text-xl font-bold text-gray-900">
+                      ₹{(bill?.bill_amount || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-12 pt-6 border-t border-gray-300">
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-gray-900 mb-8">
+                    For {company?.company_name}
+                  </p>
+                  <div className="mt-16">
+                    <p className="text-sm text-gray-700">Authorized Signatory</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .bill-print-content,
+          .bill-print-content * {
+            visibility: visible;
+          }
+          .bill-print-content {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 0;
+          }
+          @page {
+            size: A4 portrait;
+            margin: 20mm;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}

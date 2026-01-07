@@ -1,0 +1,7 @@
+    'Maharashtra',
+    NULL,
+    'accounts@nandan.co.in',
+    'info@dlslogistics.in,ACCOUNTS@NANDAN.CO.IN',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;

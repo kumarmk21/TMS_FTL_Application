@@ -1,0 +1,400 @@
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000445',
+    'SHIVAJEE DOORS AND SANITARY WARE',
+    true,
+    'VK Patel',
+    'Hemant',
+    '09AEJPA7232B1ZY',
+    '1025 ka, SHIVAJI MARG, LUCKNOW, Lucknow, Uttar Pradesh, 226018',
+    'LUCKNOW',
+    'UTTAR PRADESH',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000446',
+    'MUN HEALTH PRODUCT INDIA  PRIVATE LIMITED',
+    true,
+    'MUN HEALTH',
+    'Suhas',
+    '27AAGCP8438G1Z3',
+    'Plot No 123, Jawahar Cooperative Industrial Estate Ltd, Kamothe Road, Taluka Panvel, Navi Mumbai, Raigad, Maharashtra, 410209',
+    'PANVEL',
+    'Maharashtra',
+    '9573852004',
+    'Surendra.arangi@munglobal.com',
+    'Surendra.arangi@munglobal.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000447',
+    'SHAIL ENTERPRISES',
+    true,
+    'SHAIL ENTERPRISES',
+    'Suhas',
+    '05ACGPG5736K2ZI',
+    'Near Voiceroy Grand, 00, Sewla Kala GMS Road, Opposit Shri Ram Tower, Dehradun, Dehradun, Uttarakhand, 248171',
+    'Dehradun',
+    'UTTARAKHAND',
+    '9412018555',
+    'shailza234@gmail.com',
+    'shailza234@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000449',
+    'ALLIGO HORIZON PRIVATE LIMITED',
+    true,
+    'ALLIGO HORIZON',
+    'YOGESH',
+    '27AAHCA8881H1Z8',
+    'Gala No. 3,4, 5, 11  12, Sainath Warehouse, Jaulkegaon, Jaulkegaon, Ozar, Nashik, Maharashtra, 422206',
+    'NASHIK',
+    'MAHARASHTRA',
+    '9860551950',
+    'horizonagro.works@gmail.com',
+    'horizonagro.works@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000001',
+    'MIDAS HYGIENE INDUSTRIES PVT LTD',
+    true,
+    'MIDAS',
+    'CORPORATE',
+    '36AAACR9647P2ZJ',
+    'A-650 T T C Industrial Area, MIDC, Near Ramnath Solar Bus Stop, Mahape Navi Mumbai',
+    'Vashi',
+    'Maharashtra',
+    '02227651150',
+    'midas09actsdept@gmail.com',
+    'ravinairaccts@midashygiene.net',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000352',
+    'RISHITATVA CERAMICS PRIVATE LIMITED',
+    true,
+    'HRJOHN',
+    'CORPORATE',
+    '27AAECT4319E1ZH',
+    'PLOT NO 1,2,3, HINGNA ROAD, HINGNA ROAD NEAR T POINT, Nagpur, Maharashtra, 440016',
+    'NAGPUR',
+    'MAHARASHTRA',
+    '9999999999',
+    'manoj@dlslogistics.in',
+    'manoj@dlslogistics.in',
+    'TOPAY',
+    5
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000353',
+    'ERODE AIR PRODUCTC PVT LTD',
+    true,
+    'ASHIRWAD',
+    'CORPORATE',
+    '33AABCE7714K1ZO',
+    'PLOT J-2 SIPCOT INDUSTRIAL GROWTH CENTER KOVAI NH ROADPERUNDURAI Tamil Nadu 638052 KOVAI NH ROADPERUNDURAI,TAMIL NADU-638052',
+    'Perundurai',
+    'TAMIL NADU',
+    NULL,
+    'erodeair@yahoo.com',
+    NULL,
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000356',
+    'INTERIOR ELEMENTS',
+    true,
+    'HRJHON',
+    'CORPORATE',
+    '22AQNPT0990K1ZC',
+    'C-69,70, INTERIOR ELEMENTS, SECTOR-5, DEVENDRA NAGAR, Raipur, Chhattisgarh, 492000',
+    'RAIPUR',
+    'CHATTISGARH',
+    '999999999',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000357',
+    'NAVYA CABLES AND CONDUCTOR PRIVATE LIMITED',
+    true,
+    'NAVYA',
+    'Suhas',
+    '27AAFCN3485J1Z2',
+    'PLOT NO.062, 1ST FLOOR, HARI NIWAS, S V ROAD, OPP ROHIT TIMBER MART, KHAR WEST, Mumbai, Maharashtra, 400052',
+    'MUMBAI',
+    'MAHARASHTRA',
+    '9999',
+    'navyacables123@gmail.com',
+    'navyacables123@gmail.com;info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000358',
+    'VISMAYA GALLERIA',
+    true,
+    'HRJHON',
+    'CORPORATE',
+    '29AARFV4713A1Z2',
+    '205111, SAROVARA ARCADE, HENNUR MAIN ROAD, BANGALORE, Bengaluru Urban, Karnataka, 560043',
+    'BANGALORE',
+    'KARNATAKA',
+    '9999',
+    'manoj@dlslogistics.in',
+    NULL,
+    'TOPAY',
+    10
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000359',
+    'NEW CREATIVE FIBRE GLASS CHHATTISGARH',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '22ACAPT6055E1ZV',
+    'AMAPARA CHOWK,
+LAKHE NAGAR
+RAIPUR,CHHATTISGARH-492001',
+    'RAIPUR',
+    'CHHATTISGARH',
+    NULL,
+    'info@dlslogistics.in',
+    'Chilka, Pramod" <Pramod.Chilka@knauf.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000362',
+    'INTERNATIONAL COOLING SOLUTION',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '18AABFI8663C1ZD',
+    'NA, VISHNU MANDIR PATH, GUWAHATI, Kamrup Metropolitan, Assam, 781012',
+    'GUWAHATI',
+    'ASSAM',
+    '9830110485',
+    'inter_coolingsolution@yahoo.co.in',
+    'cwhouseindia@knauf.com',
+    'TBB',
+    15
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000363',
+    'TBK DEZINER''S HOME PRIVATE LIMITED',
+    true,
+    'HRJHON',
+    'CORPORATE',
+    '27AADCT2164N1Z0',
+    'PLOT NO 21, SECTOR 1, MUMBAI PANVEL HIGHWAY, NEAR JUL NAGAR RLY STATION, NERUL, NAVI MUMBAI, Mumbai, Maharashtra, 400706',
+    'NAVI MUMBAI',
+    'MAHARASHTRA',
+    '9892670321',
+    'shaikh.waqar@yahoo.com',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000364',
+    'TRANS ENTERPRISES',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '32BOEPJ0421H1ZM',
+    '373634 A 501191 A3, AMALA CENTRE, RAILWAY STATION ROAD, EDAPPALLY, Ernakulam, Kerala, 682024',
+    'Kerala',
+    'KERALA',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000365',
+    'KNAUF CEILING SOLUTIONS (INDIA) PRIVATE LIMITED',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '27AAACW7145B1ZI',
+    'E-2, F-2, Opp. Bypass Police Chowky, Bhiwandi Nasik Bypass Naka, Village Vadpe, Thane, Maharashtra, 42130',
+    'BHIWANDI',
+    'MAHARASHTRA',
+    NULL,
+    'kiran.mistry@knauf.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000366',
+    'GREEN BUILD INC',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '24AAJFG5834H1ZD',
+    '2627, SILVER CHAMBERS, TAGOR ROAD, Rajkot, Gujarat, 360002',
+    'Rajkot',
+    'Gujarat',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000367',
+    'Denz Enterprises',
+    true,
+    'Denz Enterprises',
+    'CORPORATE',
+    '32ADBPD4999H1ZK',
+    '321304-A, Pipeline road, ernakulam, Ernakulam, Kerala, 682025',
+    'Ernakulam',
+    'Kerala',
+    '9447842881 , 9061039251',
+    'Denz Enterprises <denzenterprisesekm@gmail.com>',
+    'info@dlslogistics.in Denz Enterprises <denzenterprisesekm@gmail.com>',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000307',
+    'UF CEILINGS (INDIA) PRIVATE LIMITED',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '07AAACU9853E1Z5',
+    'D-54
+BASEMENT OKHLA INDUSTRIAL AREA
+PHASE-II,DELHI-110020',
+    'Delhi',
+    'Delhi',
+    NULL,
+    'sachins@unifloceilings.co.in',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000309',
+    'SAHIL ENTERPRISES',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '05AHKPG5679A1ZG',

@@ -1,0 +1,400 @@
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000470',
+    'STANDARD HYDRAULICS INDIA',
+    true,
+    'STANDARD HYDRAULICS INDIA',
+    'yogesh',
+    '08ABLPS3188H1Z3',
+    'PHASE-1-IV, B-318A, RIICO INDUSTRIAL AREA, GHATAL, BHIWADI, Alwar, Rajasthan, 301019',
+    'ALWAR',
+    'RAJASTHAN',
+    '93116 89422',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000472',
+    'OXYZEN ENTERPRISES',
+    true,
+    'OXYZEN ENTERPRISES',
+    'Suhas',
+    '27DJWPD5204H1Z2',
+    'A 301, MRUNANG BUILDING, Vasant Nagari, Gokhiware, Vasai Virar, Palghar, Maharashtra, 401208',
+    'PALGHAR',
+    'Maharashtra',
+    '75075 24949',
+    'vidyasinha82@yahoo.com',
+    'vidyasinha82@yahoo.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000473',
+    'RIYA SALES',
+    true,
+    'RIYA SALES',
+    'YOGESH',
+    '10AAFFR7169E1ZD',
+    'KRISHNA MARKET, EXHIBITION ROAD, EXHIBITION ROAD, Patna, Bihar, 800001',
+    'PATNA',
+    'Bihar',
+    '97984 68106',
+    'MANTRYPK@GMAIL.COM',
+    'MANTRYPK@GMAIL.COM',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000474',
+    'SCIENTIFIC AGENCIES PVT. LTD.',
+    true,
+    'SCIENTIFIC AGENCIES',
+    'Manoj',
+    '06AAFCS4264A1ZP',
+    '20-21 J, Sector-5, Fruit Garden, N.I.T FARIDABADB, Faridabad, Haryana, 121001',
+    'Faridabad',
+    'Haryana',
+    '09284023966',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000475',
+    'PATHAK INDUSTRIES KOL',
+    true,
+    'PATHAK INDUSTRIES',
+    'SUKBHIR',
+    '19AAXFP3810A1Z7',
+    '116, G. T. ROAD NORTH, SALKIA, Howrah, West Bengal, 711106',
+    'Howrah',
+    'WEST BENGAL',
+    '93116 89422',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000476',
+    'SWIFT INTERNATIONAL',
+    true,
+    'DELHI',
+    'SUKBHIR',
+    '23AJOPB2002N1ZK',
+    '112 B, PRESTIGE TOWER, INDIRA COMPLEX, NAVLAKHA, INDORE, Indore, Madhya Pradesh, 452001',
+    'INDORE',
+    'MADHYA PRADESH',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000477',
+    'UMANG (A UNIT OF VIDHI NIWAS PVT.LTD.)',
+    true,
+    'DELHI',
+    'SUKHBIR',
+    '19AADCV2352A1ZO',
+    'SHOP NO 3, H153481971N, GOLDEN PLAZA COMPLEX, BURDWAN ROAD,, SILIGURI, Darjeeling, West Bengal, 734001',
+    'SILIGURI',
+    'WEST BENGAL',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000478',
+    'SWIFT INTERNATIONAL',
+    true,
+    'RVS',
+    'SUKBHIR',
+    '23AJOPB2002N1ZK',
+    '112 B, PRESTIGE TOWER, INDIRA COMPLEX, NAVLAKHA, INDORE, Indore, Madhya Pradesh, 452001',
+    'INDORE',
+    'Madhya Pradesh',
+    '93116 89422',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000479',
+    'PREMIER METALS AND ENGINEERING CORPORATION HYDERABAD',
+    true,
+    'ARMSTRONG',
+    'Manoj',
+    '36ABGFP1695M1ZM',
+    '12-7-2047NR, Goods shed road Moosapet, Hyderabad, Medchal Malkajgiri, Telangana, 500018',
+    'Medchal',
+    'TELANGANA',
+    '94483 89477',
+    'PMECB Raghu Reddy <pmecb1@gmail.com>',
+    'PMECB Raghu Reddy <pmecb1@gmail.com>',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000410',
+    'SIDDHANATH ENTERPRISES',
+    true,
+    'HJ-AXLE',
+    'Hemant',
+    '27AOTPC4423L1ZN',
+    'FLAT NO 102, MAULI PARK, B.M. NAGAR, H NO 0174, DIGHA, NAVI MUMBAI, Thane, Maharashtra, 400708',
+    'navi mumbai',
+    'MAHARASHTRA',
+    NULL,
+    'prem.kumar@hj-axle.in,accounts@hj-axle.in',
+    'accounts@hj-axle.in,  prem.kumar@hj-axle.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000411',
+    'ASHIRWAD INDUSTRIAL GASES LLP',
+    true,
+    'ASHIRWAD',
+    'Hemant',
+    '24ABOFA5129P1ZZ',
+    'SHOP NO.G-12, SUN ARCADE VESU, VIP ROAD, VESU, Surat, Gujarat, 395007',
+    'SURAT',
+    'GUJARAT',
+    NULL,
+    'Ashirwadequipmentspvtltd@gmail.com',
+    'Ashirwadequipmentspvtltd@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000412',
+    'TARASINGH ENTERPRISES',
+    true,
+    'ASHIRWAD',
+    'Hemant',
+    '27CDSPS5234F1Z3',
+    'LIG COLONY, FLAT NO 12, BUILDING NO 9b SEC NO 25, NEAR HANUMAN NAGAR SHINDHUNAGAR, NIGADI, Pune, Maharashtra, 411044',
+    'PUNE',
+    'MAHARASHTRA',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000413',
+    'TRIPTI GASES PVT. LTD.',
+    true,
+    'ASHIRWAD',
+    'Hemant',
+    '27AABCT0071G1ZN',
+    'Gat no.31204, Nanekarwadi, Chakan Opp. Veena Industries Ltd. Khed , Pune- 410501',
+    'MAHPE',
+    'MAHARASHTRA',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000414',
+    'SRI JOTHI GAS COMPANY',
+    true,
+    'ASHIRWAD',
+    'Hemant',
+    '33ANRPJ6836H1ZN',
+    'No.2281-A, MADUKKARAI - CHETTIPALAYAM ROAD, BODIPALAYAM POST, Coimbatore, Tamil Nadu, 641105',
+    'COIMBATORE',
+    'TAMIL NADU',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000415',
+    'SPEED TRADING ENTERPRISES',
+    true,
+    'ASHIRWAD',
+    'Hemant',
+    '27ABSFS2274D1ZW',
+    '1, SURVERY NO 84, SOPARA PATHA, Pelhar, Vasai Virar, Palghar, Maharashtra, 401208',
+    'VASAI',
+    'MAHARASHTRA',
+    NULL,
+    'Ashirwadequipmentspvtltd@gmail.com',
+    'Ashirwadequipmentspvtltd@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000416',
+    'KING TRADERS',
+    true,
+    'HJ-AXLE',
+    'Hemant',
+    '33AIHPB7531L1ZC',
+    '1399-2, SALEM BYE PASS ROAD,
+MUDALAIPATTY, NAMAKKAL',
+    'NAMAKKAL',
+    'TAMIL NADU',
+    NULL,
+    'ajaym@amlf.net',
+    NULL,
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000417',
+    'KAVERI TRADERS',
+    true,
+    'HJ-AXLE',
+    'Hemant',
+    '33BQAPS4839J1ZK',
+    '1211A, Salem Main Road
+Poonagar, Mudalaipatti,
+Namakkal Tamil Nadu',
+    'NAMAKKAL',
+    'TAMIL NADU',
+    NULL,
+    'info@dlslogistics.in',
+    NULL,
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000418',
+    'UNIVERSAL AIR PRODUCTS PRIVATE LIMITED',
+    true,
+    'ASHIRWAD',
+    'CORPORATE',
+    '29AAACU6978L1ZG',
+    'PLOT 22A, UNIVERSAL AIR PRODUCTS PVT LTD, 3RD CROSS, 3RD STAGE, PEENYA INDUSTRIAL AREA,BENGALURU-560058, Bengaluru Urban, Karnataka, 560058',
+    'BANGALORE',
+    'KARNATAKA',
+    NULL,
+    'Iinfo@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000419',
+    'LAKSHYA FORRUM FOR COMPETITIONS PRIVATE LIMITED',
+    true,
+    'ASHIRWAD',
+    'CORPORATE',
+    '27AACCL3777A1ZN',
+    '2ND FLOOR, 220, FLYING COLOURS, PANDIT DINDAYAL UPADHYAY MARG, LBS CROSS ROAD, MULUND WEST, Mumbai, Maharashtra, 400080',
+    'MULUND',
+    'MAHARASHTRA',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30

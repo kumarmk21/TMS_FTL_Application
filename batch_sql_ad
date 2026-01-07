@@ -1,0 +1,400 @@
+    'TELANGANA',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000425',
+    'DEXTRA INDIA PVT LTD',
+    true,
+    'NCC',
+    'Suhas',
+    '27AABCD4112C1ZD',
+    'Ground Floor, Unit No.1, 215 Atrium, Tower 2, Andheri Kurla Road, Andheri East, Mumbai Suburban, Maharashtra, 400059',
+    'MUMBAI',
+    'MAHARASHTRA',
+    '86600 62494',
+    'rob.mtrl@nccltd.in',
+    'rob.mtrl@nccltd.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000426',
+    'M/S AKHIL GASES',
+    true,
+    'ARMSTRONG',
+    'Hemant',
+    '29AALFA1165B1ZR',
+    'Sri Chamundeshwari Sugars Premises, Akhil Gases, Annur Road, K M Doddi, Mandya, Karnataka, 571422',
+    'BANGALORE',
+    'KARNATAKA',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000427',
+    'Baramati Oxygen',
+    true,
+    'ASHIRWAD',
+    'CORPORATE',
+    '27AHJPG8077F1Z3',
+    'C-20 MIDC Baramati Near Fire Station And A.K Industries MIDC Baramati 413133',
+    NULL,
+    'MAHARASHTRA',
+    NULL,
+    'info@dlslogistics.in',
+    NULL,
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000428',
+    'APRIES INDIA PRIVATE LIMITED',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '06AAWCA9667J1ZQ',
+    'KHEWAT NO. 436413, KHATONI NO. 451, JAKHODA, BAHADURGARH, APRIES INDIA PRIVATE LIMITED, Delhi Rohtak Road, BLS Institute of Technology Management, Sankhol, Jhajjar, Haryana, 124505',
+    'BAHADURGARH',
+    'HARYANA',
+    '99589 91171',
+    'rahul@ciplgroup.com',
+    'rahul@ciplgroup.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000429',
+    'UDAY CONSTRUCTION',
+    true,
+    'NAVYA',
+    'Suhas',
+    '22AACFU4604L1ZB',
+    'KULIPOTA, CHAMPA, JANJGIR, Janjgir Champa, Chhattisgarh, 495668',
+    'JANJGIR-CHAMPA',
+    'Chhattisgarh',
+    '98330 32139',
+    'navyacables123@gmail.com',
+    'navyacables123@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000430',
+    'ANUJ ELECTRICAL SERVICES',
+    true,
+    'ANUJ ELECTRICAL',
+    'CORPORATE',
+    '27AQAPM4604L1ZT',
+    '102, OM PUSHPAK CHS LTD, SAMATA NAGAR, OPP.DEVDAYA PARK,, THANE WEST, Thane, Maharashtra, 400606',
+    'THANE',
+    'Maharashtra',
+    '80102 46933',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000431',
+    'NAV DURGA TRADING AGENCY',
+    true,
+    'FURNITURE KRAFT',
+    'CORPORATE',
+    '10AELPP2383Q2Z0',
+    'SALEMPUR, TEKARI, GAYA, Gaya, Bihar, 824236',
+    'Gaya',
+    'BIHAR',
+    '+91 80102 46933',
+    'info@dlslogistics.in',
+    NULL,
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000433',
+    'PACIFIC ORGANICS PVT LTD',
+    true,
+    'PACIFIC ORGANICS',
+    'Hemant',
+    '27AABCP8168Q1ZK',
+    'Plot No N-4, PACIFIC ORGANICS PVT LTD, ADD MIDC, ANAND NAGAR, AMBARNATH, Thane, Maharashtra, 421506',
+    'THANE',
+    'MAHARASHTRA',
+    '+91 80102 46933',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000434',
+    'OFFSHORE INFRASTRUCTURES LIMITED',
+    true,
+    'OFFSHORE',
+    'DURGESH',
+    '22AAACO1012F2ZD',
+    '278, Sun City, Surya Mandir, Near Surya Mandir, Lalbaugh, Lalbaugh, Jagdalpur, Bastar, Chhattisgarh, 494001',
+    'Jagdalpur',
+    'CHATTISGARH',
+    '92264 97747',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000435',
+    'VISION TILES GALLERY',
+    true,
+    'HRJOHN',
+    'Suhas',
+    '29AANFV1342H1ZX',
+    'ward 15, J C Road, Sagar, Shivamogga, Karnataka, 577401',
+    'Kambalikoppa',
+    'Karnataka',
+    '9594030393',
+    'visiontilesgallery@gmail.com',
+    'visiontilesgallery@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000436',
+    'KAPLINKS ENGINEERING PVT LTD',
+    true,
+    'ARMSTRONG',
+    'Suhas',
+    '27AACCK9596Q1ZE',
+    'GROUND FLOOR, 12, SHIVSAGAR INDUSTRIAL ESTATE, KOTKAR ROAD, GOREGAON EAST, Mumbai Suburban, Maharashtra, 400063',
+    'MUMBAI',
+    'Maharashtra',
+    '99589 91171',
+    'rahul@ciplgroup.com',
+    'rahul@ciplgroup.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000437',
+    'CHICAGO CONSTRUCTION CO',
+    true,
+    'HRJOHN',
+    'Suhas',
+    '18ABZPS6291F1ZQ',
+    'PLOT NO.5B, BRAHMAPUTRA INDUSTRIAL PARK, NORTH GUWAHATI, Kamrup, Assam, 781031',
+    NULL,
+    'ASSAM',
+    '9872279944 / 98157 31320',
+    'tbksanitarysales@gmail.com',
+    'tbksanitarysales@gmail.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000438',
+    'MIRAJ CERAMICA',
+    true,
+    'HRJOHN',
+    'Suhas',
+    '27ADWPS0916J1ZX',
+    'PLOT NO 3, C S NO 894, NEAR EXCISE OFFICE, MIRAJ, Sangli, Maharashtra, 416410',
+    'SANGLI',
+    'MAHARASHTRA',
+    '92846 32524',
+    'sangliceramica@gmail.com',
+    'sangliceramica@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000439',
+    'ALUMIL SYSTEMS INDIA PRIVATE LIMITED',
+    true,
+    'ALUMIL SYSTEMS',
+    'Suhas',
+    '27AANCA2525N2ZB',
+    '9th Floor,Plot no.9, Office no. 901,902, The Affaires, Palm Beach Raod, Moraj Residency, Sanpada, Navi Mumbai, Thane, Maharashtra, 400705',
+    'NAVI MUMBAI',
+    'Maharashtra',
+    '9762776729',
+    'p.pathak@alumil.com,Sachin Sapkal <s.sapkal@alumil.com',
+    'p.pathak@alumil.com,Sachin Sapkal <s.sapkal@alumil.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000440',
+    'FUSO GLASS INDIA PVT LTD',
+    true,
+    'FUSO GLASS',
+    'Hemant',
+    '27AABCM9798H1ZS',
+    '42, Shree Dattaguru Complex, Murbad MIDC Road, Murbad Police Station, Murbad, Thane, Maharashtra, 421401',
+    'THANE',
+    'Maharashtra',
+    '80102 46933',
+    'SALES@FUSO.IN,ADMIN@FUSIO.IN',
+    'SALES@FUSO.IN,ADMIN@FUSIO.IN',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000441',
+    'OOFOAM FOOTWEARS PRIVATE LIMITED',
+    true,
+    'OOFOAM',
+    'Hemant',
+    '07AADCO0626Q1Z6',
+    'BLK B, PLOT NO 80, MANGOLPURI, INDUSTRIAL AREA PH-2, North West Delhi, Delhi, 110083',
+    'DELHI',
+    'Delhi',
+    '9310189393',
+    'oofoamfootwears@gmail.com',
+    'oofoamfootwears@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000442',
+    'CHADHA SALES PRIVATE LIMITED',
+    true,
+    'CHADHA SALES',
+    'SUKHIR',
+    '06AAACC3265E1Z3',
+    'CHADHA SALES P LTD, GT ROAD BIGHAN, MURTHAL, Sonipat, Haryana, 131039',
+    'SONIPAT',
+    'HARYANA',
+    '93116 89422',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000443',
+    'R R OOMERBHOY PVT LTD',
+    true,
+    'R R OOMERBHOY',
+    'Hemant',
+    '27AAACR2364M1Z5',
+    '2ND FLOOR, FLAT NO 05,, SOONA MAHAL BUILDING, VEER NARMAN ROAD, 143 MARINE DRIVE, Mumbai, Maharashtra, 400020',
+    'MUMBAI',
+    'Maharashtra',
+    '9004119202',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000444',
+    'FORTUNE TRADERS',
+    true,
+    'ARMSTRONG',
+    'Manoj',
+    '33BBXPP7219R1ZJ',
+    '1,2,3, 7144 A B C, PREMAPARTHIPAN TOWERS, Yercaud main road, Kondappanaickanpatty, SALEM, Salem, Tamil Nadu, 636008',
+    'SALEM',
+    'TAMIL NADU',

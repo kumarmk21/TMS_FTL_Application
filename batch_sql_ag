@@ -1,0 +1,400 @@
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000391',
+    'UNIVERSAL ENGINEERS CHENNAI PRIVATE LIMITED',
+    true,
+    'ORIENTAL',
+    'Hemant',
+    '33AABCU1168R1ZY',
+    '72, NORTH PHASE SIDCO INDUSTRIAL ESTATE, AMBATTR, NORTH PHASE, CHENNAI, Thiruvallur, Tamil Nadu, 600098',
+    'Thiruvallur',
+    'TAMIL NADU',
+    '80102 46933',
+    'hemant@dlslogistics.in',
+    'hemant@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000392',
+    'LLOYDS ENGINEERING WORKS LIMITED',
+    true,
+    'LLOYDS STEELS',
+    'Hemant',
+    '27AAACE9285C1ZL',
+    'A-55, MIDC Industrial Area, Murbad, Thane, Maharashtra, 421401',
+    'Thane',
+    'MAHARASHTRA',
+    '80102 46933',
+    'finance@industrialengineers.in',
+    'FINANCE@INDUSTRIALENGINEERS.IN',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000393',
+    'ROYAL CONSTRUCTIONS AND INTERIORS',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '32AOSPP8398E1Z9',
+    'F810, TOWN HALL SHOPPING COMPLEX, T C ROAD, THALASSERY, Kannur, Kerala, 670101',
+    'Kannur',
+    'KERALA',
+    '9847215424',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000394',
+    'National Plasters',
+    true,
+    'ARMSTRONG',
+    'Suhas',
+    '27AFUPA1083L1Z5',
+    'SHOP NO.131, NEAR MADINA MASJID, L B S MARG, SHIVAJI KUTIR MANDAL, kurla, Mumbai,
+Mumbai Suburban, Maharashtra, 400070',
+    'MUMBAI',
+    'MAHARASHTRA',
+    '91364 58486',
+    'nationalplastersmumbai@yahoo.com',
+    'NATIONALPLASTERSMUMBAI,info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000450',
+    'Tasvir',
+    true,
+    'Tasvir',
+    'Hemant',
+    '08AKGPG5406Q1ZT',
+    'B-42, RIICO Industrial Area, Sitapura, Jaipur, Rajasthan, 302022',
+    'Jaipur',
+    'Rajasthan',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000451',
+    'MAKSON ENTERPRISES',
+    true,
+    'MAKSON',
+    'GOPINATH',
+    '32ABQFM3507R1ZQ',
+    '66  1563, Makson Enterprises, TAB Road,, Kacheripady, Ernakulam, Kerala, 682018',
+    'Ernakulam',
+    'Kerala',
+    '76768 99944',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000452',
+    'MOOD BOARD',
+    true,
+    'MOOD BOARD',
+    'Manoj',
+    '36ABNFM5689H1ZJ',
+    '2ND FLOOR, 8-2-686B6MK, THE LAXMI BUILDING, ROAD NO 12, BANJARAHILLS, Hyderabad, Telangana, 500034',
+    'Hyderabad',
+    'TELANGANA',
+    '81795 31312',
+    'rangoli.rmc@gmail.com',
+    'rangoli.rmc@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000453',
+    'ANAND J S',
+    true,
+    'ANAND J S',
+    'GOPINATH',
+    '32BPVPA7641L123',
+    'FLAT NO.7-A YASOPAM HYDPBBHANUS TP ROAD COCHIN',
+    'Ernakulam',
+    'KERALA',
+    '7676899944',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000454',
+    'QUALITY POWER ELECTRICAL EQUIPMENTS LIMITED',
+    true,
+    'QUALITY POWER',
+    'GOPINATH',
+    '32AAACQ0757F1ZT',
+    '6335, Quality Power Electrical Equipments Pvt Ltd, Chalackal, Aluva, Ernakulam, Kerala, 683105',
+    'Ernakulam',
+    'KERALA',
+    '76768 99944',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000455',
+    'AMI MACHINE TOOLS',
+    true,
+    'AMI MACHINE TOOLS',
+    'sukbir',
+    '27AAJFM3615J1Z5',
+    'W 101, KHAIRANA, NAVI MUMBAI, Mumbai Suburban, Maharashtra, 400705',
+    'KHAIRANA',
+    'Maharashtra',
+    '93116 89422',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000456',
+    'HONAVAR ELECTRODES PRIVATE LIMITED',
+    true,
+    'Tasvir',
+    'HEMANT',
+    '27AAACH0376H1ZQ',
+    '3RD FLOOR, 305-309, DAMJI SHAMJI INDUSTRIAL COMPLEX,, 9 LBS MARG, KURLA WEST, Mumbai, Maharashtra, 400070',
+    'KURLA',
+    'Maharashtra',
+    '80102 46933',
+    'hemant@dlslogistics.in',
+    'hemant@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000458',
+    'ARSS BIOFUEL PVT LTD',
+    true,
+    'ARSS BIOFUEL',
+    'YOGESH',
+    '27AAECA4139M1ZH',
+    'GAT NO 196, WADIVARHE, DARNA ASWALI ROAD, IGATPURI, Nashik, Maharashtra, 422403',
+    'NASHIK',
+    'MAHARASHTRA',
+    '0253-2572401',
+    'arss 112000 @yahoo.com',
+    'arss 112000 @yahoo.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000459',
+    'AMAN CHEMICALS INDUSTRY',
+    true,
+    'AMAN',
+    'YOGESH',
+    '29AAVFA5441L1ZT',
+    'GROUND FLOOR, 121 AND 146, PETE CHENNAPPA INDUSTRIAL ESTATE, MAGADI MAIN ROAD, KAMAKSHIPALYA, Bengaluru Urban, Karnataka, 560079',
+    'Bengaluru',
+    'Karnataka',
+    '97655 31266II',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000461',
+    'Pranav Construction Systems Private Limited',
+    true,
+    'PRANAV',
+    'Suhas',
+    '27AADCP0834B3ZU',
+    'PLOT NO F8
+BADLAPUR MIDC
+BADLAPUR,MAHARASHTRA-421503',
+    'BADLAPUR',
+    'MAHARASHTRA',
+    '77150 75357',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000463',
+    'ROADON AXLES INDIA PRIVATE LIMITED',
+    true,
+    'HJ-AXLE',
+    'hemant',
+    '24AAKCR4583L1ZU',
+    '83024, Opp. GIDC Water Tank No. 3,, GIDC Estate, 83024, Opp. GIDC Water Tank No. 3,, Bharuch, Gujarat, 393110',
+    'BHARUCH',
+    'GUJARAT',
+    '8010246933',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000464',
+    'Intercrafts Parquets',
+    true,
+    'Intercrafts Parquets',
+    'YOGESH',
+    '24ABIHS6501D1ZE',
+    '22, Intercrafts India, Sola Road, Near Khodiyar Mandir, Naranpura, Ahmedabad, Ahmedabad, Gujarat, 380013',
+    'Ahmedabad',
+    'GUJARAT',
+    '98982 03521',
+    'INFO@INTERCRAFTSINDIA.COM',
+    'INFO@INTERCRAFTSINDIA.COM',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000465',
+    'SAYAJI FOODS PRIVATE LIMITED',
+    true,
+    'SAYAJI FOODS',
+    'Suhas',
+    '27AAFCB9987P1ZJ',
+    'R-701 and R-701 PART, TTC INDUSTRIAL AREA, Sayaji Foods Pvt Ltd, Rabale MIDC Road, Alfa Laval India Ltd, Rabale, Navi Mumbai, Thane, Maharashtra, 400701',
+    'NAVI MUMBAI',
+    'MAHARASHTRA',
+    '9619713269',
+    'info@dlslogistics.in',
+    'info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000258',
+    'INTERIOR POINT.',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '09ACVPT3338H1ZW',
+    '589 KHA PN VIP ROAD
+SARPOT GANJ TELIBAGH
+LUCKNOW,UTTAR PRADESH-226018',
+    'LUCKNOW',
+    'Uttar Pradesh',
+    NULL,
+    'interiorpoint09@gmail.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000270',
+    'THERMO FISHER SCIENTIFIC INDIA PVT LTD',
+    true,
+    'THERMO',
+    'CORPORATE',
+    '27AABCT3207A1ZZ',
+    'TOLL GLOBAL LOGISTICS MAYASHREE LOGISTICS CENTRE BHIWANDI,MAHARASHTRA-421302',
+    'BHIWANDI',
+    'Maharashtra',
+    NULL,

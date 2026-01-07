@@ -1,0 +1,400 @@
+    'nilesh.shivane@thermofisher.com',
+    'sharad@thermofisher.com;rohan.patil@thermofisher.com;mithun.tare@thermofisher.com;roshan.patil@thermofisher.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000272',
+    'STEP UP CONSTRUCTION',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '23AAWFS4959A1ZW',
+    'STEP UP CONSTRUCTION SUPER SPECIALTY HOSPITAL BLOCK GOA MEDICAL COLLEGE BAMBOLIN',
+    'GOA',
+    'Goa',
+    NULL,
+    NULL,
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000226',
+    'SHARMA & SHARMA ENTERPRISES',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '20ACDFS4533R1ZW',
+    'PLOT NO 1636 KHATA 251 DHARMBAND
+BALIGUMA MANGO
+JAMSHEDPUR,JHARKHAND-831012',
+    'jamshedpur',
+    'Jharkhand',
+    NULL,
+    'sharma.alu.systems@gmail.com;acssentindia1@gmail.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000227',
+    'CLASSIC ENTERRISES',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '37CCHPS0107F1ZT',
+    '45 52 12,
+ABID NAGAR
+AKKAYYAPALEM,,ANDHRA PRADESH-530016',
+    'AKKAYYAPALEM',
+    'Andhra Pradesh',
+    NULL,
+    'classiqenterpriceses@yahoo.com;classiqenterprises@gmail.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000138',
+    'DECOR N SALES',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '19AIZPS4221N1ZA',
+    'GSTIN : 19AIZ  PS422  1N1ZA
+DECOR N SALES
+WEST BENGAL
+ 134 SRI AUROBINDO SARANI
+SRI AUROBINDO SARANI,WEST BENGAL-700006',
+    'Kolkata',
+    'West Bengal',
+    NULL,
+    'decornsale@gmail.com; decomsale@gmail.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000141',
+    'M.J. TRADERS',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '32AAOFM0785C1ZF',
+    'MS MAS TECHNOLOGY BRANCH
+604847-A JR COMBINE BLDG OPP NSS COLLEGE
+TALI OUTHIYAPALAM CALICUT,KERALA-673004',
+    'CALICUT',
+    'Kerala',
+    NULL,
+    'accounts@mastechnologies.in',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000249',
+    'WOOD STOCK UTTAR PRADESH',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '09AANPP1150D1ZU',
+    'G 2349 GROUND AND 1ST FLOOR KANPUR ROAD TRANSPORT NAGAR,UTTAR PRADESH-226012',
+    'LUCKNOW',
+    'Uttar Pradesh',
+    NULL,
+    'woodstock.dinesh@gmail.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    15
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000251',
+    'ADORA CARPET SPLENDOR PVT LTD.',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '29AACCA7343K1ZF',
+    'ABB INDIA LIMITED PLOT NO 4A 2ND STATE PEENYA INDUSTRIAL AREA PHASE IV',
+    'BANGLORE',
+    'Karnataka',
+    NULL,
+    NULL,
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000252',
+    'ADORA CARPET SPLENDOR PVT LTD.',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '29AACCA7343K1ZF',
+    'ABB INDIA LIMITED PLOT NO 4A 2ND STATE PEENYA INDUSTRIAL AREA PHASE IV',
+    'Banglore',
+    'Karnataka',
+    NULL,
+    NULL,
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000254',
+    'CAPS CONTAINERS INDUSTRIES',
+    true,
+    'CAPS',
+    'CORPORATE',
+    '27AAAFC3024G1Z0',
+    'C-18, C-24, SHREYAS INDUSTRIAL ESTATE, GOREGAON EAST, MUMBAI - 400 063, TAN MUMC01552F',
+    'goregaon',
+    'Maharashtra',
+    NULL,
+    'caps@capsandcontainers.com',
+    'caps@capsandcontainers.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000396',
+    'ALMOND WALL AND CEILINGS',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '32AAVFA3580A1ZP',
+    '35772B, NORTH JANATHA ROAD, PALARIVATTOM, Ernakulam, Kerala, 682025',
+    'ERNAKULAM',
+    'Kerala',
+    '80895 40669',
+    'Carmelgyprofiles@gmail.com',
+    'Carmelgyprofiles@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000397',
+    'FANTASY INTERIORS',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '08AABFF0055D1Z1',
+    '71,, 3RD FLOOR, SHREE GOPAL NAGAR, GOPALPURA BYEPASS, JAIPUR, Jaipur, Rajasthan, 302018',
+    'JAIPUR',
+    'Rajasthan',
+    NULL,
+    'info@dlslogistics.in',
+    'info@dlslogistics.in,Pramod.Chilka@knauf.com ,Anil.Pokale@knauf.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000398',
+    'PREMIER BUILDING PRODUCTS',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '29ABBFP9566A1Z1',
+    'NO.128, KATTIGENAHALLI RAMANNA COMPLEX, N NAGENAHALLI MAIN ROAD, Bengaluru, Bengaluru Urban, Karnataka, 560077',
+    'Bengaluru',
+    'Karnataka',
+    '94483 89477',
+    'premierbuildingpro@gmail.com',
+    'premierbuildingpro@gmail.com,info@dlslogistics.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000399',
+    'GAUSAMPANNA LIFECARE PRIVATE LIMITED',
+    true,
+    'GAUSAMPANNA LIFECARE PRIVATE LIMITED',
+    'CORPORATE',
+    '27AAJCG0927G1ZN',
+    'AAKRUTI AANGAN BUILDING C103, AAKRUTI ARCADE, ANAND NAGAR , G B ROAD, THANE, Thane, Maharashtra, 400615',
+    'Thane',
+    'Maharashtra',
+    '9833876667',
+    'info@gausampanna.com',
+    'info@dlslogistics.in,INFO@GAUSAMPANNA.COM',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000400',
+    'NOVELTY WAREHOUSE',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '19AAFFN9210L1ZY',
+    'GROUND FLOOR, H3792142, KRISHNA KUNJ, GURU NANAK SARANI 2, PUNJABI PARA, SILIGURI, Darjeeling, West Bengal, 734001',
+    'SILIGURI',
+    'WEST BENGAL',
+    NULL,
+    'info@dlslogistics.in',
+    NULL,
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000401',
+    'BHARAT GYPSUM AND PLYWOOD',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '33ALQPP9335G2ZN',
+    '10271, Astabhujam Road, choolai, Chennai, Tamil Nadu, 600112',
+    'CHENNAI',
+    'TAMIL NADU',
+    '09284023966',
+    'info@dlslogistics.in',
+    NULL,
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000402',
+    'INDO HITECH APPLIANCES LIMITED',
+    true,
+    'INDO HITECH',
+    'CORPORATE',
+    '07AAECI6014M1ZH',
+    'A-13, MANGOLPURI INDUSTRIAL AREA, PHASE-II DELHI, New Delhi, North West Delhi, Delhi, 110034',
+    'DELHI',
+    'DELHI',
+    '7893494977',
+    'warehouse@indoappliances.com',
+    'warehouse@indoappliances.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000403',
+    'CREATIVE PRINT AND PACK',
+    true,
+    'CREATIVE PRINT AND PACK',
+    'CORPORATE',
+    '36AOGPP6441J1ZM',
+    'PLOT NO 106 AND 107 SY NO 315 BLOCK-7, SUBHAS NAGAR, JEEDIMETLA, HYDERABAD, Medchal Malkajgiri, Telangana, 500055',
+    'MEDCHAL',
+    'Telangana',
+    '78934 94977',
+    'accounts@creativeprintandpack.com',
+    'accounts@creativeprintandpack.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000404',
+    'STAR POP CENTER',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '23BEYPA3235A2ZY',
+    '0, NEAR PHOOLMATI MANDIR, SAMAN, Rewa, Madhya Pradesh, 486001',
+    'REWA',
+    'MADHYA PRADESH',
+    '91792 84661',
+    'gulsherstarpopcenter@gmail.com',
+    'gulsherstarpopcenter@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000407',

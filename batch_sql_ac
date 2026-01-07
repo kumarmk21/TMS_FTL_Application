@@ -1,0 +1,400 @@
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000506',
+    'ROHINI CERAMICS',
+    true,
+    'ROHINI',
+    'MANOJ VERMA',
+    '07AUGPJ5726Q1Z1',
+    'KHASRA NO. 105,, MAIN IGNOU ROAD,, NEB SARAI,, New Delhi, Delhi, 110068',
+    'NEW DELHI',
+    'DELHI',
+    NULL,
+    'rkumar.alps@gmail.com',
+    'rkumar.alps@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000276',
+    'BUILDCRAFT INTERIOR PVT LTD.',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '33AACCB2106P1ZW',
+    'NO.2, 8 TH FLOOR, KRM CENTRE, HARRINGTON ROAD, CHETPET, CHENNAI, TAMIL NADU, 600031',
+    'CHENNAI',
+    'Tamil Nadu',
+    NULL,
+    'balaji@buildcraft.co.in',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000279',
+    'J.K Traders',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '33CQLPK6577K1Z7',
+    'No.4258 Andankovil Pudtur,Covil Road Andancovil Post Karur ,Tamil Nadu - 639002',
+    'karur',
+    'Tamil Nadu',
+    NULL,
+    NULL,
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000284',
+    'R R ENTERPRISES',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '18AAEFR4733K1ZX',
+    'MP KHAITAN NORTH BENGAL NEAR CANCER DEPT SUPER SPECIALLTY BLOCK SILIGURI,WEST BENGAL-734102',
+    'siliguri',
+    'West Bengal',
+    NULL,
+    NULL,
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000285',
+    'MADAAN INTERIORS',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '03AJSPM5339H2ZX',
+    'SOUTH MODEL GRAM 110-A KOCHAR MARKET ROAD LUDHIANA,PUNJAB-141002',
+    'ludhiana',
+    'Punjab',
+    NULL,
+    NULL,
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000287',
+    'RANGOLI MARKTING COMPANY',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '36AACFR1339M1Z1',
+    '8-2-686B6MK, THE LAXMI BUILDING , ROAD NO ; 12,
+BANJARAHILLS- HYDERABAD.BANJARAHILLS- HYDERABAD.',
+    'Hyderabad',
+    'Telangana',
+    NULL,
+    'rangoli.rmc@gmail.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    5
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000289',
+    'ELEGANCE SCIENTIFICS',
+    true,
+    'THERMO',
+    'CORPORATE',
+    '36APBPK7288N1Z7',
+    'HYDERABAD NO.23, GROUND FLOOR, RTC X ROADS HYDERABAD,TELANGANA-500020',
+    'hyderabad',
+    'Telangana',
+    NULL,
+    NULL,
+    'sharad@thermofisher.com;rohan.patil@thermofisher.com;vishal.randhavi@thermofisher.com;mithun.tare@thermofisher.com;roshan.patil@thermofisher.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000292',
+    'CO-FOAM AGENCIES',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '21AGVPS4580J1ZS',
+    '102 STATION SQUARE, KHARVEL NAGAR BHUBANESWAR,ODISHA-751001',
+    'BHUBANESWAR',
+    'Odisha',
+    NULL,
+    'cofoamagencies@gmail.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TOPAY',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000507',
+    'PANTHER OVERSEAS',
+    true,
+    'PANTHER',
+    'MANOJ VERMA',
+    '24EHDPS1408G1ZK',
+    '5, 205, NAKSHATRA COMPLEX, SADHUVASHVANI ROAD, UNIVERSITY ROAD, Rajkot, Gujarat, 360005',
+    'RAJKOT',
+    'GUJARAT',
+    NULL,
+    'rkumar.alps@gmail.com',
+    'rkumar.alps@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000508',
+    'TEGAMEN SAFETY PRODUCTS PRIVATE LIMITED',
+    true,
+    'TEGAMEN SAFETY',
+    'MANOJ VERMA',
+    '08AAICT0957G1Z5',
+    'SP7-52, RIICO Industrial Area, Industrial Area Ghiloth, Kotputli Behror, Rajasthan, 301705',
+    'GHILOTH',
+    'RAJASTHAN',
+    NULL,
+    'sachin.yadav@tegamensafetyproducts.com',
+    'sachin.yadav@tegamensafetyproducts.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000509',
+    'GIRDHARI LAL CONSTRUCTIONS PRIVATE LIMITED',
+    true,
+    'GIRDHARI LAL',
+    'MANOJ SIR',
+    '36AABCG9035B1ZX',
+    'PLATFORM NO.10, NEAR RPF DOG SQUARD OFFICE OUTSIDE, S.C.RLY,RAIL NIRMAN NILAYAM, Raifalgunj Railway Quarters, Secunderabad, Hyderabad, Telangana, 500071',
+    'HYDERABAD',
+    'TELANGANA',
+    NULL,
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000510',
+    'BIOINGREDIA NATURAL PRIVATE LIMITED',
+    true,
+    'BIOINGREDIA',
+    'GOPINATH',
+    '32AAGCB1593G1ZW',
+    '3RD FLOOR, 231186, Pocudyil Plaza, Civil Line Road, Padamugal, Ernakulam, Kerala, 682030',
+    'ERNAKULAM',
+    'KERALA',
+    NULL,
+    'accounts@bioingredia.com',
+    'accounts@bioingredia.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000511',
+    'COUNTRYWIDE LOGISTICS INDIA PRIVATE LIMITED',
+    true,
+    'COUNTRYWIDE',
+    'GOPINATH',
+    '24AAECC7577P1ZZ',
+    '101, CHITRARATH COMPLEX, NEAR PRESIDENT HOTEL, SWASTIC CROSS ROAD, CG ROAD, Ahmedabad, Gujarat, 380009',
+    'AHMADABAD',
+    'GUJARAT',
+    NULL,
+    'Channel_Partner@countrywidelogistics.co.in',
+    'Channel_Partner@countrywidelogistics.co.in',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000512',
+    'RHINO MOTOR STARTER AND PANELS',
+    true,
+    'RHINO MOTOR',
+    'SUKHBIR',
+    '09ABGFR2035R1ZN',
+    'PLOT NO 444, UDYOG KENDRA II, Greater Noida, Greater Noida, Gautambuddha Nagar, Uttar Pradesh, 201306',
+    'NOIDA',
+    'UTTAR PRADESH',
+    '8800834745',
+    'ID.rhinomspanels@gmail.com',
+    'ID.rhinomspanels@gmail.com',
+    'TBB',
+    15
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000071',
+    'SKYLINE FOOD PRODUCTS LLP',
+    true,
+    'SKYLINE',
+    'CORPORATE',
+    '27ACLFS7793K1Z4',
+    'Om Taarak Bldg. Madhvi Complex Om Mandir Road Sonale Village',
+    'Bhiwandi',
+    'Maharashtra',
+    NULL,
+    'skylinefoodsacct@gmail.com',
+    'skylinefoodsacct@gmail.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000077',
+    'CARMEL AGENCIES',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '32ACNPJ8561E1ZK',
+    '44372, MKK NAIR ROAD, PALARIVATTOM, Ernakulam, Kerala, 682025.',
+    'cochin',
+    'Kerala',
+    NULL,
+    'carmelgyprofiles@gmail.com;info@carmelgyprofiles.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'PAID',
+    NULL
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000079',
+    'ARMSTRONG WORLD INDUSTRIES INDIA PVT. LTD.',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '27AACCA0171F1Z6-',
+    'ARMSTRONG WORLD INDUSTRIES INDIA PVT. LTD.
+E2F2 RAJLAXMI LOGISTICS PARK
+BHIWANDI,421302',
+    'Bhiwandi',
+    'Maharashtra',
+    NULL,
+    'CWHouseindia@knaufarmstrong.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TBB',
+    15
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000080',
+    'VENUS ENTERPRISES',
+    true,
+    'ARMSTRONG',
+    'CORPORATE',
+    '32AGMPN4301R1Z4',
+    '32AGMPN4301R1Z4-VENUS ENTERPRISES
+2628, PRASEETH BUILDING
+OPP: HiLITE MALL, CALICUT,673014',
+    'calicut',
+    'Kerala',
+    NULL,
+    'venusgypsumcalicut@gmail.com',
+    'pramod.chilka@knauf.com;anil.pokale@knauf.com;shashikant.patil@knauf.com;cwhouseindia@knauf.com',
+    'TBB',
+    30
+  ) ON CONFLICT (customer_id) DO NOTHING;
+
+INSERT INTO customer_master (
+    customer_id, customer_name, is_active, group_id, sales_person,
+    gstin, customer_address, customer_city, customer_state,
+    customer_phone, customer_email, lr_mail_id, contract_type, credit_days
+  ) VALUES (
+    'SH0000424',
+    'RAVINDRA AIRPRODUCTS PRIVATE LIMITED',
+    true,
+    'ASHIRWAD',
+    'CORPORATE',
+    '36AAJCR7557H1ZV',
+    'A 16, ROAD N0 9, NACHARAM, Medchal Malkajgiri, Telangana, 500076',
+    'HYDERADAD',
