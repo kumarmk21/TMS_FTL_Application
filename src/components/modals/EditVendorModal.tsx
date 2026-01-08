@@ -24,11 +24,6 @@ interface Vendor {
   is_active: boolean;
 }
 
-interface Branch {
-  branch_code: string;
-  branch_name: string;
-}
-
 interface EditVendorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -38,7 +33,6 @@ interface EditVendorModalProps {
 
 export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVendorModalProps) {
   const [loading, setLoading] = useState(false);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [formData, setFormData] = useState({
     vendor_name: vendor.vendor_name,
     vendor_type: vendor.vendor_type,
@@ -68,12 +62,6 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
   });
 
   useEffect(() => {
-    if (isOpen) {
-      fetchBranches();
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
     setFormData({
       vendor_name: vendor.vendor_name,
       vendor_type: vendor.vendor_type,
@@ -95,21 +83,6 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
       tds_declaration_url: vendor.tds_declaration_url,
     });
   }, [vendor]);
-
-  const fetchBranches = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('branch_master')
-        .select('branch_code, branch_name')
-        .eq('is_active', true)
-        .order('branch_name', { ascending: true });
-
-      if (error) throw error;
-      setBranches(data || []);
-    } catch (error) {
-      console.error('Error fetching branches:', error);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -308,25 +281,6 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Booking Branch
-              </label>
-              <select
-                name="ven_bk_branch"
-                value={formData.ven_bk_branch}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                <option value="">Select Branch</option>
-                {branches.map((branch) => (
-                  <option key={branch.branch_code} value={branch.branch_code}>
-                    {branch.branch_name} ({branch.branch_code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Vendor Phone <span className="text-red-500">*</span>
               </label>
               <input
@@ -336,6 +290,20 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bank Branch
+              </label>
+              <input
+                type="text"
+                name="ven_bk_branch"
+                value={formData.ven_bk_branch}
+                onChange={handleInputChange}
+                placeholder="Enter bank branch name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>
 

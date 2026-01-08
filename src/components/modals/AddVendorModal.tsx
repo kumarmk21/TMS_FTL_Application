@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,15 +9,9 @@ interface AddVendorModalProps {
   onSuccess: () => void;
 }
 
-interface Branch {
-  branch_code: string;
-  branch_name: string;
-}
-
 export function AddVendorModal({ isOpen, onClose, onSuccess }: AddVendorModalProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [formData, setFormData] = useState({
     vendor_name: '',
     vendor_type: 'Transporter',
@@ -39,27 +33,6 @@ export function AddVendorModal({ isOpen, onClose, onSuccess }: AddVendorModalPro
     cancelled_cheque: null as File | null,
     tds_declaration: null as File | null,
   });
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchBranches();
-    }
-  }, [isOpen]);
-
-  const fetchBranches = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('branch_master')
-        .select('branch_code, branch_name')
-        .eq('is_active', true)
-        .order('branch_name', { ascending: true });
-
-      if (error) throw error;
-      setBranches(data || []);
-    } catch (error) {
-      console.error('Error fetching branches:', error);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -253,25 +226,6 @@ export function AddVendorModal({ isOpen, onClose, onSuccess }: AddVendorModalPro
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Booking Branch
-              </label>
-              <select
-                name="ven_bk_branch"
-                value={formData.ven_bk_branch}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                <option value="">Select Branch</option>
-                {branches.map((branch) => (
-                  <option key={branch.branch_code} value={branch.branch_code}>
-                    {branch.branch_name} ({branch.branch_code})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Vendor Phone <span className="text-red-500">*</span>
               </label>
               <input
@@ -281,6 +235,20 @@ export function AddVendorModal({ isOpen, onClose, onSuccess }: AddVendorModalPro
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bank Branch
+              </label>
+              <input
+                type="text"
+                name="ven_bk_branch"
+                value={formData.ven_bk_branch}
+                onChange={handleInputChange}
+                placeholder="Enter bank branch name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
               />
             </div>
 
