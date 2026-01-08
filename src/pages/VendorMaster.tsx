@@ -19,6 +19,7 @@ interface Vendor {
   tds_category: string | null;
   tds_rate: number | null;
   vendor_type: string;
+  ven_bk_branch: string | null;
   pan_document_url: string | null;
   cancelled_cheque_url: string | null;
   tds_declaration_url: string | null;
@@ -83,10 +84,10 @@ export function VendorMaster() {
   };
 
   const handleDownloadTemplate = () => {
-    const csvContent = `Vendor Code,Vendor Name,Vendor Type,Vendor Address,Vendor Phone,PAN,Email ID,Account No,Bank Name,IFSC Code,TDS Applicable (Y/N),TDS Category,TDS Rate (%),Status (Active/Inactive)
-VEND001,Sample Vendor Ltd,Transporter,"123 Main Street, Mumbai 400001",9876543210,ABCDE1234F,vendor@example.com,1234567890,HDFC Bank,HDFC0001234,Y,Individual,1,Active
-VEND002,Another Vendor Pvt Ltd,Admin,"456 Park Road, Delhi 110001",9876543211,FGHIJ5678K,another@example.com,9876543210,ICICI Bank,ICIC0005678,Y,Corporate,2,Active
-VEND003,Third Vendor,Transporter,"789 Park Avenue, Bangalore 560001",9876543212,KLMNO9012P,third@example.com,1122334455,SBI Bank,SBIN0001122,N,,,Active`;
+    const csvContent = `Vendor Code,Vendor Name,Vendor Type,Booking Branch,Vendor Address,Vendor Phone,PAN,Email ID,Account No,Bank Name,IFSC Code,TDS Applicable (Y/N),TDS Category,TDS Rate (%),Status (Active/Inactive)
+VEND001,Sample Vendor Ltd,Transporter,BR001,"123 Main Street, Mumbai 400001",9876543210,ABCDE1234F,vendor@example.com,1234567890,HDFC Bank,HDFC0001234,Y,Individual,1,Active
+VEND002,Another Vendor Pvt Ltd,Admin,BR002,"456 Park Road, Delhi 110001",9876543211,FGHIJ5678K,another@example.com,9876543210,ICICI Bank,ICIC0005678,Y,Corporate,2,Active
+VEND003,Third Vendor,Transporter,,"789 Park Avenue, Bangalore 560001",9876543212,KLMNO9012P,third@example.com,1122334455,SBI Bank,SBIN0001122,N,,,Active`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -158,8 +159,8 @@ VEND003,Third Vendor,Transporter,"789 Park Avenue, Bangalore 560001",9876543212,
 
         const values = parseCSVLine(line);
 
-        if (values.length < 14) {
-          errors.push(`Line ${i + 1}: Insufficient columns (found ${values.length}, expected 14)`);
+        if (values.length < 15) {
+          errors.push(`Line ${i + 1}: Insufficient columns (found ${values.length}, expected 15)`);
           continue;
         }
 
@@ -167,6 +168,7 @@ VEND003,Third Vendor,Transporter,"789 Park Avenue, Bangalore 560001",9876543212,
           vendor_code,
           vendor_name,
           vendor_type,
+          ven_bk_branch,
           vendor_address,
           vendor_phone,
           pan,
@@ -212,6 +214,7 @@ VEND003,Third Vendor,Transporter,"789 Park Avenue, Bangalore 560001",9876543212,
           vendor_code,
           vendor_name,
           vendor_type,
+          ven_bk_branch: ven_bk_branch.trim() || null,
           vendor_address,
           vendor_phone,
           pan: pan.trim() || null,

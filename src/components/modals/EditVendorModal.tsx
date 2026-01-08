@@ -17,10 +17,16 @@ interface Vendor {
   tds_applicable: string;
   tds_category: string | null;
   tds_rate: number | null;
+  ven_bk_branch: string | null;
   pan_document_url: string | null;
   cancelled_cheque_url: string | null;
   tds_declaration_url: string | null;
   is_active: boolean;
+}
+
+interface Branch {
+  branch_code: string;
+  branch_name: string;
 }
 
 interface EditVendorModalProps {
@@ -32,6 +38,7 @@ interface EditVendorModalProps {
 
 export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVendorModalProps) {
   const [loading, setLoading] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [formData, setFormData] = useState({
     vendor_name: vendor.vendor_name,
     vendor_type: vendor.vendor_type,
@@ -44,6 +51,7 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
     ifsc_code: vendor.ifsc_code || '',
     tds_applicable: vendor.tds_applicable,
     tds_category: vendor.tds_category || '',
+    ven_bk_branch: vendor.ven_bk_branch || '',
     is_active: vendor.is_active,
   });
 
@@ -60,6 +68,12 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
   });
 
   useEffect(() => {
+    if (isOpen) {
+      fetchBranches();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     setFormData({
       vendor_name: vendor.vendor_name,
       vendor_type: vendor.vendor_type,
@@ -72,6 +86,7 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
       ifsc_code: vendor.ifsc_code || '',
       tds_applicable: vendor.tds_applicable,
       tds_category: vendor.tds_category || '',
+      ven_bk_branch: vendor.ven_bk_branch || '',
       is_active: vendor.is_active,
     });
     setExistingFiles({
@@ -80,6 +95,21 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
       tds_declaration_url: vendor.tds_declaration_url,
     });
   }, [vendor]);
+
+  const fetchBranches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('branch_master')
+        .select('branch_code, branch_name')
+        .eq('is_active', true)
+        .order('branch_name', { ascending: true });
+
+      if (error) throw error;
+      setBranches(data || []);
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -207,6 +237,7 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
           tds_applicable: formData.tds_applicable,
           tds_category: formData.tds_applicable === 'Y' ? formData.tds_category : null,
           tds_rate,
+          ven_bk_branch: formData.ven_bk_branch || null,
           pan_document_url,
           cancelled_cheque_url,
           tds_declaration_url,
@@ -272,6 +303,25 @@ export function EditVendorModal({ isOpen, onClose, onSuccess, vendor }: EditVend
               >
                 <option value="Transporter">Transporter</option>
                 <option value="Admin">Admin</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Booking Branch
+              </label>
+              <select
+                name="ven_bk_branch"
+                value={formData.ven_bk_branch}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <option value="">Select Branch</option>
+                {branches.map((branch) => (
+                  <option key={branch.branch_code} value={branch.branch_code}>
+                    {branch.branch_name} ({branch.branch_code})
+                  </option>
+                ))}
               </select>
             </div>
 
