@@ -21,6 +21,7 @@ import { VehicleTypeMaster } from '../pages/VehicleTypeMaster';
 import { CityMaster } from '../pages/CityMaster';
 import { CustomerMaster } from '../pages/CustomerMaster';
 import { VendorMaster } from '../pages/VendorMaster';
+import { VendorBranchUpdate } from '../pages/VendorBranchUpdate';
 import { CompanyMaster } from '../pages/CompanyMaster';
 import { CustomerGSTMaster } from '../pages/CustomerGSTMaster';
 import { DocTypeMaster } from '../pages/DocTypeMaster';
@@ -53,6 +54,7 @@ const menuItems: MenuItem[] = [
       { id: 'customer-master', label: 'Customer Master' },
       { id: 'customer-gst-master', label: 'Customer GST Master' },
       { id: 'vendor-master', label: 'Vendor Master' },
+      { id: 'vendor-branch-update', label: 'Vendor Branch Update' },
       { id: 'company-master', label: 'Company Master' },
       { id: 'doc-type-master', label: 'Doc Type Master' },
       { id: 'status-master', label: 'Status Master' },
@@ -158,6 +160,8 @@ export function Layout() {
         return <CustomerGSTMaster />;
       case 'vendor-master':
         return <VendorMaster />;
+      case 'vendor-branch-update':
+        return <VendorBranchUpdate />;
       case 'company-master':
         return <CompanyMaster />;
       case 'doc-type-master':
