@@ -33,6 +33,7 @@ interface Customer {
 interface OrderEnquiry {
   id: string;
   enq_id: string;
+  entry_date: string;
   customer_id: string;
   origin_id: string;
   destination_id: string;
@@ -108,11 +109,13 @@ export function LREntry() {
     lr_no_type: 'system_generated' as 'system_generated' | 'pre_printed',
     manual_lr_no: '',
     enquiry_id: '',
+    enquiry_date: '',
     lr_date: new Date().toISOString().split('T')[0],
     booking_branch: '',
     origin_id: '',
     destination_id: '',
     from_city: '',
+    to_city: '',
     est_del_date: '',
     pay_basis: '',
     booking_type: '',
@@ -268,10 +271,12 @@ export function LREntry() {
       setFormData({
         ...formData,
         enquiry_id: enquiryId,
+        enquiry_date: enquiry.entry_date ? new Date(enquiry.entry_date).toISOString().split('T')[0] : '',
         billing_party_id: enquiry.customer_id,
         origin_id: enquiry.origin_id,
         destination_id: enquiry.destination_id,
         from_city: enquiry.origin.city_name,
+        to_city: enquiry.destination.city_name,
         vehicle_type: enquiry.vehicle_type.vehicle_type,
         vehicle_number: enquiry.vehicle_number || '',
         driver_number: enquiry.driver_number || '',
@@ -304,14 +309,30 @@ export function LREntry() {
     try {
       const billingCustomer = customers.find((c) => c.id === formData.billing_party_id);
 
+      // Fetch statuses from status_master table
+      const { data: statusData, error: statusError } = await supabase
+        .from('status_master')
+        .select('status_name')
+        .in('status_name', ['In Transit', 'Booked']);
+
+      if (statusError) {
+        console.error('Error fetching statuses:', statusError);
+      }
+
+      const inTransitStatus = statusData?.find(s => s.status_name === 'In Transit')?.status_name || 'In Transit';
+      const bookedStatus = statusData?.find(s => s.status_name === 'Booked')?.status_name || 'Booked';
+
       const lrData: any = {
         lr_no_type: formData.lr_no_type,
         enquiry_id: formData.enquiry_id || null,
+        enquiry_date: formData.enquiry_date || null,
+        entry_datetime: new Date().toISOString(),
         lr_date: formData.lr_date,
         booking_branch: formData.booking_branch,
         origin_id: formData.origin_id || null,
         destination_id: formData.destination_id || null,
         from_city: formData.from_city,
+        to_city: formData.to_city,
         est_del_date: formData.est_del_date,
         pay_basis: formData.pay_basis,
         booking_type: formData.booking_type,
@@ -337,6 +358,9 @@ export function LREntry() {
         lr_email_id: formData.lr_email_id,
         customer_email_id: formData.customer_email_id,
         group_id: formData.group_id,
+        lr_status: inTransitStatus,
+        lr_financial_status: bookedStatus,
+        created_by: profile?.id || null,
       };
 
       if (formData.lr_no_type === 'pre_printed') {
@@ -447,11 +471,13 @@ export function LREntry() {
       lr_no_type: 'system_generated',
       manual_lr_no: '',
       enquiry_id: '',
+      enquiry_date: '',
       lr_date: new Date().toISOString().split('T')[0],
       booking_branch: '',
       origin_id: '',
       destination_id: '',
       from_city: '',
+      to_city: '',
       est_del_date: '',
       pay_basis: '',
       booking_type: '',
@@ -631,9 +657,11 @@ export function LREntry() {
                           setFormData({
                             ...formData,
                             enquiry_id: '',
+                            enquiry_date: '',
                             origin_id: '',
                             destination_id: '',
                             from_city: '',
+                            to_city: '',
                             vehicle_type: '',
                             vehicle_number: '',
                             driver_number: '',
@@ -662,9 +690,11 @@ export function LREntry() {
                           setFormData({
                             ...formData,
                             enquiry_id: '',
+                            enquiry_date: '',
                             origin_id: '',
                             destination_id: '',
                             from_city: '',
+                            to_city: '',
                             vehicle_type: '',
                             vehicle_number: '',
                             driver_number: '',
@@ -779,9 +809,14 @@ export function LREntry() {
                   </label>
                   <select
                     value={formData.destination_id}
-                    onChange={(e) =>
-                      setFormData({ ...formData, destination_id: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const selectedCity = cities.find(c => c.id === e.target.value);
+                      setFormData({
+                        ...formData,
+                        destination_id: e.target.value,
+                        to_city: selectedCity?.city_name || ''
+                      });
+                    }}
                     disabled={!!formData.enquiry_id}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     required
@@ -826,6 +861,7 @@ export function LREntry() {
                     <option value="TBB">TBB</option>
                     <option value="PAID">PAID</option>
                     <option value="TOPAY">TOPAY</option>
+                    <option value="FOC">FOC</option>
                   </select>
                 </div>
 
