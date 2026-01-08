@@ -78,6 +78,7 @@ export default function LRFinancialEdit() {
         .from('booking_lr')
         .select('*')
         .is('bill_no', null)
+        .neq('pay_basis', 'FOC')
         .order('lr_date', { ascending: false });
 
       if (error) throw error;
