@@ -33,6 +33,7 @@ import { LRPrint } from '../pages/LRPrint';
 import GenerateCustomerBill from '../pages/GenerateCustomerBill';
 import LRFinancialEdit from '../pages/LRFinancialEdit';
 import BillPrint from '../pages/BillPrint';
+import { TruckDispatch } from '../pages/TruckDispatch';
 
 export interface MenuItem {
   id: string;
@@ -170,6 +171,8 @@ export function Layout() {
         return <StatusMaster />;
       case 'customer-enquiry':
         return <OrderEnquiry />;
+      case 'truck-dispatch':
+        return <TruckDispatch />;
       case 'lr-entry':
         return <LREntry />;
       case 'lr-financial-edit':
