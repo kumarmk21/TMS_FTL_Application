@@ -175,6 +175,24 @@ export function GenerateTHCModal({ isOpen, onClose, onSuccess, lrRecord }: Gener
     setLoading(true);
 
     try {
+      const { data: statusOpsData, error: statusOpsError } = await supabase
+        .from('status_master')
+        .select('id')
+        .eq('status_type', 'THC')
+        .eq('status_name', 'Open')
+        .maybeSingle();
+
+      if (statusOpsError) throw statusOpsError;
+
+      const { data: statusFinData, error: statusFinError } = await supabase
+        .from('status_master')
+        .select('id')
+        .eq('status_type', 'THC')
+        .eq('status_name', 'ATH Paid')
+        .maybeSingle();
+
+      if (statusFinError) throw statusFinError;
+
       const { data: thcIdData, error: thcIdError } = await supabase
         .rpc('generate_thc_id');
 
@@ -212,6 +230,8 @@ export function GenerateTHCModal({ isOpen, onClose, onSuccess, lrRecord }: Gener
           ven_act_bank: selectedVendor?.bank_name || null,
           ven_act_ifsc: selectedVendor?.ifsc_code || null,
           ven_act_branch: selectedVendor?.ven_bk_branch || null,
+          thc_status_ops: statusOpsData?.id || null,
+          thc_status_fin: statusFinData?.id || null,
           created_by: user?.id,
         });
 
