@@ -175,10 +175,22 @@ export function GenerateTHCModal({ isOpen, onClose, onSuccess, lrRecord }: Gener
     setLoading(true);
 
     try {
+      const { data: docTypeData, error: docTypeError } = await supabase
+        .from('doc_types')
+        .select('id')
+        .eq('doc_type', 'THC')
+        .maybeSingle();
+
+      if (docTypeError) throw docTypeError;
+
+      if (!docTypeData) {
+        throw new Error('THC document type not found in system');
+      }
+
       const { data: statusOpsData, error: statusOpsError } = await supabase
         .from('status_master')
         .select('id')
-        .eq('status_type', 'THC')
+        .eq('status_type', docTypeData.id)
         .eq('status_name', 'Open')
         .maybeSingle();
 
@@ -187,7 +199,7 @@ export function GenerateTHCModal({ isOpen, onClose, onSuccess, lrRecord }: Gener
       const { data: statusFinData, error: statusFinError } = await supabase
         .from('status_master')
         .select('id')
-        .eq('status_type', 'THC')
+        .eq('status_type', docTypeData.id)
         .eq('status_name', 'ATH Paid')
         .maybeSingle();
 
