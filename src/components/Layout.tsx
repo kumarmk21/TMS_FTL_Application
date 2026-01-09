@@ -34,6 +34,7 @@ import GenerateCustomerBill from '../pages/GenerateCustomerBill';
 import LRFinancialEdit from '../pages/LRFinancialEdit';
 import BillPrint from '../pages/BillPrint';
 import { TruckDispatch } from '../pages/TruckDispatch';
+import { THCPrint } from '../pages/THCPrint';
 
 export interface MenuItem {
   id: string;
@@ -107,6 +108,7 @@ const menuItems: MenuItem[] = [
     subItems: [
       { id: 'lr-print', label: 'LR Print' },
       { id: 'bill-print', label: 'Bill Print' },
+      { id: 'thc-print', label: 'THC Print' },
       { id: 'lr-life-cycle', label: 'LR Life Cycle' },
       { id: 'lr-tracking', label: 'LR Tracking' },
     ],
@@ -183,6 +185,8 @@ export function Layout() {
         return <LRPrint />;
       case 'bill-print':
         return <BillPrint />;
+      case 'thc-print':
+        return <THCPrint />;
       default:
         return <Dashboard />;
     }
