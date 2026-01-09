@@ -264,7 +264,7 @@ export function THCPrint() {
                     Gross Amount
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Net Payable
+                    BTH Amount
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -302,7 +302,7 @@ export function THCPrint() {
                       {formatCurrency(record.thc_gross_amount)}
                     </td>
                     <td className="px-4 py-3 text-sm text-green-600 text-right font-medium">
-                      {formatCurrency(record.thc_net_payable_amount)}
+                      {formatCurrency(record.thc_balance_amount)}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <div className="flex items-center justify-center gap-2">
