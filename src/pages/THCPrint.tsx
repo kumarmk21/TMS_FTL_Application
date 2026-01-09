@@ -16,9 +16,17 @@ interface THCRecord {
   thc_tds_amount: number;
   thc_net_payable_amount: number;
   thc_balance_amount: number;
+  thc_status_ops: string | null;
+  thc_status_fin: string | null;
   vendor_master?: {
     vendor_name: string;
     vendor_code: string;
+  };
+  status_ops?: {
+    status_name: string;
+  };
+  status_fin?: {
+    status_name: string;
   };
 }
 
@@ -71,9 +79,17 @@ export function THCPrint() {
           thc_tds_amount,
           thc_net_payable_amount,
           thc_balance_amount,
+          thc_status_ops,
+          thc_status_fin,
           vendor_master:thc_vendor (
             vendor_name,
             vendor_code
+          ),
+          status_ops:thc_status_ops (
+            status_name
+          ),
+          status_fin:thc_status_fin (
+            status_name
           )
         `)
         .gte('thc_date', startDate)
@@ -174,7 +190,7 @@ export function THCPrint() {
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Search by THC Number, LR Number, or Vehicle
+                Search by Bhada Chalan, LR Number, or Vehicle
               </label>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
@@ -224,7 +240,7 @@ export function THCPrint() {
                     THC ID
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    THC Number
+                    Bhada Chalan
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     THC Date
@@ -237,6 +253,12 @@ export function THCPrint() {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Vendor
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status Ops
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status Fin
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Gross Amount
@@ -269,6 +291,12 @@ export function THCPrint() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {record.vendor_master?.vendor_name || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {record.status_ops?.status_name || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {record.status_fin?.status_name || '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
                       {formatCurrency(record.thc_gross_amount)}
