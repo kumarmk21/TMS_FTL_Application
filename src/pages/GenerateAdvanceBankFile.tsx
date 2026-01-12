@@ -43,6 +43,8 @@ export default function GenerateAdvanceBankFile() {
 
   const fetchRecords = async () => {
     setLoading(true);
+    setUploadStatus('idle');
+    setUploadMessage('');
     try {
       let query = supabase
         .from('thc_details')
@@ -84,14 +86,23 @@ export default function GenerateAdvanceBankFile() {
 
       const { data, error } = await query.order('thc_id_number', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Query error:', error);
+        throw error;
+      }
 
-      if (data) {
+      console.log('Query results:', data);
+
+      if (data && data.length > 0) {
         const vendorIds = [...new Set(data.map(r => r.thc_vendor))];
-        const { data: vendorData } = await supabase
+        const { data: vendorData, error: vendorError } = await supabase
           .from('vendor_master')
           .select('id, vendor_name')
           .in('id', vendorIds);
+
+        if (vendorError) {
+          console.error('Vendor query error:', vendorError);
+        }
 
         const vendorMap = new Map(vendorData?.map(v => [v.id, v.vendor_name]) || []);
 
@@ -101,12 +112,15 @@ export default function GenerateAdvanceBankFile() {
         }));
 
         setRecords(enrichedRecords);
+      } else {
+        setRecords([]);
       }
     } catch (error: any) {
       console.error('Error fetching records:', error);
       setUploadStatus('error');
-      setUploadMessage('Failed to fetch records');
-      setTimeout(() => setUploadStatus('idle'), 3000);
+      setUploadMessage(`Failed to fetch records: ${error.message || 'Unknown error'}`);
+      setTimeout(() => setUploadStatus('idle'), 5000);
+      setRecords([]);
     } finally {
       setLoading(false);
     }
