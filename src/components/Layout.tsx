@@ -35,6 +35,7 @@ import LRFinancialEdit from '../pages/LRFinancialEdit';
 import BillPrint from '../pages/BillPrint';
 import { TruckDispatch } from '../pages/TruckDispatch';
 import { THCPrint } from '../pages/THCPrint';
+import GenerateAdvanceBankFile from '../pages/GenerateAdvanceBankFile';
 
 export interface MenuItem {
   id: string;
@@ -187,6 +188,8 @@ export function Layout() {
         return <BillPrint />;
       case 'thc-print':
         return <THCPrint />;
+      case 'generate-advance-bank-file':
+        return <GenerateAdvanceBankFile />;
       default:
         return <Dashboard />;
     }
