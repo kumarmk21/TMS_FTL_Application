@@ -137,7 +137,7 @@ export function GenerateTHCModal({ isOpen, onClose, onSuccess, lrRecord }: Gener
   };
 
   const calculateNetPayable = () => {
-    return formData.thc_advance_amount - calculateTDSAmount();
+    return formData.thc_amount + formData.thc_loading_charges + formData.thc_detention_charges;
   };
 
   const calculateBalance = () => {
