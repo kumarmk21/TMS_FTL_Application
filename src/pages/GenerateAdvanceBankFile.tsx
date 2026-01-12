@@ -20,6 +20,7 @@ interface THCRecord {
   ven_act_branch: string | null;
   vehicle_number: string | null;
   thc_net_payable_amount: number | null;
+  ath_date: string | null;
   vendor_name?: string;
 }
 
@@ -28,6 +29,7 @@ export default function GenerateAdvanceBankFile() {
   const [records, setRecords] = useState<THCRecord[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<Set<string>>(new Set());
   const [searchDate, setSearchDate] = useState(new Date().toISOString().split('T')[0]);
+  const [athDate, setAthDate] = useState(new Date().toISOString().split('T')[0]);
   const [mode, setMode] = useState<'generate' | 'regenerate' | 'view'>('generate');
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [uploadMessage, setUploadMessage] = useState('');
@@ -67,7 +69,8 @@ export default function GenerateAdvanceBankFile() {
           vehicle_number,
           thc_net_payable_amount,
           thc_date,
-          thc_status_fin
+          thc_status_fin,
+          ath_date
         `);
 
       if (mode === 'generate') {
@@ -150,7 +153,7 @@ export default function GenerateAdvanceBankFile() {
     selectedRecordsData.forEach(record => {
       const fields = [
         'N',
-        '',
+        athDate,
         record.ven_act_number || '',
         record.thc_advance_amount?.toString() || '0',
         record.vendor_name || '',
@@ -199,7 +202,10 @@ export default function GenerateAdvanceBankFile() {
 
       const { error: updateError } = await supabase
         .from('thc_details')
-        .update({ thc_status_fin: athUploadedStatusId })
+        .update({
+          thc_status_fin: athUploadedStatusId,
+          ath_date: athDate
+        })
         .in('thc_id', Array.from(selectedRecords));
 
       if (updateError) throw updateError;
@@ -460,13 +466,24 @@ export default function GenerateAdvanceBankFile() {
               Selected: <span className="font-semibold">{selectedRecords.size}</span> of{' '}
               <span className="font-semibold">{records.length}</span> records
             </p>
-            <button
-              onClick={handleSubmit}
-              disabled={selectedRecords.size === 0}
-              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Submit
-            </button>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">ATH Date:</label>
+                <input
+                  type="date"
+                  value={athDate}
+                  onChange={(e) => setAthDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
+              <button
+                onClick={handleSubmit}
+                disabled={selectedRecords.size === 0}
+                className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit
+              </button>
+            </div>
           </div>
         )}
 
