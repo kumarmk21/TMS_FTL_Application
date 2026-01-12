@@ -36,6 +36,7 @@ import BillPrint from '../pages/BillPrint';
 import { TruckDispatch } from '../pages/TruckDispatch';
 import { THCPrint } from '../pages/THCPrint';
 import GenerateAdvanceBankFile from '../pages/GenerateAdvanceBankFile';
+import RegenerateAdvanceBankFile from '../pages/RegenerateAdvanceBankFile';
 
 export interface MenuItem {
   id: string;
@@ -82,10 +83,10 @@ const menuItems: MenuItem[] = [
     label: 'Finance',
     icon: <DollarSign className="w-5 h-5" />,
     subItems: [
-      { id: 'truck-advance-payment', label: 'Truck Advance Payment' },
       { id: 'truck-balance-payment', label: 'Truck Balance Payment' },
       { id: 'admin-expenses', label: 'Admin Expenses' },
       { id: 'generate-advance-bank-file', label: 'Generate Advance Bank File' },
+      { id: 'regenerate-advance-bank-file', label: 'Advance Bank Payment File Regenerate' },
       { id: 'generate-balance-bank-file', label: 'Generate Balance Bank File' },
       { id: 'generate-debit-note', label: 'Generate Debit Note' },
       { id: 'generate-credit-note', label: 'Generate Credit Note' },
@@ -190,6 +191,8 @@ export function Layout() {
         return <THCPrint />;
       case 'generate-advance-bank-file':
         return <GenerateAdvanceBankFile />;
+      case 'regenerate-advance-bank-file':
+        return <RegenerateAdvanceBankFile />;
       default:
         return <Dashboard />;
     }
