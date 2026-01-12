@@ -8,9 +8,21 @@ interface AddCustomerModalProps {
   onSuccess: () => void;
 }
 
+interface City {
+  id: string;
+  city_name: string;
+}
+
+interface State {
+  id: string;
+  state_name: string;
+}
+
 export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModalProps) {
   const [loading, setLoading] = useState(false);
   const [loadingCode, setLoadingCode] = useState(false);
+  const [cities, setCities] = useState<City[]>([]);
+  const [states, setStates] = useState<State[]>([]);
   const [formData, setFormData] = useState({
     customer_id: '',
     customer_name: '',
@@ -31,8 +43,38 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
   useEffect(() => {
     if (isOpen) {
       generateNextCustomerId();
+      fetchCities();
+      fetchStates();
     }
   }, [isOpen]);
+
+  const fetchCities = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('city_master')
+        .select('id, city_name')
+        .order('city_name', { ascending: true });
+
+      if (error) throw error;
+      setCities(data || []);
+    } catch (error: any) {
+      console.error('Error fetching cities:', error);
+    }
+  };
+
+  const fetchStates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('state_master')
+        .select('id, state_name')
+        .order('state_name', { ascending: true });
+
+      if (error) throw error;
+      setStates(data || []);
+    } catch (error: any) {
+      console.error('Error fetching states:', error);
+    }
+  };
 
   const generateNextCustomerId = async () => {
     setLoadingCode(true);
@@ -260,26 +302,36 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 City
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.customer_city}
                 onChange={(e) => setFormData({ ...formData, customer_city: e.target.value })}
-                placeholder="Enter city"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
+              >
+                <option value="">Select city</option>
+                {cities.map((city) => (
+                  <option key={city.id} value={city.city_name}>
+                    {city.city_name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 State
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.customer_state}
                 onChange={(e) => setFormData({ ...formData, customer_state: e.target.value })}
-                placeholder="Enter state"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-              />
+              >
+                <option value="">Select state</option>
+                {states.map((state) => (
+                  <option key={state.id} value={state.state_name}>
+                    {state.state_name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
