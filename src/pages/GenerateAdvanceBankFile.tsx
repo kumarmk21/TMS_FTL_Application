@@ -153,7 +153,7 @@ export default function GenerateAdvanceBankFile() {
     selectedRecordsData.forEach(record => {
       const fields = [
         'N',
-        athDate,
+        '',
         record.ven_act_number || '',
         record.thc_advance_amount?.toString() || '0',
         record.vendor_name || '',
@@ -166,6 +166,7 @@ export default function GenerateAdvanceBankFile() {
         '',
         '',
         record.vehicle_number || '',
+        athDate,
         record.lr_number || '',
         record.thc_net_payable_amount?.toString() || '0',
         record.thc_advance_amount?.toString() || '0',
