@@ -200,7 +200,7 @@ export function GenerateTHCModal({ isOpen, onClose, onSuccess, lrRecord }: Gener
         .from('status_master')
         .select('id')
         .eq('status_type', docTypeData.id)
-        .eq('status_name', 'ATH Paid')
+        .eq('status_name', 'ATH Prepared')
         .maybeSingle();
 
       if (statusFinError) throw statusFinError;
