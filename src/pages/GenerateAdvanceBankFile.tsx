@@ -177,7 +177,6 @@ export default function GenerateAdvanceBankFile() {
         '',
         '',
         formattedAthDate,
-        record.thc_advance_date || '',
         '',
         record.ven_act_ifsc || '',
         record.ven_act_bank || '',
