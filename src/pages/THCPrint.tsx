@@ -81,6 +81,7 @@ export function THCPrint() {
           thc_balance_amount,
           thc_status_ops,
           thc_status_fin,
+          ath_voucher_no,
           vendor_master:thc_vendor (
             vendor_name,
             vendor_code
