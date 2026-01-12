@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Printer,
   Loader2,
+  Home,
 } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { UserMaster } from '../pages/UserMaster';
@@ -46,6 +47,11 @@ export interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: <Home className="w-5 h-5" />,
+  },
   {
     id: 'masters',
     label: 'Masters',
@@ -139,18 +145,25 @@ export function Layout() {
     return true;
   });
 
-  const defaultMenu = profile?.role === 'admin' ? 'masters' : 'booking';
-  const defaultSubItem = profile?.role === 'admin' ? 'user-master' : 'customer-enquiry';
+  const defaultMenu = 'dashboard';
+  const defaultSubItem = 'dashboard';
 
   const [expandedMenu, setExpandedMenu] = useState<string | null>(defaultMenu);
   const [activeSubItem, setActiveSubItem] = useState<string>(defaultSubItem);
 
-  const toggleMenu = (menuId: string) => {
-    setExpandedMenu(expandedMenu === menuId ? null : menuId);
+  const toggleMenu = (menuId: string, hasSubItems: boolean) => {
+    if (!hasSubItems) {
+      setActiveSubItem(menuId);
+      setExpandedMenu(null);
+    } else {
+      setExpandedMenu(expandedMenu === menuId ? null : menuId);
+    }
   };
 
   const renderContent = () => {
     switch (activeSubItem) {
+      case 'dashboard':
+        return <Dashboard />;
       case 'user-master':
         return <UserMaster />;
       case 'branch-master':
@@ -225,9 +238,9 @@ export function Layout() {
           {filteredMenuItems.map((item) => (
             <div key={item.id}>
               <button
-                onClick={() => toggleMenu(item.id)}
+                onClick={() => toggleMenu(item.id, !!item.subItems)}
                 className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg transition-all ${
-                  expandedMenu === item.id
+                  (expandedMenu === item.id || activeSubItem === item.id)
                     ? 'bg-red-600 text-white'
                     : 'text-slate-300 hover:bg-slate-800'
                 }`}
