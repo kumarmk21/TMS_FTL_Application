@@ -244,6 +244,9 @@ export function GenerateTHCModal({ isOpen, onClose, onSuccess, lrRecord }: Gener
           ven_act_branch: selectedVendor?.ven_bk_branch || null,
           thc_status_ops: statusOpsData?.id || null,
           thc_status_fin: statusFinData?.id || null,
+          origin: lrRecord.from_city || null,
+          destination: lrRecord.to_city || null,
+          vehicle_type: lrRecord.vehicle_type || null,
           created_by: user?.id,
         });
 

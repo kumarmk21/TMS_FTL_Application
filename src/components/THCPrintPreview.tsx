@@ -30,6 +30,10 @@ interface THCDetails {
   ven_act_bank: string;
   ven_act_ifsc: string;
   ven_act_branch: string;
+  ath_voucher_no: string;
+  origin: string;
+  destination: string;
+  vehicle_type: string;
   vendor_master?: {
     vendor_name: string;
     vendor_code: string;

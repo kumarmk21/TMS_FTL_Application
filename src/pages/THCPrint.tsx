@@ -82,6 +82,9 @@ export function THCPrint() {
           thc_status_ops,
           thc_status_fin,
           ath_voucher_no,
+          origin,
+          destination,
+          vehicle_type,
           vendor_master:thc_vendor (
             vendor_name,
             vendor_code
