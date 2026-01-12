@@ -150,6 +150,8 @@ export default function GenerateAdvanceBankFile() {
   const generateCSVContent = (selectedRecordsData: THCRecord[]): string => {
     const lines: string[] = [];
 
+    const formattedAthDate = athDate ? new Date(athDate).toLocaleDateString('en-GB') : '';
+
     selectedRecordsData.forEach(record => {
       const fields = [
         'N',
@@ -166,7 +168,6 @@ export default function GenerateAdvanceBankFile() {
         '',
         '',
         record.vehicle_number || '',
-        athDate,
         record.lr_number || '',
         record.thc_net_payable_amount?.toString() || '0',
         record.thc_advance_amount?.toString() || '0',
@@ -175,6 +176,7 @@ export default function GenerateAdvanceBankFile() {
         record.vehicle_type || '',
         '',
         '',
+        formattedAthDate,
         record.thc_advance_date || '',
         '',
         record.ven_act_ifsc || '',
