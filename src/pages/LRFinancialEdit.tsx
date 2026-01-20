@@ -256,7 +256,7 @@ export default function LRFinancialEdit() {
             <Search className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by LR No, Consignor, Consignee, or Billing Party..."
+              placeholder="Search by LR No or Billing Party..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -288,9 +288,6 @@ export default function LRFinancialEdit() {
                     From - To
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Consignor - Consignee
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Billing Party
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -318,9 +315,6 @@ export default function LRFinancialEdit() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {lr.from_city} - {lr.to_city || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {lr.consignor} - {lr.consignee}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {lr.billing_party_name || '-'}
