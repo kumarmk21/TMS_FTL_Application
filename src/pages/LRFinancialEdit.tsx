@@ -13,6 +13,7 @@ interface LRFinancial {
   no_of_pkgs: number;
   chrg_wt: number;
   billing_party_name: string;
+  vehicle_type: string;
   freight_rate: number;
   freight_amount: number;
   freight_type: string;
@@ -291,6 +292,9 @@ export default function LRFinancialEdit() {
                     Billing Party
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Vehicle Type
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Weight (KG)
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -318,6 +322,9 @@ export default function LRFinancialEdit() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {lr.billing_party_name || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {lr.vehicle_type || '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                       {lr.chrg_wt || 0}
