@@ -377,12 +377,12 @@ export default function LRFinancialEdit() {
                   <p className="font-medium">{editingLR.consignee}</p>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-600">Weight:</span>
-                  <p className="font-medium">{editingLR.chrg_wt} KG</p>
+                  <span className="text-sm text-gray-600">Vehicle Type:</span>
+                  <p className="font-medium">{editingLR.vehicle_type || '-'}</p>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-600">Packages:</span>
-                  <p className="font-medium">{editingLR.no_of_pkgs}</p>
+                  <span className="text-sm text-gray-600">Origin-Destination:</span>
+                  <p className="font-medium">{editingLR.from_city} - {editingLR.to_city || '-'}</p>
                 </div>
               </div>
 
