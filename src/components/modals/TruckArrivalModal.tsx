@@ -104,8 +104,23 @@ export function TruckArrivalModal({ booking, onClose, onSuccess }: TruckArrivalM
         podUrl = urlData.publicUrl;
       }
 
+      // Calculate SLA status
+      let slaStatus = 'ON TIME';
+      if (booking.est_del_date && formData.arrivalDate) {
+        const estDate = new Date(booking.est_del_date);
+        const actDate = new Date(formData.arrivalDate);
+        estDate.setHours(0, 0, 0, 0);
+        actDate.setHours(0, 0, 0, 0);
+
+        if (actDate > estDate) {
+          slaStatus = 'LATE';
+        }
+      }
+
       const updateData: any = {
         act_del_date: formData.arrivalDate,
+        lr_sla_status: slaStatus,
+        lr_ops_status: 'Delivered',
         updated_at: new Date().toISOString(),
       };
 
