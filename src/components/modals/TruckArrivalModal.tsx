@@ -120,7 +120,7 @@ export function TruckArrivalModal({ booking, onClose, onSuccess }: TruckArrivalM
       // Construct lr_status string
       let lrStatus = `Delivered On ${formData.arrivalDate}`;
       if (formData.uploadPOD) {
-        lrStatus += ` ${formData.podReceivedDate} ${formData.podReceivedType}`;
+        lrStatus += ` POD Received On ${formData.podReceivedDate} Received Via ${formData.podReceivedType}`;
       }
 
       const updateData: any = {
