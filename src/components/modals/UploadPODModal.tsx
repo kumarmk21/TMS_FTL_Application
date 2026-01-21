@@ -39,16 +39,18 @@ export function UploadPODModal({ booking, onClose, onSuccess }: UploadPODModalPr
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const maxSize = 10 * 1024 * 1024;
+      const maxSize = 100 * 1024;
 
       if (file.size > maxSize) {
-        alert('File size must be less than 10MB');
+        alert('File size must be less than 100 KB. Please compress or resize your file and try again.');
+        e.target.value = '';
         return;
       }
 
       const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
       if (!allowedTypes.includes(file.type)) {
         alert('Only PDF, JPG, and PNG files are allowed');
+        e.target.value = '';
         return;
       }
 
@@ -226,7 +228,7 @@ export function UploadPODModal({ booking, onClose, onSuccess }: UploadPODModalPr
                       Click to upload POD document
                     </p>
                     <p className="text-xs text-gray-500">
-                      PDF, JPG, PNG up to 10MB
+                      PDF, JPG, PNG up to 100 KB
                     </p>
                   </>
                 )}
