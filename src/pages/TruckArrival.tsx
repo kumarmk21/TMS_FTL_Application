@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Truck, Search, Filter, Calendar, Upload, CheckCircle, Loader2 } from 'lucide-react';
-import { UploadPODModal } from '../components/modals/UploadPODModal';
+import { Truck, Search, Filter, Calendar, CheckCircle, Loader2 } from 'lucide-react';
+import { TruckArrivalModal } from '../components/modals/TruckArrivalModal';
 
 interface BookingLR {
   tran_id: string;
@@ -37,7 +37,7 @@ export function TruckArrival() {
   const [filteredBookings, setFilteredBookings] = useState<BookingLR[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<BookingLR | null>(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showArrivalModal, setShowArrivalModal] = useState(false);
 
   const [filters, setFilters] = useState({
     searchTerm: '',
@@ -110,13 +110,13 @@ export function TruckArrival() {
     setFilteredBookings(filtered);
   };
 
-  const handleUploadPOD = (booking: BookingLR) => {
+  const handleTruckArrival = (booking: BookingLR) => {
     setSelectedBooking(booking);
-    setShowUploadModal(true);
+    setShowArrivalModal(true);
   };
 
-  const handlePODUploaded = () => {
-    setShowUploadModal(false);
+  const handleArrivalRecorded = () => {
+    setShowArrivalModal(false);
     setSelectedBooking(null);
     fetchBookings();
   };
@@ -265,11 +265,11 @@ export function TruckArrival() {
                     </p>
                   </div>
                   <button
-                    onClick={() => handleUploadPOD(booking)}
+                    onClick={() => handleTruckArrival(booking)}
                     className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                   >
-                    <Upload className="w-4 h-4" />
-                    {booking.pod_upload ? 'Update POD' : 'Upload POD'}
+                    <Truck className="w-4 h-4" />
+                    Truck Arrival
                   </button>
                 </div>
 
@@ -381,14 +381,14 @@ export function TruckArrival() {
         )}
       </div>
 
-      {showUploadModal && selectedBooking && (
-        <UploadPODModal
+      {showArrivalModal && selectedBooking && (
+        <TruckArrivalModal
           booking={selectedBooking}
           onClose={() => {
-            setShowUploadModal(false);
+            setShowArrivalModal(false);
             setSelectedBooking(null);
           }}
-          onSuccess={handlePODUploaded}
+          onSuccess={handleArrivalRecorded}
         />
       )}
     </div>
