@@ -35,6 +35,7 @@ import GenerateCustomerBill from '../pages/GenerateCustomerBill';
 import LRFinancialEdit from '../pages/LRFinancialEdit';
 import BillPrint from '../pages/BillPrint';
 import { TruckDispatch } from '../pages/TruckDispatch';
+import { TruckArrival } from '../pages/TruckArrival';
 import { THCPrint } from '../pages/THCPrint';
 import GenerateAdvanceBankFile from '../pages/GenerateAdvanceBankFile';
 import RegenerateAdvanceBankFile from '../pages/RegenerateAdvanceBankFile';
@@ -191,6 +192,8 @@ export function Layout() {
         return <OrderEnquiry />;
       case 'truck-dispatch':
         return <TruckDispatch />;
+      case 'truck-arrival':
+        return <TruckArrival />;
       case 'lr-entry':
         return <LREntry />;
       case 'lr-financial-edit':
