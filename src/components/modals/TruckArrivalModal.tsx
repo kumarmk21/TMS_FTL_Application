@@ -121,6 +121,7 @@ export function TruckArrivalModal({ booking, onClose, onSuccess }: TruckArrivalM
         act_del_date: formData.arrivalDate,
         lr_sla_status: slaStatus,
         lr_ops_status: 'Delivered',
+        lr_status: 'Delivered',
         updated_at: new Date().toISOString(),
       };
 
