@@ -40,6 +40,7 @@ import { THCPrint } from '../pages/THCPrint';
 import GenerateAdvanceBankFile from '../pages/GenerateAdvanceBankFile';
 import RegenerateAdvanceBankFile from '../pages/RegenerateAdvanceBankFile';
 import SalesReport from '../pages/SalesReport';
+import { LRTracking } from '../pages/LRTracking';
 
 export interface MenuItem {
   id: string;
@@ -212,6 +213,8 @@ export function Layout() {
         return <RegenerateAdvanceBankFile />;
       case 'sales-report':
         return <SalesReport />;
+      case 'lr-tracking':
+        return <LRTracking />;
       default:
         return <Dashboard />;
     }
