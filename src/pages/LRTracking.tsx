@@ -13,13 +13,13 @@ interface LRTrackingData {
   lr_sla_status: string;
   lr_status: string;
   lr_ops_status: string;
-  lr_fin_status: string;
+  lr_financial_status: string;
   pod_upload: string;
 }
 
 export function LRTracking() {
   const [searchType, setSearchType] = useState<'dateRange' | 'lrNumber'>('dateRange');
-  const [statusType, setStatusType] = useState<'lr_status' | 'lr_ops_status' | 'lr_fin_status'>('lr_status');
+  const [statusType, setStatusType] = useState<'lr_status' | 'lr_ops_status' | 'lr_financial_status'>('lr_status');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<LRTrackingData[]>([]);
 
@@ -48,7 +48,7 @@ export function LRTracking() {
 
       let query = supabase
         .from('booking_lr')
-        .select('manual_lr_no, from_city, to_city, vehicle_type, billing_party_name, est_del_date, act_del_date, lr_sla_status, lr_status, lr_ops_status, lr_fin_status, pod_upload');
+        .select('manual_lr_no, from_city, to_city, vehicle_type, billing_party_name, est_del_date, act_del_date, lr_sla_status, lr_status, lr_ops_status, lr_financial_status, pod_upload');
 
       if (searchType === 'dateRange') {
         query = query
@@ -289,8 +289,8 @@ export function LRTracking() {
                 {lr.billing_party_name || '-'}
               </td>
               <td className="px-4 py-3 text-sm">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(lr.lr_fin_status)}`}>
-                  {lr.lr_fin_status || '-'}
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeColor(lr.lr_financial_status)}`}>
+                  {lr.lr_financial_status || '-'}
                 </span>
               </td>
             </tr>
@@ -418,8 +418,8 @@ export function LRTracking() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
-                  value="lr_fin_status"
-                  checked={statusType === 'lr_fin_status'}
+                  value="lr_financial_status"
+                  checked={statusType === 'lr_financial_status'}
                   onChange={(e) => setStatusType(e.target.value as any)}
                   className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
                 />
@@ -460,7 +460,7 @@ export function LRTracking() {
           <div className="p-6">
             {statusType === 'lr_status' && renderLRStatusView()}
             {statusType === 'lr_ops_status' && renderOpsStatusView()}
-            {statusType === 'lr_fin_status' && renderFinStatusView()}
+            {statusType === 'lr_financial_status' && renderFinStatusView()}
           </div>
         </div>
       )}
