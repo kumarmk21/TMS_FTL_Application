@@ -19,7 +19,7 @@ interface BookingLR {
   pod_upload: string;
   pod_recd_date: string;
   pod_recd_type: string;
-  arrival_date: string;
+  act_del_date: string;
 }
 
 interface TruckArrivalModalProps {
@@ -33,7 +33,7 @@ export function TruckArrivalModal({ booking, onClose, onSuccess }: TruckArrivalM
   const [saving, setSaving] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
-    arrivalDate: booking.arrival_date || new Date().toISOString().split('T')[0],
+    arrivalDate: booking.act_del_date || new Date().toISOString().split('T')[0],
     arrivalTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
     remarks: '',
     uploadPOD: false,
@@ -104,7 +104,7 @@ export function TruckArrivalModal({ booking, onClose, onSuccess }: TruckArrivalM
       }
 
       const updateData: any = {
-        arrival_date: formData.arrivalDate,
+        act_del_date: formData.arrivalDate,
         updated_at: new Date().toISOString(),
       };
 
@@ -123,6 +123,15 @@ export function TruckArrivalModal({ booking, onClose, onSuccess }: TruckArrivalM
         .eq('tran_id', booking.tran_id);
 
       if (updateError) throw updateError;
+
+      const { error: thcUpdateError } = await supabase
+        .from('thc_details')
+        .update({ unloading_date: formData.arrivalDate })
+        .eq('lr_no', booking.manual_lr_no);
+
+      if (thcUpdateError) {
+        console.warn('THC update error:', thcUpdateError);
+      }
 
       alert('Truck arrival recorded successfully!');
       onSuccess();

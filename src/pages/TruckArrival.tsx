@@ -28,7 +28,6 @@ interface BookingLR {
   pod_recd_type: string;
   pod_upload: string;
   dispatch_date: string;
-  arrival_date: string;
 }
 
 export function TruckArrival() {
