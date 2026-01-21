@@ -117,11 +117,17 @@ export function TruckArrivalModal({ booking, onClose, onSuccess }: TruckArrivalM
         }
       }
 
+      // Construct lr_status string
+      let lrStatus = `Delivered On ${formData.arrivalDate}`;
+      if (formData.uploadPOD) {
+        lrStatus += ` ${formData.podReceivedDate} ${formData.podReceivedType}`;
+      }
+
       const updateData: any = {
         act_del_date: formData.arrivalDate,
         lr_sla_status: slaStatus,
         lr_ops_status: 'Delivered',
-        lr_status: 'Delivered',
+        lr_status: lrStatus,
         updated_at: new Date().toISOString(),
       };
 
