@@ -59,6 +59,7 @@ export function TruckArrival() {
         .from('booking_lr')
         .select('*')
         .eq('lr_status', 'In Transit')
+        .is('act_del_date', null)
         .order('lr_date', { ascending: false });
 
       if (profile?.role === 'user' && profile?.branch_code) {
