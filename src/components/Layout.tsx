@@ -38,6 +38,7 @@ import { TruckDispatch } from '../pages/TruckDispatch';
 import { THCPrint } from '../pages/THCPrint';
 import GenerateAdvanceBankFile from '../pages/GenerateAdvanceBankFile';
 import RegenerateAdvanceBankFile from '../pages/RegenerateAdvanceBankFile';
+import SalesReport from '../pages/SalesReport';
 
 export interface MenuItem {
   id: string;
@@ -206,6 +207,8 @@ export function Layout() {
         return <GenerateAdvanceBankFile />;
       case 'regenerate-advance-bank-file':
         return <RegenerateAdvanceBankFile />;
+      case 'sales-report':
+        return <SalesReport />;
       default:
         return <Dashboard />;
     }
