@@ -20,6 +20,7 @@ interface BookingLR {
   pod_recd_date: string;
   pod_recd_type: string;
   act_del_date: string;
+  est_del_date: string;
 }
 
 interface TruckArrivalModalProps {
@@ -189,6 +190,12 @@ export function TruckArrivalModal({ booking, onClose, onSuccess }: TruckArrivalM
               <div>
                 <span className="text-gray-600">Driver:</span>
                 <span className="ml-2 font-semibold text-gray-900">{booking.driver_name || '-'}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Est. Delivery Date:</span>
+                <span className="ml-2 font-semibold text-gray-900">
+                  {booking.est_del_date ? new Date(booking.est_del_date).toLocaleDateString('en-IN') : '-'}
+                </span>
               </div>
               <div className="col-span-2">
                 <span className="text-gray-600">Consignor:</span>
