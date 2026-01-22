@@ -294,6 +294,10 @@ Deno.serve(async (req: Request) => {
 
     console.log('Sending email from:', fromEmail, 'to:', customerResult.data.customer_email);
 
+    console.log('Attempting to send email...');
+    console.log('From:', fromEmail);
+    console.log('To:', customerResult.data.customer_email);
+
     const emailResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -304,6 +308,7 @@ Deno.serve(async (req: Request) => {
     });
 
     const responseText = await emailResponse.text();
+    console.log('Resend API status:', emailResponse.status);
     console.log('Resend API response:', responseText);
 
     if (!emailResponse.ok) {
@@ -313,10 +318,17 @@ Deno.serve(async (req: Request) => {
       } catch {
         errorData = { message: responseText };
       }
-      throw new Error(`Resend API error (${emailResponse.status}): ${JSON.stringify(errorData)}`);
+      const errorMsg = `Resend API error (${emailResponse.status}): ${JSON.stringify(errorData)}`;
+      console.error(errorMsg);
+      throw new Error(errorMsg);
     }
 
-    const result = await emailResponse.json();
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      result = { id: 'unknown' };
+    }
 
     return new Response(
       JSON.stringify({
