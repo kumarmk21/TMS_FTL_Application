@@ -62,6 +62,7 @@ interface LREntry {
   lr_date: string;
   booking_branch: string;
   from_city: string;
+  to_city: string;
   est_del_date: string;
   pay_basis: string;
   booking_type: string;
@@ -514,7 +515,9 @@ export function LREntry() {
       lr.manual_lr_no?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lr.billing_party_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lr.vehicle_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lr.vehicle_type?.toLowerCase().includes(searchTerm.toLowerCase())
+      lr.vehicle_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lr.from_city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lr.to_city?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -1241,7 +1244,7 @@ export function LREntry() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search by LR number, billing party, vehicle type, or vehicle number..."
+              placeholder="Search by LR number, billing party, origin, destination, vehicle type, or vehicle number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -1264,6 +1267,9 @@ export function LREntry() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Origin
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Destination
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Billing Party
@@ -1296,6 +1302,9 @@ export function LREntry() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {lr.from_city || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {lr.to_city || '-'}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
                     {lr.billing_party_name || '-'}
