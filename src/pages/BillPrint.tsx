@@ -102,7 +102,8 @@ export default function BillPrint() {
       const { data: { session } } = await supabase.auth.getSession();
 
       const headers = {
-        'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${session?.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       };
 
