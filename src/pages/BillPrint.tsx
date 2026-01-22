@@ -19,6 +19,7 @@ interface Bill {
 export default function BillPrint() {
   const [billingParties, setBillingParties] = useState<BillingParty[]>([]);
   const [selectedParty, setSelectedParty] = useState('');
+  const [billNumber, setBillNumber] = useState('');
   const [bills, setBills] = useState<Bill[]>([]);
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -55,18 +56,26 @@ export default function BillPrint() {
   };
 
   const handleSearch = async () => {
-    if (!selectedParty) {
-      alert('Please select a billing party');
+    if (!selectedParty && !billNumber) {
+      alert('Please select a billing party or enter a bill number');
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('lr_bill')
-        .select('bill_id, lr_bill_number, lr_bill_date, billing_party_name, bill_amount')
-        .eq('billing_party_code', selectedParty)
-        .order('lr_bill_date', { ascending: false });
+        .select('bill_id, lr_bill_number, lr_bill_date, billing_party_name, bill_amount');
+
+      if (billNumber) {
+        query = query.ilike('lr_bill_number', `%${billNumber}%`);
+      }
+
+      if (selectedParty) {
+        query = query.eq('billing_party_code', selectedParty);
+      }
+
+      const { data, error } = await query.order('lr_bill_date', { ascending: false });
 
       if (error) throw error;
 
@@ -105,45 +114,65 @@ export default function BillPrint() {
           <h1 className="text-2xl font-bold text-gray-800">Bill Print</h1>
         </div>
 
-        <div className="flex gap-4 items-end">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Billing Party *
-            </label>
-            <select
-              value={selectedParty}
-              onChange={(e) => setSelectedParty(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">Select Billing Party</option>
-              {billingParties.map((party) => (
-                <option key={party.billing_party_code} value={party.billing_party_code}>
-                  {party.billing_party_name} ({party.billing_party_code})
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="space-y-4">
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Billing Party
+              </label>
+              <select
+                value={selectedParty}
+                onChange={(e) => setSelectedParty(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select Billing Party</option>
+                {billingParties.map((party) => (
+                  <option key={party.billing_party_code} value={party.billing_party_code}>
+                    {party.billing_party_name} ({party.billing_party_code})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <button
-            onClick={handleSearch}
-            disabled={loading}
-            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-          >
-            <Search className="w-4 h-4" />
-            {loading ? 'Searching...' : 'Search Bills'}
-          </button>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Bill Number
+              </label>
+              <input
+                type="text"
+                value={billNumber}
+                onChange={(e) => setBillNumber(e.target.value)}
+                placeholder="Enter bill number"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
 
-          {showResults && (
             <button
-              onClick={() => {
-                setShowResults(false);
-                setBills([]);
-              }}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              onClick={handleSearch}
+              disabled={loading}
+              className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
             >
-              Clear Results
+              <Search className="w-4 h-4" />
+              {loading ? 'Searching...' : 'Search Bills'}
             </button>
-          )}
+
+            {showResults && (
+              <button
+                onClick={() => {
+                  setShowResults(false);
+                  setBills([]);
+                  setSelectedParty('');
+                  setBillNumber('');
+                }}
+                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Clear Results
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-gray-500">
+            Search by Billing Party and/or Bill Number
+          </p>
         </div>
       </div>
 
