@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { FileText, Search, Printer } from 'lucide-react';
+import { FileText, Search, Printer, Mail } from 'lucide-react';
 import { BillPrintPreview } from '../components/BillPrintPreview';
 
 interface BillingParty {
@@ -24,6 +24,7 @@ export default function BillPrint() {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBillingParties();
@@ -91,6 +92,39 @@ export default function BillPrint() {
 
   const handlePrint = (bill: Bill) => {
     setSelectedBillId(bill.bill_id);
+  };
+
+  const handleSendEmail = async (bill: Bill) => {
+    setSendingEmail(bill.bill_id);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-bill-email`;
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers = {
+        'Authorization': `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      };
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ billId: bill.bill_id }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send email');
+      }
+
+      alert(`Email sent successfully to customer!\n\n${result.message}`);
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSendingEmail(null);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -227,13 +261,23 @@ export default function BillPrint() {
                         ₹{(bill.bill_amount || 0).toFixed(2)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
-                        <button
-                          onClick={() => handlePrint(bill)}
-                          className="flex items-center gap-2 px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                          <Printer className="w-4 h-4" />
-                          Print
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handlePrint(bill)}
+                            className="flex items-center gap-2 px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            <Printer className="w-4 h-4" />
+                            Print
+                          </button>
+                          <button
+                            onClick={() => handleSendEmail(bill)}
+                            disabled={sendingEmail === bill.bill_id}
+                            className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                          >
+                            <Mail className="w-4 h-4" />
+                            {sendingEmail === bill.bill_id ? 'Sending...' : 'Send Mail'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
