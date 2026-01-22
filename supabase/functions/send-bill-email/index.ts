@@ -282,10 +282,8 @@ Deno.serve(async (req: Request) => {
 </html>
     `;
 
-    // Use verified sender email - change this to your verified domain
-    // For testing, use onboarding@resend.dev
-    // For production, use your verified domain email
-    const fromEmail = Deno.env.get('SENDER_EMAIL') || 'onboarding@resend.dev';
+    // Use verified sender email
+    const fromEmail = Deno.env.get('SENDER_EMAIL') || 'info@dlslogistics.in';
 
     const emailData = {
       from: fromEmail,
