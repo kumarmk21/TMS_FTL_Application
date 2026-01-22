@@ -21,6 +21,9 @@ interface CompanyDetails {
   account_number: string | null;
   ifsc_code: string | null;
   bank_branch: string | null;
+  bill_footer1: string | null;
+  bill_footer2: string | null;
+  bill_footer3: string | null;
 }
 
 interface BillDetails {
@@ -378,6 +381,26 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                   </div>
                 </div>
               </div>
+
+              {(company?.bill_footer1 || company?.bill_footer2 || company?.bill_footer3) && (
+                <div className="mt-8 pt-6 border-t border-gray-300 space-y-2">
+                  {company?.bill_footer1 && (
+                    <p className="text-xs text-gray-700 text-center break-words whitespace-pre-wrap">
+                      {company.bill_footer1}
+                    </p>
+                  )}
+                  {company?.bill_footer2 && (
+                    <p className="text-xs text-gray-700 text-center break-words whitespace-pre-wrap">
+                      {company.bill_footer2}
+                    </p>
+                  )}
+                  {company?.bill_footer3 && (
+                    <p className="text-xs text-gray-700 text-center break-words whitespace-pre-wrap">
+                      {company.bill_footer3}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
