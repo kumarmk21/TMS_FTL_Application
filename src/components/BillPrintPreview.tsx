@@ -87,11 +87,11 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
       setCompany(companyResult.data);
       setBill(billResult.data);
 
-      if (billResult.data?.tran_id) {
+      if (billResult.data?.lr_bill_number) {
         const lrResult = await supabase
           .from('booking_lr')
           .select('manual_lr_no, lr_date, act_del_date, from_city, to_city, vehicle_type, vehicle_number, invoice_number, invoice_date, invoice_value, eway_bill_number')
-          .eq('tran_id', billResult.data.tran_id)
+          .eq('bill_no', billResult.data.lr_bill_number)
           .maybeSingle();
 
         if (lrResult.error) throw lrResult.error;
