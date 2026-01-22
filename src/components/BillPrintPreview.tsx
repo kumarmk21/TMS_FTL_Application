@@ -17,6 +17,10 @@ interface CompanyDetails {
   state_id: string | null;
   msme_no: string | null;
   pan: string | null;
+  bank_name: string | null;
+  account_number: string | null;
+  ifsc_code: string | null;
+  bank_branch: string | null;
 }
 
 interface BillDetails {
@@ -32,6 +36,8 @@ interface BillDetails {
   sub_total: number | null;
   credit_days: number | null;
   lr_bill_due_date: string | null;
+  sac_code: string | null;
+  sac_description: string | null;
 }
 
 interface BillPrintPreviewProps {
@@ -228,6 +234,9 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                       <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-300">
                         Description
                       </th>
+                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 border-b border-gray-300">
+                        SAC Code
+                      </th>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 border-b border-gray-300">
                         Amount (₹)
                       </th>
@@ -236,7 +245,10 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                   <tbody>
                     <tr className="border-b border-gray-200">
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        Transportation Charges
+                        {bill?.sac_description || 'Transportation Charges'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center text-gray-700">
+                        {bill?.sac_code || '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">
                         {(bill?.sub_total || 0).toFixed(2)}
@@ -258,6 +270,28 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
               </div>
 
               <div className="mt-12 pt-6 border-t border-gray-300">
+                <div className="mb-8">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Bank Details</h3>
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                    <p className="text-gray-700">
+                      <span className="font-medium">Bank Name:</span>{' '}
+                      {company?.bank_name || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Account Number:</span>{' '}
+                      {company?.account_number || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">IFSC Code:</span>{' '}
+                      {company?.ifsc_code || '-'}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Branch:</span>{' '}
+                      {company?.bank_branch || '-'}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="text-right">
                   <p className="text-sm font-semibold text-gray-900 mb-8">
                     For {company?.company_name}
