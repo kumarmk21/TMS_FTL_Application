@@ -376,7 +376,23 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                   <p className="text-sm font-semibold text-gray-900 mb-8">
                     For {company?.company_name}
                   </p>
-                  <div className="mt-16">
+                  <div className="mt-8 flex items-end justify-end gap-4">
+                    <div className="relative">
+                      <img
+                        src="/signature.jpg"
+                        alt="Authorized Signature"
+                        className="h-16 w-auto object-contain"
+                      />
+                    </div>
+                    <div className="relative">
+                      <img
+                        src="/round_stamp.jpg"
+                        alt="Company Seal"
+                        className="h-20 w-20 object-contain"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2">
                     <p className="text-sm text-gray-700">Authorized Signatory</p>
                   </div>
                 </div>
