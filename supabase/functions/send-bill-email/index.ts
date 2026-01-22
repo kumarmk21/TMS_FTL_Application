@@ -27,7 +27,8 @@ Deno.serve(async (req: Request) => {
     const smtpPort = Deno.env.get('SMTP_PORT');
     const smtpUser = Deno.env.get('SMTP_USER');
     const smtpPass = Deno.env.get('SMTP_PASS');
-    const fromEmail = Deno.env.get('SENDER_EMAIL') || smtpUser;
+    const senderName = Deno.env.get('SENDER_NAME') || 'DLS Logistics';
+    const fromEmail = smtpUser;
 
     if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
       throw new Error('SMTP configuration is incomplete. Please set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS in your environment variables.');
@@ -311,7 +312,7 @@ Deno.serve(async (req: Request) => {
     });
 
     const info = await transporter.sendMail({
-      from: fromEmail,
+      from: `"${senderName}" <${fromEmail}>`,
       to: customerResult.data.customer_email,
       subject: `Tax Invoice - ${bill.lr_bill_number} from ${company?.company_name || 'DLS Logistics'}`,
       html: emailHtml,
