@@ -45,6 +45,7 @@ export default function GenerateCustomerBill() {
         .from('booking_lr')
         .select('billing_party_code, billing_party_name')
         .is('bill_no', null)
+        .gt('lr_total_amount', 0)
         .not('billing_party_code', 'is', null)
         .order('billing_party_name');
 
@@ -84,6 +85,7 @@ export default function GenerateCustomerBill() {
         .select('*')
         .eq('billing_party_code', selectedParty)
         .is('bill_no', null)
+        .gt('lr_total_amount', 0)
         .gte('lr_date', fromDate)
         .lte('lr_date', toDate)
         .order('lr_date', { ascending: true });
