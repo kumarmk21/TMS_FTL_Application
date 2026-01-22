@@ -27,6 +27,7 @@ import { CompanyMaster } from '../pages/CompanyMaster';
 import { CustomerGSTMaster } from '../pages/CustomerGSTMaster';
 import { DocTypeMaster } from '../pages/DocTypeMaster';
 import StatusMaster from '../pages/StatusMaster';
+import SACCodeMaster from '../pages/SACCodeMaster';
 import { OrderEnquiry } from '../pages/OrderEnquiry';
 import { Dashboard } from '../pages/Dashboard';
 import { LREntry } from '../pages/LREntry';
@@ -71,6 +72,7 @@ const menuItems: MenuItem[] = [
       { id: 'company-master', label: 'Company Master' },
       { id: 'doc-type-master', label: 'Doc Type Master' },
       { id: 'status-master', label: 'Status Master' },
+      { id: 'sac-code-master', label: 'SAC Code Master' },
       { id: 'lr-master', label: 'LR Master' },
     ],
   },
@@ -189,6 +191,8 @@ export function Layout() {
         return <DocTypeMaster />;
       case 'status-master':
         return <StatusMaster />;
+      case 'sac-code-master':
+        return <SACCodeMaster />;
       case 'customer-enquiry':
         return <OrderEnquiry />;
       case 'truck-dispatch':
