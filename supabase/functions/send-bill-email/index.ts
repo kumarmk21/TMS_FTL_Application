@@ -299,10 +299,15 @@ Deno.serve(async (req: Request) => {
       host: smtpHost,
       port: port,
       secure: port === 465,
+      requireTLS: port === 587,
       auth: {
         user: smtpUser,
         pass: smtpPass,
       },
+      tls: {
+        rejectUnauthorized: true,
+        minVersion: 'TLSv1.2'
+      }
     });
 
     const info = await transporter.sendMail({
