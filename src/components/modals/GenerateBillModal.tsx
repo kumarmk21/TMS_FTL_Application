@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, Calendar, Building2, CreditCard } from 'lucide-react';
+import { X, Calendar, Building2, CreditCard, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface Company {
@@ -16,6 +16,12 @@ interface CustomerGST {
   gstin: string;
   state_name: string;
   billing_address: string;
+}
+
+interface SACCode {
+  sac_id: string;
+  sac_code: string;
+  sac_description: string;
 }
 
 interface LRData {
@@ -49,6 +55,7 @@ export default function GenerateBillModal({
   const [loading, setLoading] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [customerGSTOptions, setCustomerGSTOptions] = useState<CustomerGST[]>([]);
+  const [sacCodes, setSacCodes] = useState<SACCode[]>([]);
   const [formData, setFormData] = useState({
     bill_generation_branch: '',
     bill_number: '',
@@ -58,11 +65,14 @@ export default function GenerateBillModal({
     bill_to_state: '',
     bill_to_gstin: '',
     bill_to_address: '',
+    sac_code: '',
+    sac_description: '',
   });
 
   useEffect(() => {
     if (isOpen) {
       fetchCompanies();
+      fetchSACCodes();
       generateBillNumber();
       if (selectedLRs.length > 0) {
         fetchCustomerDetails();
@@ -93,6 +103,22 @@ export default function GenerateBillModal({
       setCompanies(formattedData);
     } catch (error) {
       console.error('Error fetching companies:', error);
+    }
+  };
+
+  const fetchSACCodes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sac_code_master')
+        .select('sac_id, sac_code, sac_description')
+        .eq('is_active', true)
+        .order('sac_code');
+
+      if (error) throw error;
+
+      setSacCodes(data || []);
+    } catch (error) {
+      console.error('Error fetching SAC codes:', error);
     }
   };
 
@@ -197,6 +223,17 @@ export default function GenerateBillModal({
     }
   };
 
+  const handleSACCodeChange = (sacId: string) => {
+    const selectedSAC = sacCodes.find((sac) => sac.sac_id === sacId);
+    if (selectedSAC) {
+      setFormData((prev) => ({
+        ...prev,
+        sac_code: selectedSAC.sac_code,
+        sac_description: selectedSAC.sac_description,
+      }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -228,6 +265,8 @@ export default function GenerateBillModal({
         credit_days: formData.credit_days,
         sub_total: subTotal,
         bill_amount: billAmount,
+        sac_code: formData.sac_code || null,
+        sac_description: formData.sac_description || null,
         lr_bill_status: 'Generated',
         created_by: user?.id,
       };
@@ -383,6 +422,27 @@ export default function GenerateBillModal({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                SAC Code
+              </label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
+                <select
+                  value={sacCodes.find(sac => sac.sac_code === formData.sac_code)?.sac_id || ''}
+                  onChange={(e) => handleSACCodeChange(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select SAC Code</option>
+                  {sacCodes.map((sac) => (
+                    <option key={sac.sac_id} value={sac.sac_id}>
+                      {sac.sac_code} - {sac.sac_description}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="md:col-span-2">
