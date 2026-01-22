@@ -282,12 +282,19 @@ Deno.serve(async (req: Request) => {
 </html>
     `;
 
+    // Use verified sender email - change this to your verified domain
+    // For testing, use onboarding@resend.dev
+    // For production, use your verified domain email
+    const fromEmail = Deno.env.get('SENDER_EMAIL') || 'onboarding@resend.dev';
+
     const emailData = {
-      from: 'info@dlslogistics.in',
+      from: fromEmail,
       to: customerResult.data.customer_email,
       subject: `Tax Invoice - ${bill.lr_bill_number} from ${company?.company_name || 'DLS Logistics'}`,
       html: emailHtml,
     };
+
+    console.log('Sending email from:', fromEmail, 'to:', customerResult.data.customer_email);
 
     const emailResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -298,9 +305,17 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify(emailData),
     });
 
+    const responseText = await emailResponse.text();
+    console.log('Resend API response:', responseText);
+
     if (!emailResponse.ok) {
-      const errorData = await emailResponse.json();
-      throw new Error(`Resend API error: ${JSON.stringify(errorData)}`);
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        errorData = { message: responseText };
+      }
+      throw new Error(`Resend API error (${emailResponse.status}): ${JSON.stringify(errorData)}`);
     }
 
     const result = await emailResponse.json();
