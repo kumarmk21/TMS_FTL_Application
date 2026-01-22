@@ -82,6 +82,7 @@ interface LREntry {
   vehicle_type: string;
   seal_no: string;
   billing_party_id: string;
+  billing_party_name: string;
   lr_email_id: string;
   customer_email_id: string;
   group_id: string;
@@ -511,8 +512,9 @@ export function LREntry() {
   const filteredLREntries = lrEntries.filter(
     (lr) =>
       lr.manual_lr_no?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lr.consignor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lr.consignee?.toLowerCase().includes(searchTerm.toLowerCase())
+      lr.billing_party_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lr.vehicle_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lr.vehicle_type?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -1239,7 +1241,7 @@ export function LREntry() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search by LR number, consignor, or consignee..."
+              placeholder="Search by LR number, billing party, vehicle type, or vehicle number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
@@ -1264,13 +1266,13 @@ export function LREntry() {
                   Origin
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Consignor
+                  Billing Party
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Consignee
+                  Vehicle Type
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Vehicle
+                  Vehicle No.
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
@@ -1296,10 +1298,10 @@ export function LREntry() {
                     {lr.from_city || '-'}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
-                    {lr.consignor || '-'}
+                    {lr.billing_party_name || '-'}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {lr.consignee || '-'}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {lr.vehicle_type || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {lr.vehicle_number || '-'}
