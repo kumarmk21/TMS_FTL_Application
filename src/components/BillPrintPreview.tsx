@@ -38,6 +38,21 @@ interface BillDetails {
   lr_bill_due_date: string | null;
   sac_code: string | null;
   sac_description: string | null;
+  tran_id: string | null;
+}
+
+interface LRDetails {
+  manual_lr_no: string | null;
+  lr_date: string | null;
+  act_del_date: string | null;
+  from_city: string | null;
+  to_city: string | null;
+  vehicle_type: string | null;
+  vehicle_number: string | null;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  invoice_value: number | null;
+  eway_bill_number: string | null;
 }
 
 interface BillPrintPreviewProps {
@@ -48,6 +63,7 @@ interface BillPrintPreviewProps {
 export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
   const [company, setCompany] = useState<CompanyDetails | null>(null);
   const [bill, setBill] = useState<BillDetails | null>(null);
+  const [lrDetails, setLrDetails] = useState<LRDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,6 +86,17 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
 
       setCompany(companyResult.data);
       setBill(billResult.data);
+
+      if (billResult.data?.tran_id) {
+        const lrResult = await supabase
+          .from('booking_lr')
+          .select('manual_lr_no, lr_date, act_del_date, from_city, to_city, vehicle_type, vehicle_number, invoice_number, invoice_date, invoice_value, eway_bill_number')
+          .eq('tran_id', billResult.data.tran_id)
+          .maybeSingle();
+
+        if (lrResult.error) throw lrResult.error;
+        setLrDetails(lrResult.data);
+      }
     } catch (error) {
       console.error('Error fetching bill data:', error);
       alert('Error loading bill data');
@@ -224,6 +251,56 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                     <span className="font-medium">GSTIN:</span>{' '}
                     {bill?.bill_to_gstin || '-'}
                   </p>
+                </div>
+              </div>
+
+              <div className="border border-gray-300 rounded p-4 mb-6">
+                <h3 className="font-semibold text-gray-900 mb-3">LR Details</h3>
+                <div className="grid grid-cols-4 gap-x-6 gap-y-3 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-700">LR No:</span>
+                    <p className="text-gray-900">{lrDetails?.manual_lr_no || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">LR Date:</span>
+                    <p className="text-gray-900">{formatDate(lrDetails?.lr_date || null)}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Delivery Date:</span>
+                    <p className="text-gray-900">{formatDate(lrDetails?.act_del_date || null)}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">From:</span>
+                    <p className="text-gray-900">{lrDetails?.from_city || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">To:</span>
+                    <p className="text-gray-900">{lrDetails?.to_city || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Vehicle Type:</span>
+                    <p className="text-gray-900">{lrDetails?.vehicle_type || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Vehicle No:</span>
+                    <p className="text-gray-900">{lrDetails?.vehicle_number || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Invoice No:</span>
+                    <p className="text-gray-900">{lrDetails?.invoice_number || '-'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Invoice Date:</span>
+                    <p className="text-gray-900">{formatDate(lrDetails?.invoice_date || null)}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Invoice Value:</span>
+                    <p className="text-gray-900">{lrDetails?.invoice_value ? `₹${lrDetails.invoice_value.toFixed(2)}` : '-'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">E-Way Bill:</span>
+                    <p className="text-gray-900">{lrDetails?.eway_bill_number || '-'}</p>
+                  </div>
                 </div>
               </div>
 
