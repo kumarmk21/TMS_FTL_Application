@@ -21,10 +21,16 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
-    if (!resendApiKey) {
-      throw new Error('RESEND_API_KEY is not configured. Please set up Resend API key in your environment variables.');
+    // SMTP Configuration
+    const smtpHost = Deno.env.get('SMTP_HOST');
+    const smtpPort = Deno.env.get('SMTP_PORT');
+    const smtpUser = Deno.env.get('SMTP_USER');
+    const smtpPass = Deno.env.get('SMTP_PASS');
+    const fromEmail = Deno.env.get('SENDER_EMAIL') || smtpUser;
+
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+      throw new Error('SMTP configuration is incomplete. Please set SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS in your environment variables.');
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -282,59 +288,76 @@ Deno.serve(async (req: Request) => {
 </html>
     `;
 
-    // Use verified sender email
-    const fromEmail = Deno.env.get('SENDER_EMAIL') || 'info@dlslogistics.in';
-
-    const emailData = {
-      from: fromEmail,
-      to: customerResult.data.customer_email,
-      subject: `Tax Invoice - ${bill.lr_bill_number} from ${company?.company_name || 'DLS Logistics'}`,
-      html: emailHtml,
-    };
-
-    console.log('Sending email from:', fromEmail, 'to:', customerResult.data.customer_email);
-
-    console.log('Attempting to send email...');
+    console.log('Preparing email via SMTP...');
+    console.log('SMTP Host:', smtpHost);
+    console.log('SMTP Port:', smtpPort);
     console.log('From:', fromEmail);
     console.log('To:', customerResult.data.customer_email);
 
-    const emailResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailData),
+    // Build email message in MIME format
+    const boundary = `boundary_${Date.now()}`;
+    const emailMessage = [
+      `From: ${fromEmail}`,
+      `To: ${customerResult.data.customer_email}`,
+      `Subject: Tax Invoice - ${bill.lr_bill_number} from ${company?.company_name || 'DLS Logistics'}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/plain; charset=utf-8`,
+      ``,
+      `This is an HTML email. Please view it in an HTML-capable email client.`,
+      ``,
+      `--${boundary}`,
+      `Content-Type: text/html; charset=utf-8`,
+      ``,
+      emailHtml,
+      ``,
+      `--${boundary}--`,
+    ].join('\r\n');
+
+    // Connect to SMTP server using raw TCP
+    const conn = await Deno.connect({
+      hostname: smtpHost,
+      port: parseInt(smtpPort),
     });
 
-    const responseText = await emailResponse.text();
-    console.log('Resend API status:', emailResponse.status);
-    console.log('Resend API response:', responseText);
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
 
-    if (!emailResponse.ok) {
-      let errorData;
-      try {
-        errorData = JSON.parse(responseText);
-      } catch {
-        errorData = { message: responseText };
-      }
-      const errorMsg = `Resend API error (${emailResponse.status}): ${JSON.stringify(errorData)}`;
-      console.error(errorMsg);
-      throw new Error(errorMsg);
+    async function readResponse(): Promise<string> {
+      const buffer = new Uint8Array(1024);
+      const n = await conn.read(buffer);
+      if (n === null) return '';
+      return decoder.decode(buffer.subarray(0, n));
     }
 
-    let result;
-    try {
-      result = JSON.parse(responseText);
-    } catch {
-      result = { id: 'unknown' };
+    async function sendCommand(command: string): Promise<string> {
+      await conn.write(encoder.encode(command + '\r\n'));
+      return await readResponse();
     }
+
+    // SMTP handshake
+    await readResponse(); // Read greeting
+    await sendCommand(`EHLO ${smtpHost}`);
+    await sendCommand('AUTH LOGIN');
+    await sendCommand(btoa(smtpUser));
+    await sendCommand(btoa(smtpPass));
+    await sendCommand(`MAIL FROM:<${fromEmail}>`);
+    await sendCommand(`RCPT TO:<${customerResult.data.customer_email}>`);
+    await sendCommand('DATA');
+    await conn.write(encoder.encode(emailMessage + '\r\n.\r\n'));
+    await readResponse();
+    await sendCommand('QUIT');
+
+    conn.close();
+
+    console.log('Email sent successfully!');
 
     return new Response(
       JSON.stringify({
         success: true,
         message: `Bill sent successfully to ${customerResult.data.customer_email}`,
-        emailId: result.id
       }),
       {
         status: 200,
