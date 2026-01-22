@@ -116,10 +116,12 @@ export default function BillPrint() {
       const result = await response.json();
 
       if (!response.ok) {
-        const errorMsg = result.details ? `${result.error}\n\nDetails: ${result.details}` : (result.error || 'Failed to send email');
+        console.error('Email send failed:', response.status, result);
+        const errorMsg = result.details ? `${result.error}\n\nDetails: ${result.details}` : (result.error || `Failed to send email (Status: ${response.status})`);
         throw new Error(errorMsg);
       }
 
+      console.log('Email sent successfully:', result);
       alert(`Email sent successfully to customer!\n\n${result.message}`);
     } catch (error) {
       console.error('Error sending email:', error);
