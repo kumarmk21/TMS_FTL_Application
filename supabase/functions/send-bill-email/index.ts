@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@6.9.7';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,7 +23,6 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // SMTP Configuration
     const smtpHost = Deno.env.get('SMTP_HOST');
     const smtpPort = Deno.env.get('SMTP_PORT');
     const smtpUser = Deno.env.get('SMTP_USER');
@@ -288,76 +288,38 @@ Deno.serve(async (req: Request) => {
 </html>
     `;
 
-    console.log('Preparing email via SMTP...');
+    console.log('Configuring SMTP transport...');
     console.log('SMTP Host:', smtpHost);
     console.log('SMTP Port:', smtpPort);
     console.log('From:', fromEmail);
     console.log('To:', customerResult.data.customer_email);
 
-    // Build email message in MIME format
-    const boundary = `boundary_${Date.now()}`;
-    const emailMessage = [
-      `From: ${fromEmail}`,
-      `To: ${customerResult.data.customer_email}`,
-      `Subject: Tax Invoice - ${bill.lr_bill_number} from ${company?.company_name || 'DLS Logistics'}`,
-      `MIME-Version: 1.0`,
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-      ``,
-      `--${boundary}`,
-      `Content-Type: text/plain; charset=utf-8`,
-      ``,
-      `This is an HTML email. Please view it in an HTML-capable email client.`,
-      ``,
-      `--${boundary}`,
-      `Content-Type: text/html; charset=utf-8`,
-      ``,
-      emailHtml,
-      ``,
-      `--${boundary}--`,
-    ].join('\r\n');
-
-    // Connect to SMTP server using raw TCP
-    const conn = await Deno.connect({
-      hostname: smtpHost,
-      port: parseInt(smtpPort),
+    const port = parseInt(smtpPort);
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: port,
+      secure: port === 465,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
     });
 
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-
-    async function readResponse(): Promise<string> {
-      const buffer = new Uint8Array(1024);
-      const n = await conn.read(buffer);
-      if (n === null) return '';
-      return decoder.decode(buffer.subarray(0, n));
-    }
-
-    async function sendCommand(command: string): Promise<string> {
-      await conn.write(encoder.encode(command + '\r\n'));
-      return await readResponse();
-    }
-
-    // SMTP handshake
-    await readResponse(); // Read greeting
-    await sendCommand(`EHLO ${smtpHost}`);
-    await sendCommand('AUTH LOGIN');
-    await sendCommand(btoa(smtpUser));
-    await sendCommand(btoa(smtpPass));
-    await sendCommand(`MAIL FROM:<${fromEmail}>`);
-    await sendCommand(`RCPT TO:<${customerResult.data.customer_email}>`);
-    await sendCommand('DATA');
-    await conn.write(encoder.encode(emailMessage + '\r\n.\r\n'));
-    await readResponse();
-    await sendCommand('QUIT');
-
-    conn.close();
+    const info = await transporter.sendMail({
+      from: fromEmail,
+      to: customerResult.data.customer_email,
+      subject: `Tax Invoice - ${bill.lr_bill_number} from ${company?.company_name || 'DLS Logistics'}`,
+      html: emailHtml,
+    });
 
     console.log('Email sent successfully!');
+    console.log('Message ID:', info.messageId);
 
     return new Response(
       JSON.stringify({
         success: true,
         message: `Bill sent successfully to ${customerResult.data.customer_email}`,
+        messageId: info.messageId,
       }),
       {
         status: 200,
