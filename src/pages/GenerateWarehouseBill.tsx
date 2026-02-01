@@ -119,7 +119,10 @@ export default function GenerateWarehouseBill() {
       billing_party_id: customerId,
       billing_party_code: customer.customer_code,
       billing_party_name: customer.customer_name,
-      credit_days: customer.credit_days || 0
+      credit_days: customer.credit_days || 0,
+      bill_to_gstin: '',
+      bill_to_state: '',
+      bill_to_address: ''
     }));
 
     const { data: gstData, error } = await supabase
@@ -129,6 +132,7 @@ export default function GenerateWarehouseBill() {
 
     if (error) {
       console.error('Error fetching customer GST:', error);
+      setCustomerGSTs([]);
     } else {
       setCustomerGSTs(gstData || []);
     }
