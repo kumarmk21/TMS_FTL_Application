@@ -42,6 +42,8 @@ import GenerateAdvanceBankFile from '../pages/GenerateAdvanceBankFile';
 import RegenerateAdvanceBankFile from '../pages/RegenerateAdvanceBankFile';
 import SalesReport from '../pages/SalesReport';
 import { LRTracking } from '../pages/LRTracking';
+import GenerateWarehouseBill from '../pages/GenerateWarehouseBill';
+import WarehouseBillPrint from '../pages/WarehouseBillPrint';
 
 export interface MenuItem {
   id: string;
@@ -96,6 +98,7 @@ const menuItems: MenuItem[] = [
     subItems: [
       { id: 'truck-balance-payment', label: 'Truck Balance Payment' },
       { id: 'admin-expenses', label: 'Admin Expenses' },
+      { id: 'generate-warehouse-bill', label: 'Generate Warehouse Bill' },
       { id: 'generate-advance-bank-file', label: 'Generate Advance Bank File' },
       { id: 'regenerate-advance-bank-file', label: 'Advance Bank Payment File Regenerate' },
       { id: 'generate-balance-bank-file', label: 'Generate Balance Bank File' },
@@ -121,6 +124,7 @@ const menuItems: MenuItem[] = [
     subItems: [
       { id: 'lr-print', label: 'LR Print' },
       { id: 'bill-print', label: 'Bill Print' },
+      { id: 'warehouse-bill-print', label: 'Warehouse Bill Print' },
       { id: 'thc-print', label: 'THC Print' },
       { id: 'lr-life-cycle', label: 'LR Life Cycle' },
       { id: 'lr-tracking', label: 'LR Tracking' },
@@ -205,10 +209,14 @@ export function Layout() {
         return <LRFinancialEdit />;
       case 'generate-bill':
         return <GenerateCustomerBill />;
+      case 'generate-warehouse-bill':
+        return <GenerateWarehouseBill />;
       case 'lr-print':
         return <LRPrint />;
       case 'bill-print':
         return <BillPrint />;
+      case 'warehouse-bill-print':
+        return <WarehouseBillPrint />;
       case 'thc-print':
         return <THCPrint />;
       case 'generate-advance-bank-file':
