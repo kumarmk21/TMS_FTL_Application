@@ -92,7 +92,7 @@ export default function GenerateWarehouseBill() {
   const fetchMasterData = async () => {
     try {
       const [customersData, sacCodesData, companiesData] = await Promise.all([
-        supabase.from('customer_master').select('*').eq('active', true).order('customer_name'),
+        supabase.from('customer_master').select('*').eq('is_active', true).order('customer_name'),
         supabase.from('sac_code_master').select('*').order('sac_code'),
         supabase.from('company_master').select('*').order('company_name')
       ]);
