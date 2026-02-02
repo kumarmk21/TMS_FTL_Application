@@ -3,16 +3,15 @@ import { supabase } from '../lib/supabase';
 import { Save, Plus, X, Calculator } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-interface Customer {
-  id: string;
+interface UniqueCustomer {
   customer_code: string;
   customer_name: string;
-  credit_days: number;
 }
 
 interface CustomerGST {
   id: string;
   customer_code: string;
+  customer_name: string;
   gstin: string;
   bill_to_address: string;
   state_master?: {
@@ -36,7 +35,8 @@ interface Company {
 
 export default function GenerateWarehouseBill() {
   const { user } = useAuth();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [uniqueCustomers, setUniqueCustomers] = useState<UniqueCustomer[]>([]);
+  const [allCustomerGSTs, setAllCustomerGSTs] = useState<CustomerGST[]>([]);
   const [customerGSTs, setCustomerGSTs] = useState<CustomerGST[]>([]);
   const [sacCodes, setSACCodes] = useState<SACCode[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -93,17 +93,30 @@ export default function GenerateWarehouseBill() {
 
   const fetchMasterData = async () => {
     try {
-      const [customersData, sacCodesData, companiesData] = await Promise.all([
-        supabase.from('customer_master').select('*').eq('is_active', true).order('customer_name'),
+      const [customerGSTData, sacCodesData, companiesData] = await Promise.all([
+        supabase.from('customer_gst_master').select('*, state_master(state_name)').eq('is_active', true).order('customer_name'),
         supabase.from('sac_code_master').select('*').order('sac_code'),
         supabase.from('company_master').select('*').order('company_name')
       ]);
 
-      if (customersData.error) throw customersData.error;
+      if (customerGSTData.error) throw customerGSTData.error;
       if (sacCodesData.error) throw sacCodesData.error;
       if (companiesData.error) throw companiesData.error;
 
-      setCustomers(customersData.data || []);
+      const gstData = customerGSTData.data || [];
+      setAllCustomerGSTs(gstData);
+
+      const uniqueCustomersMap = new Map<string, UniqueCustomer>();
+      gstData.forEach(gst => {
+        if (!uniqueCustomersMap.has(gst.customer_code)) {
+          uniqueCustomersMap.set(gst.customer_code, {
+            customer_code: gst.customer_code,
+            customer_name: gst.customer_name
+          });
+        }
+      });
+      setUniqueCustomers(Array.from(uniqueCustomersMap.values()));
+
       setSACCodes(sacCodesData.data || []);
       setCompanies(companiesData.data || []);
     } catch (error) {
@@ -112,32 +125,39 @@ export default function GenerateWarehouseBill() {
     }
   };
 
-  const handleCustomerChange = async (customerId: string) => {
-    const customer = customers.find(c => c.id === customerId);
+  const handleCustomerChange = async (customerCode: string) => {
+    const customer = uniqueCustomers.find(c => c.customer_code === customerCode);
     if (!customer) return;
+
+    const customerGSTRecords = allCustomerGSTs.filter(gst => gst.customer_code === customerCode);
+
+    const { data: customerMasterData } = await supabase
+      .from('customer_master')
+      .select('customer_id, credit_days')
+      .eq('customer_id', customerCode)
+      .maybeSingle();
 
     setFormData(prev => ({
       ...prev,
-      billing_party_id: customerId,
+      billing_party_id: customerCode,
       billing_party_code: customer.customer_code,
       billing_party_name: customer.customer_name,
-      credit_days: customer.credit_days || 0,
+      credit_days: customerMasterData?.credit_days || 0,
       bill_to_gstin: '',
       bill_to_state: '',
       bill_to_address: ''
     }));
 
-    const { data: gstData, error } = await supabase
-      .from('customer_gst_master')
-      .select('*, state_master(state_name)')
-      .eq('customer_code', customer.customer_code)
-      .eq('is_active', true);
+    setCustomerGSTs(customerGSTRecords);
 
-    if (error) {
-      console.error('Error fetching customer GST:', error);
-      setCustomerGSTs([]);
-    } else {
-      setCustomerGSTs(gstData || []);
+    if (customerGSTRecords.length === 1) {
+      const singleGST = customerGSTRecords[0];
+      setFormData(prev => ({
+        ...prev,
+        bill_to_gstin: singleGST.gstin,
+        bill_to_state: singleGST.state_master?.state_name || '',
+        bill_to_address: singleGST.bill_to_address || ''
+      }));
     }
   };
 
@@ -373,14 +393,14 @@ export default function GenerateWarehouseBill() {
                 Customer *
               </label>
               <select
-                value={formData.billing_party_id}
+                value={formData.billing_party_code}
                 onChange={(e) => handleCustomerChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               >
                 <option value="">Select Customer</option>
-                {customers.map(customer => (
-                  <option key={customer.id} value={customer.id}>
+                {uniqueCustomers.map(customer => (
+                  <option key={customer.customer_code} value={customer.customer_code}>
                     {customer.customer_name} ({customer.customer_code})
                   </option>
                 ))}
