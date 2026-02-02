@@ -49,6 +49,7 @@ export default function GenerateWarehouseBill() {
   const [customerGSTs, setCustomerGSTs] = useState<CustomerGST[]>([]);
   const [sacCodes, setSACCodes] = useState<SACCode[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [customerRates, setCustomerRates] = useState<CustomerRate[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -148,12 +149,13 @@ export default function GenerateWarehouseBill() {
       .eq('customer_id', customerCode)
       .maybeSingle();
 
-    const { data: customerRateData } = await supabase
+    const { data: customerRatesData } = await supabase
       .from('customer_rate_master')
       .select('sac_code, sac_description, service_type, service_type_rate, gst_charge_type, gst_percentage')
       .eq('customer_id', customerCode)
-      .eq('is_active', true)
-      .maybeSingle();
+      .eq('is_active', true);
+
+    setCustomerRates(customerRatesData || []);
 
     setFormData(prev => ({
       ...prev,
@@ -161,12 +163,12 @@ export default function GenerateWarehouseBill() {
       billing_party_code: customer.customer_code,
       billing_party_name: customer.customer_name,
       credit_days: customerMasterData?.credit_days || 0,
-      service_type: customerRateData?.service_type || '',
-      sac_code: customerRateData?.sac_code || '',
-      sac_description: customerRateData?.sac_description || '',
-      warehouse_charges: customerRateData?.service_type_rate || 0,
-      gst_charge_type: customerRateData?.gst_charge_type || 'IGST',
-      gst_percentage: customerRateData?.gst_percentage || 18,
+      service_type: '',
+      sac_code: '',
+      sac_description: '',
+      warehouse_charges: 0,
+      gst_charge_type: 'IGST',
+      gst_percentage: 18,
       bill_to_gstin: '',
       bill_to_state: '',
       bill_to_address: ''
@@ -194,6 +196,21 @@ export default function GenerateWarehouseBill() {
       bill_to_gstin: gstin,
       bill_to_state: gst.state_master?.state_name || '',
       bill_to_address: gst.bill_to_address || ''
+    }));
+  };
+
+  const handleServiceTypeChange = (serviceType: string) => {
+    const rate = customerRates.find(r => r.service_type === serviceType);
+    if (!rate) return;
+
+    setFormData(prev => ({
+      ...prev,
+      service_type: serviceType,
+      sac_code: rate.sac_code || '',
+      sac_description: rate.sac_description || '',
+      warehouse_charges: rate.service_type_rate || 0,
+      gst_charge_type: rate.gst_charge_type || 'IGST',
+      gst_percentage: rate.gst_percentage || 18
     }));
   };
 
@@ -240,8 +257,8 @@ export default function GenerateWarehouseBill() {
       return;
     }
 
-    if (!formData.sac_code) {
-      alert('Please select SAC code');
+    if (!formData.service_type) {
+      alert('Please select service type');
       return;
     }
 
@@ -341,6 +358,7 @@ export default function GenerateWarehouseBill() {
       remarks: ''
     });
     setCustomerGSTs([]);
+    setCustomerRates([]);
   };
 
   return (
@@ -462,14 +480,22 @@ export default function GenerateWarehouseBill() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Service Type
+                Service Type *
               </label>
-              <input
-                type="text"
+              <select
                 value={formData.service_type}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-              />
+                onChange={(e) => handleServiceTypeChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!formData.billing_party_id}
+                required
+              >
+                <option value="">Select Service Type</option>
+                {customerRates.map((rate, index) => (
+                  <option key={index} value={rate.service_type || ''}>
+                    {rate.service_type}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
