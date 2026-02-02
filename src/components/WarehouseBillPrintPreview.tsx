@@ -33,6 +33,8 @@ interface WarehouseBillDetails {
   bill_to_address: string | null;
   bill_to_gstin: string | null;
   bill_to_state: string | null;
+  service_branch_name: string | null;
+  service_type: string | null;
   sac_code: string | null;
   sac_description: string | null;
   warehouse_charges: number;
@@ -252,6 +254,18 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                     <span className="font-medium">Credit Days:</span>{' '}
                     {bill?.credit_days || 0} days
                   </p>
+                  {bill?.service_branch_name && (
+                    <p className="mb-1">
+                      <span className="font-medium">Service Branch:</span>{' '}
+                      {bill.service_branch_name}
+                    </p>
+                  )}
+                  {bill?.service_type && (
+                    <p className="mb-1">
+                      <span className="font-medium">Service Type:</span>{' '}
+                      {bill.service_type}
+                    </p>
+                  )}
                 </div>
 
                 <div className="border border-gray-300 p-2 rounded">
