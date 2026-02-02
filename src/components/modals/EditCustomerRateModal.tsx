@@ -7,6 +7,8 @@ interface CustomerRate {
   customer_id: string | null;
   customer_master_id: string | null;
   customer_name: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
   is_active: boolean;
   sac_code: string | null;
   sac_description: string | null;
@@ -37,6 +39,12 @@ interface Customer {
   customer_name: string;
 }
 
+interface Branch {
+  id: string;
+  branch_code: string;
+  branch_name: string;
+}
+
 interface City {
   id: string;
   city_name: string;
@@ -62,6 +70,8 @@ export default function EditCustomerRateModal({
     customer_master_id: rate.customer_master_id || '',
     customer_id: rate.customer_id || '',
     customer_name: rate.customer_name || '',
+    branch_id: rate.branch_id || '',
+    branch_name: rate.branch_name || '',
     sac_code: rate.sac_code || '',
     sac_description: rate.sac_description || '',
     from_city_id: rate.from_city_id || '',
@@ -81,6 +91,7 @@ export default function EditCustomerRateModal({
   });
 
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
   const [sacCodes, setSacCodes] = useState<SACCode[]>([]);
@@ -88,6 +99,7 @@ export default function EditCustomerRateModal({
 
   useEffect(() => {
     fetchCustomers();
+    fetchBranches();
     fetchCities();
     fetchVehicleTypes();
     fetchSACCodes();
@@ -102,6 +114,18 @@ export default function EditCustomerRateModal({
 
     if (!error && data) {
       setCustomers(data);
+    }
+  };
+
+  const fetchBranches = async () => {
+    const { data, error } = await supabase
+      .from('branch_master')
+      .select('id, branch_code, branch_name')
+      .eq('is_active', true)
+      .order('branch_name');
+
+    if (!error && data) {
+      setBranches(data);
     }
   };
 
@@ -148,6 +172,17 @@ export default function EditCustomerRateModal({
         customer_master_id: customerId,
         customer_id: customer.customer_code,
         customer_name: customer.customer_name,
+      });
+    }
+  };
+
+  const handleBranchChange = (branchId: string) => {
+    const branch = branches.find((b) => b.id === branchId);
+    if (branch) {
+      setFormData({
+        ...formData,
+        branch_id: branchId,
+        branch_name: branch.branch_name,
       });
     }
   };
@@ -207,6 +242,8 @@ export default function EditCustomerRateModal({
           customer_master_id: formData.customer_master_id || null,
           customer_id: formData.customer_id || null,
           customer_name: formData.customer_name || null,
+          branch_id: formData.branch_id || null,
+          branch_name: formData.branch_name || null,
           sac_code: formData.sac_code || null,
           sac_description: formData.sac_description || null,
           from_city_id: formData.from_city_id || null,
@@ -264,6 +301,24 @@ export default function EditCustomerRateModal({
                 {customers.map((customer) => (
                   <option key={customer.id} value={customer.id}>
                     {customer.customer_code} - {customer.customer_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Branch
+              </label>
+              <select
+                value={formData.branch_id}
+                onChange={(e) => handleBranchChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select Branch</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.branch_code} - {branch.branch_name}
                   </option>
                 ))}
               </select>

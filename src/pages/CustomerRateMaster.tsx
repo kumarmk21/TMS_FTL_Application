@@ -9,6 +9,8 @@ interface CustomerRate {
   customer_id: string | null;
   customer_master_id: string | null;
   customer_name: string | null;
+  branch_id: string | null;
+  branch_name: string | null;
   is_active: boolean;
   sac_code: string | null;
   sac_description: string | null;
@@ -95,6 +97,7 @@ export default function CustomerRateMaster() {
       (rate) =>
         rate.customer_name?.toLowerCase().includes(term) ||
         rate.customer_id?.toLowerCase().includes(term) ||
+        rate.branch_name?.toLowerCase().includes(term) ||
         rate.from_city?.toLowerCase().includes(term) ||
         rate.to_city?.toLowerCase().includes(term) ||
         rate.vehicle_type?.toLowerCase().includes(term) ||
@@ -163,7 +166,7 @@ export default function CustomerRateMaster() {
           <Search className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by customer, city, vehicle type, or service type..."
+            placeholder="Search by customer, branch, city, vehicle type, or service type..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -176,6 +179,9 @@ export default function CustomerRateMaster() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Customer
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Branch
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Route
@@ -206,7 +212,7 @@ export default function CustomerRateMaster() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredRates.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                     No customer rates found
                   </td>
                 </tr>
@@ -220,6 +226,9 @@ export default function CustomerRateMaster() {
                       <div className="text-xs text-gray-500">
                         {rate.customer_id || '-'}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      {rate.branch_name || '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
