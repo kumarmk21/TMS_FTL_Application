@@ -468,7 +468,6 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                 <div className="flex justify-between items-start gap-2">
                   <div className="text-xs text-gray-600 leading-tight" style={{ fontSize: '9px', lineHeight: '1.2', maxWidth: '55%' }}>
                     {company?.bill_footer2 && <p className="mb-0.5">{company.bill_footer2}</p>}
-                    {company?.bill_footer3 && <p className="mb-0.5">{company.bill_footer3}</p>}
                   </div>
                   <div className="text-center flex-shrink-0">
                     <p className="font-semibold text-xs text-gray-900 mb-1">For {company?.company_name}</p>
