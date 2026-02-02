@@ -160,25 +160,25 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
 
         <div className="p-8 bill-print-content">
           <div className="bg-white print-page" style={{ maxWidth: '210mm', margin: '0 auto', padding: '10mm' }}>
-            <div className="space-y-4">
-              <div className="border-b-2 border-gray-300 pb-4">
-                <div className="flex items-start justify-between mb-3">
+            <div className="space-y-2">
+              <div className="border-b-2 border-gray-300 pb-2">
+                <div className="flex items-start justify-between mb-2">
                   {company?.logo_url && (
                     <img
                       src={company.logo_url}
                       alt={company.company_name}
-                      className="h-16 w-auto object-contain"
+                      className="h-14 w-auto object-contain print-logo"
                     />
                   )}
                   <div className="text-right">
-                    <h1 className="text-2xl font-bold text-gray-900">{company?.company_name}</h1>
+                    <h1 className="text-xl font-bold text-gray-900">{company?.company_name}</h1>
                     {company?.company_tagline && (
-                      <p className="text-xs text-gray-600 italic mt-1">{company.company_tagline}</p>
+                      <p className="text-xs text-gray-600 italic">{company.company_tagline}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
                     <p className="text-gray-700">
                       <span className="font-semibold">Address:</span>{' '}
@@ -221,38 +221,38 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
               </div>
 
               <div className="text-center">
-                <h2 className="text-xl font-bold text-gray-900 border-b-2 border-gray-300 pb-2">
+                <h2 className="text-lg font-bold text-gray-900 border-b-2 border-gray-300 pb-1">
                   TAX INVOICE
                 </h2>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="border border-gray-300 p-4 rounded">
-                  <h3 className="font-semibold text-gray-900 mb-3 border-b pb-2">Bill Details</h3>
-                  <p className="mb-2">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="border border-gray-300 p-2 rounded">
+                  <h3 className="font-semibold text-gray-900 mb-2 border-b pb-1">Bill Details</h3>
+                  <p className="mb-1">
                     <span className="font-medium">Bill No:</span>{' '}
                     <span className="font-semibold">{bill?.bill_number}</span>
                   </p>
-                  <p className="mb-2">
+                  <p className="mb-1">
                     <span className="font-medium">Bill Date:</span>{' '}
                     {formatDate(bill?.bill_date || null)}
                   </p>
-                  <p className="mb-2">
+                  <p className="mb-1">
                     <span className="font-medium">Due Date:</span>{' '}
                     {formatDate(bill?.bill_due_date || null)}
                   </p>
-                  <p className="mb-2">
+                  <p className="mb-1">
                     <span className="font-medium">Credit Days:</span>{' '}
                     {bill?.credit_days || 0} days
                   </p>
                 </div>
 
-                <div className="border border-gray-300 p-4 rounded">
-                  <h3 className="font-semibold text-gray-900 mb-3 border-b pb-2">Bill To</h3>
-                  <p className="font-semibold text-lg mb-2">{bill?.billing_party_name}</p>
+                <div className="border border-gray-300 p-2 rounded">
+                  <h3 className="font-semibold text-gray-900 mb-2 border-b pb-1">Bill To</h3>
+                  <p className="font-semibold text-sm mb-1">{bill?.billing_party_name}</p>
                   <p className="mb-1 text-gray-700">Code: {bill?.billing_party_code}</p>
                   {bill?.bill_to_address && (
-                    <p className="mb-2 text-gray-700">{bill.bill_to_address}</p>
+                    <p className="mb-1 text-gray-700">{bill.bill_to_address}</p>
                   )}
                   {bill?.bill_to_state && (
                     <p className="mb-1 text-gray-700">State: {bill.bill_to_state}</p>
@@ -266,83 +266,83 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
               </div>
 
               <div className="border border-gray-300 rounded">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="border-b border-gray-300 p-3 text-left">Sr. No.</th>
-                      <th className="border-b border-gray-300 p-3 text-left">Description of Service</th>
-                      <th className="border-b border-gray-300 p-3 text-left">SAC Code</th>
-                      <th className="border-b border-gray-300 p-3 text-right">Amount (₹)</th>
+                      <th className="border-b border-gray-300 p-2 text-left">Sr. No.</th>
+                      <th className="border-b border-gray-300 p-2 text-left">Description of Service</th>
+                      <th className="border-b border-gray-300 p-2 text-left">SAC Code</th>
+                      <th className="border-b border-gray-300 p-2 text-right">Amount (₹)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {bill && bill.warehouse_charges > 0 && (
                       <tr>
-                        <td className="border-b border-gray-300 p-3">1</td>
-                        <td className="border-b border-gray-300 p-3">
+                        <td className="border-b border-gray-300 p-2">1</td>
+                        <td className="border-b border-gray-300 p-2">
                           {bill.sac_description || 'Warehouse Charges'}
                         </td>
-                        <td className="border-b border-gray-300 p-3">{bill.sac_code}</td>
-                        <td className="border-b border-gray-300 p-3 text-right">
+                        <td className="border-b border-gray-300 p-2">{bill.sac_code}</td>
+                        <td className="border-b border-gray-300 p-2 text-right">
                           {formatCurrency(bill.warehouse_charges)}
                         </td>
                       </tr>
                     )}
                     {bill && bill.other_charges > 0 && (
                       <tr>
-                        <td className="border-b border-gray-300 p-3">
+                        <td className="border-b border-gray-300 p-2">
                           {bill.warehouse_charges > 0 ? 2 : 1}
                         </td>
-                        <td className="border-b border-gray-300 p-3">Other Charges</td>
-                        <td className="border-b border-gray-300 p-3">{bill.sac_code}</td>
-                        <td className="border-b border-gray-300 p-3 text-right">
+                        <td className="border-b border-gray-300 p-2">Other Charges</td>
+                        <td className="border-b border-gray-300 p-2">{bill.sac_code}</td>
+                        <td className="border-b border-gray-300 p-2 text-right">
                           {formatCurrency(bill.other_charges)}
                         </td>
                       </tr>
                     )}
                     <tr className="bg-gray-50">
-                      <td colSpan={3} className="border-b border-gray-300 p-3 text-right font-semibold">
+                      <td colSpan={3} className="border-b border-gray-300 p-2 text-right font-semibold">
                         Sub Total
                       </td>
-                      <td className="border-b border-gray-300 p-3 text-right font-semibold">
+                      <td className="border-b border-gray-300 p-2 text-right font-semibold">
                         {formatCurrency(bill?.sub_total || 0)}
                       </td>
                     </tr>
                     {bill && bill.igst_amount > 0 && (
                       <tr>
-                        <td colSpan={3} className="border-b border-gray-300 p-3 text-right">
+                        <td colSpan={3} className="border-b border-gray-300 p-2 text-right">
                           IGST @ {bill.gst_percentage}%
                         </td>
-                        <td className="border-b border-gray-300 p-3 text-right">
+                        <td className="border-b border-gray-300 p-2 text-right">
                           {formatCurrency(bill.igst_amount)}
                         </td>
                       </tr>
                     )}
                     {bill && bill.cgst_amount > 0 && (
                       <tr>
-                        <td colSpan={3} className="border-b border-gray-300 p-3 text-right">
+                        <td colSpan={3} className="border-b border-gray-300 p-2 text-right">
                           CGST @ {(bill.gst_percentage / 2).toFixed(2)}%
                         </td>
-                        <td className="border-b border-gray-300 p-3 text-right">
+                        <td className="border-b border-gray-300 p-2 text-right">
                           {formatCurrency(bill.cgst_amount)}
                         </td>
                       </tr>
                     )}
                     {bill && bill.sgst_amount > 0 && (
                       <tr>
-                        <td colSpan={3} className="border-b border-gray-300 p-3 text-right">
+                        <td colSpan={3} className="border-b border-gray-300 p-2 text-right">
                           SGST @ {(bill.gst_percentage / 2).toFixed(2)}%
                         </td>
-                        <td className="border-b border-gray-300 p-3 text-right">
+                        <td className="border-b border-gray-300 p-2 text-right">
                           {formatCurrency(bill.sgst_amount)}
                         </td>
                       </tr>
                     )}
                     <tr className="bg-blue-50">
-                      <td colSpan={3} className="border-b-2 border-gray-400 p-3 text-right font-bold text-lg">
+                      <td colSpan={3} className="border-b-2 border-gray-400 p-2 text-right font-bold text-sm">
                         Total Amount
                       </td>
-                      <td className="border-b-2 border-gray-400 p-3 text-right font-bold text-lg">
+                      <td className="border-b-2 border-gray-400 p-2 text-right font-bold text-sm">
                         {formatCurrency(bill?.total_amount || 0)}
                       </td>
                     </tr>
@@ -350,8 +350,8 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                 </table>
               </div>
 
-              <div className="border border-gray-300 rounded p-4 bg-gray-50">
-                <p className="font-semibold text-gray-900">
+              <div className="border border-gray-300 rounded p-2 bg-gray-50">
+                <p className="font-semibold text-xs text-gray-900">
                   Amount in Words:{' '}
                   <span className="font-normal">
                     {bill ? numberToWords(bill.total_amount) : '-'}
@@ -360,29 +360,29 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
               </div>
 
               {bill?.remarks && (
-                <div className="border border-gray-300 rounded p-4">
-                  <p className="font-semibold text-gray-900 mb-2">Remarks:</p>
-                  <p className="text-gray-700">{bill.remarks}</p>
+                <div className="border border-gray-300 rounded p-2">
+                  <p className="font-semibold text-xs text-gray-900 mb-1">Remarks:</p>
+                  <p className="text-xs text-gray-700">{bill.remarks}</p>
                 </div>
               )}
 
               {company?.bank_name && (
-                <div className="border border-gray-300 rounded p-4">
-                  <h3 className="font-semibold text-gray-900 mb-3 border-b pb-2">Bank Details</h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="border border-gray-300 rounded p-2">
+                  <h3 className="font-semibold text-xs text-gray-900 mb-2 border-b pb-1">Bank Details</h3>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <p className="mb-2">
+                      <p className="mb-1">
                         <span className="font-medium">Bank Name:</span> {company.bank_name}
                       </p>
-                      <p className="mb-2">
+                      <p className="mb-1">
                         <span className="font-medium">Account No:</span> {company.account_number}
                       </p>
                     </div>
                     <div>
-                      <p className="mb-2">
+                      <p className="mb-1">
                         <span className="font-medium">IFSC Code:</span> {company.ifsc_code}
                       </p>
-                      <p className="mb-2">
+                      <p className="mb-1">
                         <span className="font-medium">Branch:</span> {company.bank_branch}
                       </p>
                     </div>
@@ -390,28 +390,28 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                 </div>
               )}
 
-              <div className="border-t-2 border-gray-300 pt-4 mt-6">
+              <div className="border-t-2 border-gray-300 pt-2 mt-2">
                 <div className="flex justify-between items-end">
-                  <div className="text-sm text-gray-600">
+                  <div className="text-xs text-gray-600 leading-tight">
                     {company?.bill_footer1 && <p>{company.bill_footer1}</p>}
                     {company?.bill_footer2 && <p>{company.bill_footer2}</p>}
                     {company?.bill_footer3 && <p>{company.bill_footer3}</p>}
                   </div>
                   <div className="text-center">
-                    <p className="font-semibold text-gray-900 mb-3">For {company?.company_name}</p>
-                    <div className="flex items-center justify-center gap-3 mb-2">
+                    <p className="font-semibold text-xs text-gray-900 mb-1">For {company?.company_name}</p>
+                    <div className="flex items-center justify-center gap-2 mb-1">
                       <img
                         src="/round_stamp.jpg"
                         alt="Company Seal"
-                        className="h-16 w-16 object-contain print-seal"
+                        className="h-12 w-12 object-contain print-seal"
                       />
                       <img
                         src="/signature.jpg"
                         alt="Signature"
-                        className="h-12 w-auto object-contain print-signature"
+                        className="h-10 w-auto object-contain print-signature"
                       />
                     </div>
-                    <p className="border-t border-gray-400 pt-2">Authorized Signatory</p>
+                    <p className="border-t border-gray-400 pt-1 text-xs">Authorized Signatory</p>
                   </div>
                 </div>
               </div>
@@ -424,7 +424,7 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
         @media print {
           @page {
             size: A4 portrait;
-            margin: 10mm;
+            margin: 8mm;
           }
 
           body * {
@@ -447,7 +447,7 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
           .print-page {
             width: 100% !important;
             max-width: 100% !important;
-            padding: 0 !important;
+            padding: 5mm !important;
             margin: 0 !important;
           }
 
@@ -462,13 +462,31 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
           }
 
           /* Optimize image sizes for print */
+          .print-logo {
+            height: 45px !important;
+          }
+
           .print-seal {
-            height: 50px !important;
-            width: 50px !important;
+            height: 40px !important;
+            width: 40px !important;
           }
 
           .print-signature {
-            height: 40px !important;
+            height: 32px !important;
+          }
+
+          /* Reduce spacing in print */
+          .space-y-2 > * + * {
+            margin-top: 0.25rem !important;
+          }
+
+          /* Compact borders */
+          .border-b-2 {
+            padding-bottom: 0.25rem !important;
+          }
+
+          .border-t-2 {
+            padding-top: 0.25rem !important;
           }
         }
       `}</style>
