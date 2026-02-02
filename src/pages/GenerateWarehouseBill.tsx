@@ -33,7 +33,14 @@ interface Company {
   gstin: string;
 }
 
+interface CustomerBranch {
+  branch_id: string;
+  branch_name: string;
+}
+
 interface CustomerRate {
+  branch_id: string | null;
+  branch_name: string | null;
   sac_code: string | null;
   sac_description: string | null;
   service_type: string | null;
@@ -49,6 +56,7 @@ export default function GenerateWarehouseBill() {
   const [customerGSTs, setCustomerGSTs] = useState<CustomerGST[]>([]);
   const [sacCodes, setSACCodes] = useState<SACCode[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [customerBranches, setCustomerBranches] = useState<CustomerBranch[]>([]);
   const [customerRates, setCustomerRates] = useState<CustomerRate[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -66,6 +74,8 @@ export default function GenerateWarehouseBill() {
     bill_generation_branch: '',
     credit_days: 0,
     bill_due_date: '',
+    service_branch_id: '',
+    service_branch_name: '',
     service_type: '',
     sac_code: '',
     sac_description: '',
@@ -151,11 +161,22 @@ export default function GenerateWarehouseBill() {
 
     const { data: customerRatesData } = await supabase
       .from('customer_rate_master')
-      .select('sac_code, sac_description, service_type, service_type_rate, gst_charge_type, gst_percentage')
+      .select('branch_id, branch_name, sac_code, sac_description, service_type, service_type_rate, gst_charge_type, gst_percentage')
       .eq('customer_id', customerCode)
       .eq('is_active', true);
 
     setCustomerRates(customerRatesData || []);
+
+    const uniqueBranchesMap = new Map<string, CustomerBranch>();
+    (customerRatesData || []).forEach(rate => {
+      if (rate.branch_id && rate.branch_name && !uniqueBranchesMap.has(rate.branch_id)) {
+        uniqueBranchesMap.set(rate.branch_id, {
+          branch_id: rate.branch_id,
+          branch_name: rate.branch_name
+        });
+      }
+    });
+    setCustomerBranches(Array.from(uniqueBranchesMap.values()));
 
     setFormData(prev => ({
       ...prev,
@@ -163,6 +184,8 @@ export default function GenerateWarehouseBill() {
       billing_party_code: customer.customer_code,
       billing_party_name: customer.customer_name,
       credit_days: customerMasterData?.credit_days || 0,
+      service_branch_id: '',
+      service_branch_name: '',
       service_type: '',
       sac_code: '',
       sac_description: '',
@@ -199,8 +222,28 @@ export default function GenerateWarehouseBill() {
     }));
   };
 
+  const handleServiceBranchChange = (branchId: string) => {
+    const branch = customerBranches.find(b => b.branch_id === branchId);
+    if (!branch) return;
+
+    setFormData(prev => ({
+      ...prev,
+      service_branch_id: branchId,
+      service_branch_name: branch.branch_name,
+      service_type: '',
+      sac_code: '',
+      sac_description: '',
+      warehouse_charges: 0,
+      gst_charge_type: 'IGST',
+      gst_percentage: 18
+    }));
+  };
+
   const handleServiceTypeChange = (serviceType: string) => {
-    const rate = customerRates.find(r => r.service_type === serviceType);
+    const rate = customerRates.find(r =>
+      r.service_type === serviceType &&
+      r.branch_id === formData.service_branch_id
+    );
     if (!rate) return;
 
     setFormData(prev => ({
@@ -257,6 +300,11 @@ export default function GenerateWarehouseBill() {
       return;
     }
 
+    if (!formData.service_branch_id) {
+      alert('Please select service branch');
+      return;
+    }
+
     if (!formData.service_type) {
       alert('Please select service type');
       return;
@@ -299,6 +347,8 @@ export default function GenerateWarehouseBill() {
           bill_to_state: formData.bill_to_state,
           bill_to_gstin: formData.bill_to_gstin,
           bill_to_address: formData.bill_to_address,
+          service_branch_id: formData.service_branch_id || null,
+          service_branch_name: formData.service_branch_name || null,
           service_type: formData.service_type || null,
           sac_code: formData.sac_code,
           sac_description: formData.sac_description,
@@ -350,6 +400,8 @@ export default function GenerateWarehouseBill() {
       bill_generation_branch: '',
       credit_days: 0,
       bill_due_date: '',
+      service_branch_id: '',
+      service_branch_name: '',
       service_type: '',
       sac_code: '',
       sac_description: '',
@@ -368,6 +420,7 @@ export default function GenerateWarehouseBill() {
       remarks: ''
     });
     setCustomerGSTs([]);
+    setCustomerBranches([]);
     setCustomerRates([]);
   };
 
@@ -490,21 +543,43 @@ export default function GenerateWarehouseBill() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                Service Branch *
+              </label>
+              <select
+                value={formData.service_branch_id}
+                onChange={(e) => handleServiceBranchChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={!formData.billing_party_id}
+                required
+              >
+                <option value="">Select Service Branch</option>
+                {customerBranches.map((branch) => (
+                  <option key={branch.branch_id} value={branch.branch_id}>
+                    {branch.branch_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Service Type *
               </label>
               <select
                 value={formData.service_type}
                 onChange={(e) => handleServiceTypeChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={!formData.billing_party_id}
+                disabled={!formData.service_branch_id}
                 required
               >
                 <option value="">Select Service Type</option>
-                {customerRates.map((rate, index) => (
-                  <option key={index} value={rate.service_type || ''}>
-                    {rate.service_type}
-                  </option>
-                ))}
+                {customerRates
+                  .filter(rate => rate.branch_id === formData.service_branch_id)
+                  .map((rate, index) => (
+                    <option key={index} value={rate.service_type || ''}>
+                      {rate.service_type}
+                    </option>
+                  ))}
               </select>
             </div>
 
