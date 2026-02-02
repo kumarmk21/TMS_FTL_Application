@@ -98,7 +98,14 @@ export function THCPrintPreview({ isOpen, onClose, thcId }: THCPrintPreviewProps
   };
 
   const handlePrint = () => {
+    const originalTitle = document.title;
+    if (thcDetails?.vendor_master?.vendor_code && thcDetails?.thc_number) {
+      document.title = `${thcDetails.vendor_master.vendor_code}_${thcDetails.thc_number}`;
+    }
     window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 100);
   };
 
   if (!isOpen) return null;

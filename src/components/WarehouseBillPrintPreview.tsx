@@ -83,7 +83,14 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
   };
 
   const handlePrint = () => {
+    const originalTitle = document.title;
+    if (bill?.billing_party_code && bill?.bill_number) {
+      document.title = `${bill.billing_party_code}_${bill.bill_number}`;
+    }
     window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 100);
   };
 
   const formatDate = (dateString: string | null) => {

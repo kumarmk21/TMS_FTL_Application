@@ -109,7 +109,14 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
   };
 
   const handlePrint = () => {
+    const originalTitle = document.title;
+    if (bill?.billing_party_code && bill?.lr_bill_number) {
+      document.title = `${bill.billing_party_code}_${bill.lr_bill_number}`;
+    }
     window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 100);
   };
 
   const formatDate = (dateString: string | null) => {
