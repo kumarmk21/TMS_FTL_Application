@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { X, Printer } from 'lucide-react';
+import { X, Printer, Download } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 
 interface CompanyDetails {
   logo_url: string | null;
@@ -96,6 +97,25 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
     }, 100);
   };
 
+  const handleDownloadPDF = () => {
+    const element = document.querySelector('.bill-print-content');
+    if (!element) return;
+
+    const filename = bill?.billing_party_code && bill?.bill_number
+      ? `${bill.billing_party_code}_${bill.bill_number}.pdf`
+      : 'warehouse_bill.pdf';
+
+    const opt = {
+      margin: 10,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save();
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-IN');
@@ -152,6 +172,13 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between print:hidden">
           <h2 className="text-xl font-semibold text-gray-800">Warehouse Bill Preview</h2>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download PDF
+            </button>
             <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
