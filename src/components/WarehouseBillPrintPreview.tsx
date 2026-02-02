@@ -28,6 +28,7 @@ interface WarehouseBillDetails {
   bill_id: string;
   bill_number: string;
   bill_date: string;
+  bill_period: string | null;
   billing_party_name: string;
   billing_party_code: string;
   bill_to_address: string | null;
@@ -246,6 +247,12 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                     <span className="font-medium">Bill Date:</span>{' '}
                     {formatDate(bill?.bill_date || null)}
                   </p>
+                  {bill?.bill_period && (
+                    <p className="mb-1">
+                      <span className="font-medium">Bill Period:</span>{' '}
+                      {bill.bill_period}
+                    </p>
+                  )}
                   <p className="mb-1">
                     <span className="font-medium">Due Date:</span>{' '}
                     {formatDate(bill?.bill_due_date || null)}

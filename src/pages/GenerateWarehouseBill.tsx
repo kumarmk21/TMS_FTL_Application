@@ -62,6 +62,7 @@ export default function GenerateWarehouseBill() {
 
   const [formData, setFormData] = useState({
     bill_date: new Date().toISOString().split('T')[0],
+    bill_period: '',
     bill_sub_date: '',
     bill_sub_type: '',
     bill_sub_details: '',
@@ -335,6 +336,7 @@ export default function GenerateWarehouseBill() {
         .insert([{
           bill_number: billNumber,
           bill_date: formData.bill_date,
+          bill_period: formData.bill_period || null,
           bill_sub_date: formData.bill_sub_date || null,
           bill_sub_type: formData.bill_sub_type || null,
           bill_sub_details: formData.bill_sub_details || null,
@@ -388,6 +390,7 @@ export default function GenerateWarehouseBill() {
   const resetForm = () => {
     setFormData({
       bill_date: new Date().toISOString().split('T')[0],
+      bill_period: '',
       bill_sub_date: '',
       bill_sub_type: '',
       bill_sub_details: '',
@@ -432,7 +435,7 @@ export default function GenerateWarehouseBill() {
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Bill Date *
@@ -443,6 +446,19 @@ export default function GenerateWarehouseBill() {
               onChange={(e) => setFormData({ ...formData, bill_date: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Bill Period (mmm-yyyy)
+            </label>
+            <input
+              type="text"
+              value={formData.bill_period}
+              onChange={(e) => setFormData({ ...formData, bill_period: e.target.value })}
+              placeholder="e.g., Jan-2026"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
