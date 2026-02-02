@@ -28,6 +28,7 @@ import { CustomerGSTMaster } from '../pages/CustomerGSTMaster';
 import { DocTypeMaster } from '../pages/DocTypeMaster';
 import StatusMaster from '../pages/StatusMaster';
 import SACCodeMaster from '../pages/SACCodeMaster';
+import CustomerRateMaster from '../pages/CustomerRateMaster';
 import { OrderEnquiry } from '../pages/OrderEnquiry';
 import { Dashboard } from '../pages/Dashboard';
 import { LREntry } from '../pages/LREntry';
@@ -69,6 +70,7 @@ const menuItems: MenuItem[] = [
       { id: 'city-master', label: 'City Master' },
       { id: 'customer-master', label: 'Customer Master' },
       { id: 'customer-gst-master', label: 'Customer GST Master' },
+      { id: 'customer-rate-master', label: 'Customer Rate Master' },
       { id: 'vendor-master', label: 'Vendor Master' },
       { id: 'vendor-branch-update', label: 'Vendor Branch Update' },
       { id: 'company-master', label: 'Company Master' },
@@ -185,6 +187,8 @@ export function Layout() {
         return <CustomerMaster />;
       case 'customer-gst-master':
         return <CustomerGSTMaster />;
+      case 'customer-rate-master':
+        return <CustomerRateMaster />;
       case 'vendor-master':
         return <VendorMaster />;
       case 'vendor-branch-update':
