@@ -12,10 +12,12 @@ interface Customer {
 
 interface CustomerGST {
   id: string;
-  customer_id: string;
+  customer_code: string;
   gstin: string;
-  state_name: string;
-  address: string;
+  bill_to_address: string;
+  state_master?: {
+    state_name: string;
+  };
 }
 
 interface SACCode {
@@ -127,8 +129,9 @@ export default function GenerateWarehouseBill() {
 
     const { data: gstData, error } = await supabase
       .from('customer_gst_master')
-      .select('*')
-      .eq('customer_id', customerId);
+      .select('*, state_master(state_name)')
+      .eq('customer_code', customer.customer_code)
+      .eq('is_active', true);
 
     if (error) {
       console.error('Error fetching customer GST:', error);
@@ -145,8 +148,8 @@ export default function GenerateWarehouseBill() {
     setFormData(prev => ({
       ...prev,
       bill_to_gstin: gstin,
-      bill_to_state: gst.state_name || '',
-      bill_to_address: gst.address || ''
+      bill_to_state: gst.state_master?.state_name || '',
+      bill_to_address: gst.bill_to_address || ''
     }));
   };
 
@@ -397,7 +400,7 @@ export default function GenerateWarehouseBill() {
                 <option value="">Select GSTIN</option>
                 {customerGSTs.map(gst => (
                   <option key={gst.id} value={gst.gstin}>
-                    {gst.gstin} - {gst.state_name}
+                    {gst.gstin} - {gst.state_master?.state_name || 'Unknown State'}
                   </option>
                 ))}
               </select>
