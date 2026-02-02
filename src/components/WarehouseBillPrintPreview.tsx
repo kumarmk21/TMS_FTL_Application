@@ -398,7 +398,19 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                     {company?.bill_footer3 && <p>{company.bill_footer3}</p>}
                   </div>
                   <div className="text-center">
-                    <p className="font-semibold text-gray-900 mb-12">For {company?.company_name}</p>
+                    <p className="font-semibold text-gray-900 mb-4">For {company?.company_name}</p>
+                    <div className="flex items-center justify-center gap-4 mb-2">
+                      <img
+                        src="/round_stamp.jpg"
+                        alt="Company Seal"
+                        className="h-20 w-20 object-contain"
+                      />
+                      <img
+                        src="/signature.jpg"
+                        alt="Signature"
+                        className="h-16 w-auto object-contain"
+                      />
+                    </div>
                     <p className="border-t border-gray-400 pt-2">Authorized Signatory</p>
                   </div>
                 </div>
