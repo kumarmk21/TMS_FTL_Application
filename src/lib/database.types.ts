@@ -135,6 +135,89 @@ export interface Database {
           updated_by?: string | null
         }
       }
+      customer_rate_master: {
+        Row: {
+          rate_id: string
+          customer_id: string | null
+          customer_master_id: string | null
+          customer_name: string | null
+          is_active: boolean
+          sac_code: string | null
+          sac_description: string | null
+          from_city: string | null
+          from_city_id: string | null
+          to_city: string | null
+          to_city_id: string | null
+          vehicle_type: string | null
+          vehicle_type_id: string | null
+          service_type: string | null
+          service_type_rate: number
+          gst_charge_type: string | null
+          gst_percentage: number
+          effective_from: string | null
+          effective_to: string | null
+          remarks: string | null
+          created_by: string | null
+          created_date: string | null
+          created_at: string
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          rate_id?: string
+          customer_id?: string | null
+          customer_master_id?: string | null
+          customer_name?: string | null
+          is_active?: boolean
+          sac_code?: string | null
+          sac_description?: string | null
+          from_city?: string | null
+          from_city_id?: string | null
+          to_city?: string | null
+          to_city_id?: string | null
+          vehicle_type?: string | null
+          vehicle_type_id?: string | null
+          service_type?: string | null
+          service_type_rate?: number
+          gst_charge_type?: string | null
+          gst_percentage?: number
+          effective_from?: string | null
+          effective_to?: string | null
+          remarks?: string | null
+          created_by?: string | null
+          created_date?: string | null
+          created_at?: string
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          rate_id?: string
+          customer_id?: string | null
+          customer_master_id?: string | null
+          customer_name?: string | null
+          is_active?: boolean
+          sac_code?: string | null
+          sac_description?: string | null
+          from_city?: string | null
+          from_city_id?: string | null
+          to_city?: string | null
+          to_city_id?: string | null
+          vehicle_type?: string | null
+          vehicle_type_id?: string | null
+          service_type?: string | null
+          service_type_rate?: number
+          gst_charge_type?: string | null
+          gst_percentage?: number
+          effective_from?: string | null
+          effective_to?: string | null
+          remarks?: string | null
+          created_by?: string | null
+          created_date?: string | null
+          created_at?: string
+          updated_by?: string | null
+          updated_at?: string
+        }
+      }
     }
   }
 }
