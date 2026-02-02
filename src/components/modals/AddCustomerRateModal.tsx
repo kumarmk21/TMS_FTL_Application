@@ -248,6 +248,8 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
     });
   };
 
+  const isWarehousingService = formData.sac_code === '996729';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -363,10 +365,10 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                From City <span className="text-red-500">*</span>
+                From City {!isWarehousingService && <span className="text-red-500">*</span>}
               </label>
               <select
-                required
+                required={!isWarehousingService}
                 value={formData.from_city_id}
                 onChange={(e) => handleFromCityChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -382,10 +384,10 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                To City <span className="text-red-500">*</span>
+                To City {!isWarehousingService && <span className="text-red-500">*</span>}
               </label>
               <select
-                required
+                required={!isWarehousingService}
                 value={formData.to_city_id}
                 onChange={(e) => handleToCityChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -401,10 +403,10 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Vehicle Type <span className="text-red-500">*</span>
+                Vehicle Type {!isWarehousingService && <span className="text-red-500">*</span>}
               </label>
               <select
-                required
+                required={!isWarehousingService}
                 value={formData.vehicle_type_id}
                 onChange={(e) => handleVehicleTypeChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
