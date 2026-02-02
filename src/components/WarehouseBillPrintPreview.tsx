@@ -97,7 +97,7 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
     }, 100);
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     const element = document.querySelector('.bill-print-content');
     if (!element) return;
 
@@ -106,14 +106,34 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
       : 'warehouse_bill.pdf';
 
     const opt = {
-      margin: 10,
+      margin: [8, 8, 8, 8],
       filename: filename,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        letterRendering: true,
+        allowTaint: true,
+        scrollY: 0,
+        scrollX: 0,
+        windowHeight: element.scrollHeight
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait',
+        compress: true
+      },
+      pagebreak: {
+        mode: ['avoid-all', 'css', 'legacy'],
+        before: '.page-break-before',
+        after: '.page-break-after',
+        avoid: ['tr', 'td', 'th', 'img']
+      }
     };
 
-    html2pdf().set(opt).from(element).save();
+    await html2pdf().set(opt).from(element).save();
   };
 
   const formatDate = (dateString: string | null) => {
@@ -445,14 +465,14 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                 </div>
               )}
 
-              <div className="border-t-2 border-gray-300 pt-2 mt-2">
-                <div className="flex justify-between items-end">
-                  <div className="text-xs text-gray-600 leading-tight">
-                    {company?.bill_footer1 && <p>{company.bill_footer1}</p>}
-                    {company?.bill_footer2 && <p>{company.bill_footer2}</p>}
-                    {company?.bill_footer3 && <p>{company.bill_footer3}</p>}
+              <div className="border-t-2 border-gray-300 pt-2 mt-2 page-break-avoid">
+                <div className="flex justify-between items-start">
+                  <div className="text-xs text-gray-600 leading-tight max-w-[60%]" style={{ fontSize: '10px', lineHeight: '1.3' }}>
+                    {company?.bill_footer1 && <p className="mb-0.5">{company.bill_footer1}</p>}
+                    {company?.bill_footer2 && <p className="mb-0.5">{company.bill_footer2}</p>}
+                    {company?.bill_footer3 && <p className="mb-0.5">{company.bill_footer3}</p>}
                   </div>
-                  <div className="text-center">
+                  <div className="text-center flex-shrink-0">
                     <p className="font-semibold text-xs text-gray-900 mb-1">For {company?.company_name}</p>
                     <div className="flex items-center justify-center gap-2 mb-1">
                       <img
@@ -476,6 +496,11 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
       </div>
 
       <style>{`
+        .page-break-avoid {
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+
         @media print {
           @page {
             size: A4 portrait;
@@ -542,6 +567,12 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
 
           .border-t-2 {
             padding-top: 0.25rem !important;
+          }
+
+          /* Prevent page breaks in footer */
+          .page-break-avoid {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
