@@ -42,6 +42,7 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
     customer_name: '',
     branch_id: '',
     branch_name: '',
+    sac_id: '',
     sac_code: '',
     sac_description: '',
     from_city_id: '',
@@ -195,10 +196,32 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
     if (sac) {
       setFormData({
         ...formData,
+        sac_id: sacId,
         sac_code: sac.sac_code,
         sac_description: sac.sac_description,
       });
+    } else {
+      setFormData({
+        ...formData,
+        sac_id: '',
+        sac_code: '',
+        sac_description: '',
+      });
     }
+  };
+
+  const handleGSTChargeTypeChange = (chargeType: string) => {
+    let percentage = '18';
+    if (chargeType === 'CGST+SGST') {
+      percentage = '9';
+    } else if (chargeType === 'Out of GST Scope') {
+      percentage = '0';
+    }
+    setFormData({
+      ...formData,
+      gst_charge_type: chargeType,
+      gst_percentage: percentage,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -301,11 +324,8 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
                 SAC Code
               </label>
               <select
-                value={formData.sac_code}
-                onChange={(e) => {
-                  const sacId = e.target.value;
-                  handleSACCodeChange(sacId);
-                }}
+                value={formData.sac_id}
+                onChange={(e) => handleSACCodeChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select SAC Code</option>
@@ -385,6 +405,9 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select Service Type</option>
+                <option value="Warehousing Services">Warehousing Services</option>
+                <option value="FTL Services">FTL Services</option>
+                <option value="Door Delivery Services">Door Delivery Services</option>
                 <option value="Express">Express</option>
                 <option value="Standard">Standard</option>
                 <option value="Economy">Economy</option>
@@ -413,11 +436,12 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
               </label>
               <select
                 value={formData.gst_charge_type}
-                onChange={(e) => setFormData({ ...formData, gst_charge_type: e.target.value })}
+                onChange={(e) => handleGSTChargeTypeChange(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="IGST">IGST</option>
-                <option value="CGST+SGST">CGST+SGST</option>
+                <option value="IGST">IGST (18%)</option>
+                <option value="CGST+SGST">CGST+SGST (9%)</option>
+                <option value="Out of GST Scope">Out of GST Scope (0%)</option>
               </select>
             </div>
 
@@ -429,8 +453,8 @@ export default function AddCustomerRateModal({ onClose, onSuccess }: AddCustomer
                 type="number"
                 step="0.01"
                 value={formData.gst_percentage}
-                onChange={(e) => setFormData({ ...formData, gst_percentage: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700"
                 placeholder="18.00"
               />
             </div>
