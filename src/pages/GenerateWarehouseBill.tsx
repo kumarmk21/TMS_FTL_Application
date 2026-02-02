@@ -145,7 +145,7 @@ export default function GenerateWarehouseBill() {
 
     const { data: customerMasterData } = await supabase
       .from('customer_master')
-      .select('customer_id, credit_days')
+      .select('id, customer_id, credit_days')
       .eq('customer_id', customerCode)
       .maybeSingle();
 
@@ -159,7 +159,7 @@ export default function GenerateWarehouseBill() {
 
     setFormData(prev => ({
       ...prev,
-      billing_party_id: customerCode,
+      billing_party_id: customerMasterData?.id || '',
       billing_party_code: customer.customer_code,
       billing_party_name: customer.customer_name,
       credit_days: customerMasterData?.credit_days || 0,
@@ -273,7 +273,12 @@ export default function GenerateWarehouseBill() {
       const { data: billNumberData, error: billNumberError } = await supabase
         .rpc('generate_warehouse_bill_number');
 
-      if (billNumberError) throw billNumberError;
+      if (billNumberError) {
+        console.error('Error generating bill number:', billNumberError);
+        alert(`Error generating bill number: ${billNumberError.message}`);
+        setLoading(false);
+        return;
+      }
 
       const billNumber = billNumberData;
 
@@ -286,7 +291,7 @@ export default function GenerateWarehouseBill() {
           bill_sub_type: formData.bill_sub_type || null,
           bill_sub_details: formData.bill_sub_details || null,
           credit_days: formData.credit_days,
-          bill_due_date: formData.bill_due_date,
+          bill_due_date: formData.bill_due_date || null,
           bill_generation_branch: formData.bill_generation_branch,
           billing_party_code: formData.billing_party_code,
           billing_party_name: formData.billing_party_name,
@@ -313,13 +318,18 @@ export default function GenerateWarehouseBill() {
           created_by: user?.id
         }]);
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('Error inserting warehouse bill:', insertError);
+        alert(`Error creating warehouse bill: ${insertError.message}`);
+        setLoading(false);
+        return;
+      }
 
       alert(`Warehouse bill generated successfully!\nBill Number: ${billNumber}`);
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating warehouse bill:', error);
-      alert('Error generating warehouse bill. Please try again.');
+      alert(`Error generating warehouse bill: ${error?.message || 'Please try again.'}`);
     } finally {
       setLoading(false);
     }
