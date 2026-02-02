@@ -33,6 +33,15 @@ interface Company {
   gstin: string;
 }
 
+interface CustomerRate {
+  sac_code: string | null;
+  sac_description: string | null;
+  service_type: string | null;
+  service_type_rate: number;
+  gst_charge_type: string | null;
+  gst_percentage: number;
+}
+
 export default function GenerateWarehouseBill() {
   const { user } = useAuth();
   const [uniqueCustomers, setUniqueCustomers] = useState<UniqueCustomer[]>([]);
@@ -56,11 +65,13 @@ export default function GenerateWarehouseBill() {
     bill_generation_branch: '',
     credit_days: 0,
     bill_due_date: '',
+    service_type: '',
     sac_code: '',
     sac_description: '',
     warehouse_charges: 0,
     other_charges: 0,
     sub_total: 0,
+    gst_charge_type: 'IGST',
     gst_percentage: 18,
     igst_amount: 0,
     cgst_amount: 0,
@@ -81,15 +92,15 @@ export default function GenerateWarehouseBill() {
   }, [formData.warehouse_charges, formData.other_charges, formData.gst_percentage, formData.bill_to_state]);
 
   useEffect(() => {
-    if (formData.bill_date && formData.credit_days) {
-      const billDate = new Date(formData.bill_date);
-      billDate.setDate(billDate.getDate() + formData.credit_days);
+    if (formData.bill_sub_date && formData.credit_days) {
+      const subDate = new Date(formData.bill_sub_date);
+      subDate.setDate(subDate.getDate() + formData.credit_days);
       setFormData(prev => ({
         ...prev,
-        bill_due_date: billDate.toISOString().split('T')[0]
+        bill_due_date: subDate.toISOString().split('T')[0]
       }));
     }
-  }, [formData.bill_date, formData.credit_days]);
+  }, [formData.bill_sub_date, formData.credit_days]);
 
   const fetchMasterData = async () => {
     try {
@@ -137,12 +148,25 @@ export default function GenerateWarehouseBill() {
       .eq('customer_id', customerCode)
       .maybeSingle();
 
+    const { data: customerRateData } = await supabase
+      .from('customer_rate_master')
+      .select('sac_code, sac_description, service_type, service_type_rate, gst_charge_type, gst_percentage')
+      .eq('customer_id', customerCode)
+      .eq('is_active', true)
+      .maybeSingle();
+
     setFormData(prev => ({
       ...prev,
       billing_party_id: customerCode,
       billing_party_code: customer.customer_code,
       billing_party_name: customer.customer_name,
       credit_days: customerMasterData?.credit_days || 0,
+      service_type: customerRateData?.service_type || '',
+      sac_code: customerRateData?.sac_code || '',
+      sac_description: customerRateData?.sac_description || '',
+      warehouse_charges: customerRateData?.service_type_rate || 0,
+      gst_charge_type: customerRateData?.gst_charge_type || 'IGST',
+      gst_percentage: customerRateData?.gst_percentage || 18,
       bill_to_gstin: '',
       bill_to_state: '',
       bill_to_address: ''
@@ -170,17 +194,6 @@ export default function GenerateWarehouseBill() {
       bill_to_gstin: gstin,
       bill_to_state: gst.state_master?.state_name || '',
       bill_to_address: gst.bill_to_address || ''
-    }));
-  };
-
-  const handleSACCodeChange = (sacCode: string) => {
-    const sac = sacCodes.find(s => s.sac_code === sacCode);
-    if (!sac) return;
-
-    setFormData(prev => ({
-      ...prev,
-      sac_code: sacCode,
-      sac_description: sac.sac_description || ''
     }));
   };
 
@@ -264,11 +277,13 @@ export default function GenerateWarehouseBill() {
           bill_to_state: formData.bill_to_state,
           bill_to_gstin: formData.bill_to_gstin,
           bill_to_address: formData.bill_to_address,
+          service_type: formData.service_type || null,
           sac_code: formData.sac_code,
           sac_description: formData.sac_description,
           warehouse_charges: formData.warehouse_charges,
           other_charges: formData.other_charges,
           sub_total: formData.sub_total,
+          gst_charge_type: formData.gst_charge_type || null,
           gst_percentage: formData.gst_percentage,
           igst_amount: formData.igst_amount,
           cgst_amount: formData.cgst_amount,
@@ -308,11 +323,13 @@ export default function GenerateWarehouseBill() {
       bill_generation_branch: '',
       credit_days: 0,
       bill_due_date: '',
+      service_type: '',
       sac_code: '',
       sac_description: '',
       warehouse_charges: 0,
       other_charges: 0,
       sub_total: 0,
+      gst_charge_type: 'IGST',
       gst_percentage: 18,
       igst_amount: 0,
       cgst_amount: 0,
@@ -445,24 +462,29 @@ export default function GenerateWarehouseBill() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                SAC Code *
+                Service Type
               </label>
-              <select
-                value={formData.sac_code}
-                onChange={(e) => handleSACCodeChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Select SAC Code</option>
-                {sacCodes.map(sac => (
-                  <option key={sac.sac_id} value={sac.sac_code}>
-                    {sac.sac_code} - {sac.sac_description}
-                  </option>
-                ))}
-              </select>
+              <input
+                type="text"
+                value={formData.service_type}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+              />
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                SAC Code
+              </label>
+              <input
+                type="text"
+                value={formData.sac_code}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+              />
+            </div>
+
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 SAC Description
               </label>
@@ -520,14 +542,26 @@ export default function GenerateWarehouseBill() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                GST Charge Type
+              </label>
+              <input
+                type="text"
+                value={formData.gst_charge_type}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 GST %
               </label>
               <input
                 type="number"
                 step="0.01"
                 value={formData.gst_percentage}
-                onChange={(e) => setFormData({ ...formData, gst_percentage: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
               />
             </div>
 
@@ -588,31 +622,7 @@ export default function GenerateWarehouseBill() {
         <div className="border-t pt-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Terms</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Credit Days
-              </label>
-              <input
-                type="number"
-                value={formData.credit_days}
-                onChange={(e) => setFormData({ ...formData, credit_days: parseInt(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Due Date
-              </label>
-              <input
-                type="date"
-                value={formData.bill_due_date}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-              />
-            </div>
-
-            <div className="flex items-center pt-8">
+            <div className="flex items-center pt-2">
               <input
                 type="checkbox"
                 checked={formData.tds_applicable}
@@ -697,6 +707,32 @@ export default function GenerateWarehouseBill() {
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Any additional notes or remarks"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pt-6 border-t">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Credit Days
+              </label>
+              <input
+                type="number"
+                value={formData.credit_days}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Due Date (Submission Date + Credit Days)
+              </label>
+              <input
+                type="date"
+                value={formData.bill_due_date}
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
               />
             </div>
           </div>
