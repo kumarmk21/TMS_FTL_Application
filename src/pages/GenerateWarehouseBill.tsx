@@ -20,9 +20,9 @@ interface CustomerGST {
 }
 
 interface SACCode {
-  id: string;
+  sac_id: string;
   sac_code: string;
-  description: string;
+  sac_description: string;
 }
 
 interface Company {
@@ -95,7 +95,7 @@ export default function GenerateWarehouseBill() {
     try {
       const [customerGSTData, sacCodesData, companiesData] = await Promise.all([
         supabase.from('customer_gst_master').select('*, state_master(state_name)').eq('is_active', true).order('customer_name'),
-        supabase.from('sac_code_master').select('*').order('sac_code'),
+        supabase.from('sac_code_master').select('*').eq('is_active', true).order('sac_code'),
         supabase.from('company_master').select('*').order('company_name')
       ]);
 
@@ -180,7 +180,7 @@ export default function GenerateWarehouseBill() {
     setFormData(prev => ({
       ...prev,
       sac_code: sacCode,
-      sac_description: sac.description || ''
+      sac_description: sac.sac_description || ''
     }));
   };
 
@@ -455,8 +455,8 @@ export default function GenerateWarehouseBill() {
               >
                 <option value="">Select SAC Code</option>
                 {sacCodes.map(sac => (
-                  <option key={sac.id} value={sac.sac_code}>
-                    {sac.sac_code} - {sac.description}
+                  <option key={sac.sac_id} value={sac.sac_code}>
+                    {sac.sac_code} - {sac.sac_description}
                   </option>
                 ))}
               </select>
