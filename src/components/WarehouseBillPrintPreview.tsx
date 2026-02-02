@@ -106,18 +106,19 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
       : 'warehouse_bill.pdf';
 
     const opt = {
-      margin: [8, 8, 8, 8],
+      margin: [5, 5, 5, 5],
       filename: filename,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         logging: false,
         letterRendering: true,
         allowTaint: true,
-        scrollY: 0,
-        scrollX: 0,
-        windowHeight: element.scrollHeight
+        scrollY: -window.scrollY,
+        scrollX: -window.scrollX,
+        windowHeight: element.scrollHeight + 100,
+        height: element.scrollHeight + 100
       },
       jsPDF: {
         unit: 'mm',
@@ -126,10 +127,8 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
         compress: true
       },
       pagebreak: {
-        mode: ['avoid-all', 'css', 'legacy'],
-        before: '.page-break-before',
-        after: '.page-break-after',
-        avoid: ['tr', 'td', 'th', 'img']
+        mode: 'avoid-all',
+        avoid: ['tr', 'td', 'th', 'img', '.page-break-avoid']
       }
     };
 
@@ -216,10 +215,10 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
         </div>
 
         <div className="p-8 bill-print-content">
-          <div className="bg-white print-page" style={{ maxWidth: '210mm', margin: '0 auto', padding: '10mm' }}>
-            <div className="space-y-2">
-              <div className="border-b-2 border-gray-300 pb-2">
-                <div className="flex items-start justify-between mb-2">
+          <div className="bg-white print-page" style={{ maxWidth: '210mm', margin: '0 auto', padding: '8mm' }}>
+            <div className="space-y-1">
+              <div className="border-b-2 border-gray-300 pb-1">
+                <div className="flex items-start justify-between mb-1">
                   {company?.logo_url && (
                     <img
                       src={company.logo_url}
@@ -235,7 +234,7 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <p className="text-gray-700">
                       <span className="font-semibold">Address:</span>{' '}
@@ -283,9 +282,9 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                 </h2>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="border border-gray-300 p-2 rounded">
-                  <h3 className="font-semibold text-gray-900 mb-2 border-b pb-1">Bill Details</h3>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="border border-gray-300 p-1.5 rounded">
+                  <h3 className="font-semibold text-gray-900 mb-1 border-b pb-0.5">Bill Details</h3>
                   <p className="mb-1">
                     <span className="font-medium">Bill No:</span>{' '}
                     <span className="font-semibold">{bill?.bill_number}</span>
@@ -322,8 +321,8 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                   )}
                 </div>
 
-                <div className="border border-gray-300 p-2 rounded">
-                  <h3 className="font-semibold text-gray-900 mb-2 border-b pb-1">Bill To</h3>
+                <div className="border border-gray-300 p-1.5 rounded">
+                  <h3 className="font-semibold text-gray-900 mb-1 border-b pb-0.5">Bill To</h3>
                   <p className="font-semibold text-sm mb-1">{bill?.billing_party_name}</p>
                   <p className="mb-1 text-gray-700">Code: {bill?.billing_party_code}</p>
                   {bill?.bill_to_address && (
@@ -425,7 +424,7 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                 </table>
               </div>
 
-              <div className="border border-gray-300 rounded p-2 bg-gray-50">
+              <div className="border border-gray-300 rounded p-1.5 bg-gray-50">
                 <p className="font-semibold text-xs text-gray-900">
                   Amount in Words:{' '}
                   <span className="font-normal">
@@ -435,16 +434,16 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
               </div>
 
               {bill?.remarks && (
-                <div className="border border-gray-300 rounded p-2">
-                  <p className="font-semibold text-xs text-gray-900 mb-1">Remarks:</p>
+                <div className="border border-gray-300 rounded p-1.5">
+                  <p className="font-semibold text-xs text-gray-900 mb-0.5">Remarks:</p>
                   <p className="text-xs text-gray-700">{bill.remarks}</p>
                 </div>
               )}
 
               {company?.bank_name && (
-                <div className="border border-gray-300 rounded p-2">
-                  <h3 className="font-semibold text-xs text-gray-900 mb-2 border-b pb-1">Bank Details</h3>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="border border-gray-300 rounded p-1.5">
+                  <h3 className="font-semibold text-xs text-gray-900 mb-1 border-b pb-0.5">Bank Details</h3>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <p className="mb-1">
                         <span className="font-medium">Bank Name:</span> {company.bank_name}
@@ -465,10 +464,9 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                 </div>
               )}
 
-              <div className="border-t-2 border-gray-300 pt-2 mt-2 page-break-avoid">
-                <div className="flex justify-between items-start">
-                  <div className="text-xs text-gray-600 leading-tight max-w-[60%]" style={{ fontSize: '10px', lineHeight: '1.3' }}>
-                    {company?.bill_footer1 && <p className="mb-0.5">{company.bill_footer1}</p>}
+              <div className="border-t-2 border-gray-300 pt-1 mt-1 page-break-avoid">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="text-xs text-gray-600 leading-tight" style={{ fontSize: '9px', lineHeight: '1.2', maxWidth: '55%' }}>
                     {company?.bill_footer2 && <p className="mb-0.5">{company.bill_footer2}</p>}
                     {company?.bill_footer3 && <p className="mb-0.5">{company.bill_footer3}</p>}
                   </div>
@@ -478,15 +476,17 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                       <img
                         src="/round_stamp.jpg"
                         alt="Company Seal"
-                        className="h-12 w-12 object-contain print-seal"
+                        className="h-14 w-14 object-contain"
+                        crossOrigin="anonymous"
                       />
                       <img
                         src="/signature.jpg"
                         alt="Signature"
-                        className="h-10 w-auto object-contain print-signature"
+                        className="h-12 w-auto object-contain"
+                        crossOrigin="anonymous"
                       />
                     </div>
-                    <p className="border-t border-gray-400 pt-1 text-xs">Authorized Signatory</p>
+                    <p className="border-t border-gray-400 pt-1 text-xs font-medium">Authorized Signatory</p>
                   </div>
                 </div>
               </div>
@@ -504,7 +504,7 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
         @media print {
           @page {
             size: A4 portrait;
-            margin: 8mm;
+            margin: 5mm;
           }
 
           body * {
@@ -527,7 +527,7 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
           .print-page {
             width: 100% !important;
             max-width: 100% !important;
-            padding: 5mm !important;
+            padding: 4mm !important;
             margin: 0 !important;
           }
 
@@ -546,27 +546,19 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
             height: 45px !important;
           }
 
-          .print-seal {
-            height: 40px !important;
-            width: 40px !important;
-          }
-
-          .print-signature {
-            height: 32px !important;
-          }
-
           /* Reduce spacing in print */
-          .space-y-2 > * + * {
-            margin-top: 0.25rem !important;
+          .space-y-1 > * + * {
+            margin-top: 0.15rem !important;
           }
 
           /* Compact borders */
           .border-b-2 {
-            padding-bottom: 0.25rem !important;
+            padding-bottom: 0.15rem !important;
           }
 
           .border-t-2 {
-            padding-top: 0.25rem !important;
+            padding-top: 0.15rem !important;
+            margin-top: 0.15rem !important;
           }
 
           /* Prevent page breaks in footer */
