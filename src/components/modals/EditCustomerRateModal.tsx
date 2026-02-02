@@ -116,14 +116,25 @@ export default function EditCustomerRateModal({
   }, [sacCodes, rate.sac_code]);
 
   const fetchCustomers = async () => {
-    const { data, error } = await supabase
-      .from('customer_master')
-      .select('id, customer_code, customer_name')
-      .eq('is_active', true)
-      .order('customer_name');
+    try {
+      const { data, error } = await supabase
+        .from('customer_master')
+        .select('id, customer_code, customer_name')
+        .eq('is_active', true)
+        .order('customer_name');
 
-    if (!error && data) {
-      setCustomers(data);
+      if (error) {
+        console.error('Error fetching customers:', error);
+        alert('Error loading customers: ' + error.message);
+        return;
+      }
+
+      if (data) {
+        console.log('Loaded customers:', data.length);
+        setCustomers(data);
+      }
+    } catch (err) {
+      console.error('Exception fetching customers:', err);
     }
   };
 
@@ -175,14 +186,27 @@ export default function EditCustomerRateModal({
   };
 
   const handleCustomerChange = (customerId: string) => {
+    if (!customerId) {
+      setFormData({
+        ...formData,
+        customer_master_id: '',
+        customer_id: '',
+        customer_name: '',
+      });
+      return;
+    }
+
     const customer = customers.find((c) => c.id === customerId);
     if (customer) {
+      console.log('Selected customer:', customer);
       setFormData({
         ...formData,
         customer_master_id: customerId,
         customer_id: customer.customer_code,
         customer_name: customer.customer_name,
       });
+    } else {
+      console.warn('Customer not found:', customerId);
     }
   };
 
