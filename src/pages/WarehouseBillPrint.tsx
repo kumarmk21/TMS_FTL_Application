@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { FileText, Search, Printer, Filter } from 'lucide-react';
+import { FileText, Search, Printer, Filter, Edit } from 'lucide-react';
 import { WarehouseBillPrintPreview } from '../components/WarehouseBillPrintPreview';
+import { EditWarehouseBillModal } from '../components/modals/EditWarehouseBillModal';
 
 interface BillingParty {
   billing_party_code: string;
@@ -28,6 +29,7 @@ export default function WarehouseBillPrint() {
   const [loading, setLoading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
+  const [editBillId, setEditBillId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBillingParties();
@@ -104,6 +106,14 @@ export default function WarehouseBillPrint() {
     setSelectedBillId(bill.bill_id);
   };
 
+  const handleEdit = (bill: WarehouseBill) => {
+    setEditBillId(bill.bill_id);
+  };
+
+  const handleEditSuccess = () => {
+    handleSearch();
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-IN');
@@ -146,6 +156,14 @@ export default function WarehouseBillPrint() {
         <WarehouseBillPrintPreview
           billId={selectedBillId}
           onClose={() => setSelectedBillId(null)}
+        />
+      )}
+
+      {editBillId && (
+        <EditWarehouseBillModal
+          billId={editBillId}
+          onClose={() => setEditBillId(null)}
+          onSuccess={handleEditSuccess}
         />
       )}
 
@@ -311,13 +329,22 @@ export default function WarehouseBillPrint() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button
-                            onClick={() => handlePrint(bill)}
-                            className="flex items-center gap-2 text-blue-600 hover:text-blue-900"
-                          >
-                            <Printer className="w-4 h-4" />
-                            Print
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleEdit(bill)}
+                              className="flex items-center gap-2 text-green-600 hover:text-green-900"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handlePrint(bill)}
+                              className="flex items-center gap-2 text-blue-600 hover:text-blue-900"
+                            >
+                              <Printer className="w-4 h-4" />
+                              Print
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
