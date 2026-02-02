@@ -35,7 +35,7 @@ interface EditCustomerRateModalProps {
 
 interface Customer {
   id: string;
-  customer_code: string;
+  customer_id: string;
   customer_name: string;
 }
 
@@ -119,7 +119,7 @@ export default function EditCustomerRateModal({
     try {
       const { data, error } = await supabase
         .from('customer_master')
-        .select('id, customer_code, customer_name')
+        .select('id, customer_id, customer_name')
         .eq('is_active', true)
         .order('customer_name');
 
@@ -202,7 +202,7 @@ export default function EditCustomerRateModal({
       setFormData({
         ...formData,
         customer_master_id: customerId,
-        customer_id: customer.customer_code,
+        customer_id: customer.customer_id,
         customer_name: customer.customer_name,
       });
     } else {
@@ -356,7 +356,7 @@ export default function EditCustomerRateModal({
                 <option value="">Select Customer</option>
                 {customers.map((customer) => (
                   <option key={customer.id} value={customer.id}>
-                    {customer.customer_code} - {customer.customer_name}
+                    {customer.customer_id} - {customer.customer_name}
                   </option>
                 ))}
               </select>
