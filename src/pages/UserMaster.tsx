@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Pencil, Trash2, Search } from 'lucide-react';
+import { UserPlus, Pencil, Trash2, Search, Key } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../lib/database.types';
 import { AddUserModal } from '../components/modals/AddUserModal';
 import { EditUserModal } from '../components/modals/EditUserModal';
+import { ResetPasswordModal } from '../components/modals/ResetPasswordModal';
 import { useAuth } from '../contexts/AuthContext';
 
 export function UserMaster() {
@@ -13,6 +14,7 @@ export function UserMaster() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const { profile } = useAuth();
 
@@ -52,6 +54,11 @@ export function UserMaster() {
   const handleEdit = (user: UserProfile) => {
     setSelectedUser(user);
     setIsEditModalOpen(true);
+  };
+
+  const handleResetPassword = (user: UserProfile) => {
+    setSelectedUser(user);
+    setIsResetPasswordModalOpen(true);
   };
 
   const handleDelete = async (userId: string) => {
@@ -213,6 +220,13 @@ export function UserMaster() {
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => handleResetPassword(user)}
+                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                          title="Reset password"
+                        >
+                          <Key className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleDelete(user.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete user"
@@ -248,6 +262,15 @@ export function UserMaster() {
           setSelectedUser(null);
         }}
         onSuccess={fetchUsers}
+        user={selectedUser}
+      />
+
+      <ResetPasswordModal
+        isOpen={isResetPasswordModalOpen}
+        onClose={() => {
+          setIsResetPasswordModalOpen(false);
+          setSelectedUser(null);
+        }}
         user={selectedUser}
       />
     </div>
