@@ -42,6 +42,7 @@ import { THCPrint } from '../pages/THCPrint';
 import GenerateAdvanceBankFile from '../pages/GenerateAdvanceBankFile';
 import RegenerateAdvanceBankFile from '../pages/RegenerateAdvanceBankFile';
 import SalesReport from '../pages/SalesReport';
+import CustomerMISReport from '../pages/CustomerMISReport';
 import { LRTracking } from '../pages/LRTracking';
 import GenerateWarehouseBill from '../pages/GenerateWarehouseBill';
 import WarehouseBillPrint from '../pages/WarehouseBillPrint';
@@ -138,6 +139,7 @@ const menuItems: MenuItem[] = [
     icon: <BarChart3 className="w-5 h-5" />,
     subItems: [
       { id: 'sales-report', label: 'Sales Report' },
+      { id: 'customer-mis-report', label: 'Customer MIS Report' },
       { id: 'pending-pod', label: 'Pending POD' },
       { id: 'ar-report', label: 'AR Report' },
       { id: 'ap-report', label: 'AP Report' },
@@ -229,6 +231,8 @@ export function Layout() {
         return <RegenerateAdvanceBankFile />;
       case 'sales-report':
         return <SalesReport />;
+      case 'customer-mis-report':
+        return <CustomerMISReport />;
       case 'lr-tracking':
         return <LRTracking />;
       default:
