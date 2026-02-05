@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Search, DollarSign, Save, X, Calculator } from 'lucide-react';
+import { Search, DollarSign, Save, X, Calculator, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LRFinancial {
   tran_id: string;
@@ -14,6 +14,7 @@ interface LRFinancial {
   chrg_wt: number;
   billing_party_name: string;
   vehicle_type: string;
+  vehicle_number: string;
   freight_rate: number;
   freight_amount: number;
   freight_type: string;
@@ -37,6 +38,8 @@ export default function LRFinancialEdit() {
   const [editingLR, setEditingLR] = useState<LRFinancial | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const recordsPerPage = 20;
 
   const [financialData, setFinancialData] = useState({
     freight_type: 'Fixed',
@@ -96,6 +99,7 @@ export default function LRFinancialEdit() {
   const filterLRs = () => {
     if (!searchTerm.trim()) {
       setFilteredLRs(lrList);
+      setCurrentPage(1);
       return;
     }
 
@@ -108,6 +112,16 @@ export default function LRFinancialEdit() {
         lr.billing_party_name?.toLowerCase().includes(term)
     );
     setFilteredLRs(filtered);
+    setCurrentPage(1);
+  };
+
+  const totalPages = Math.ceil(filteredLRs.length / recordsPerPage);
+  const startIndex = (currentPage - 1) * recordsPerPage;
+  const endIndex = startIndex + recordsPerPage;
+  const paginatedLRs = filteredLRs.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   const calculateTotals = () => {
@@ -275,79 +289,124 @@ export default function LRFinancialEdit() {
             <p className="text-lg">No unbilled LRs found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    LR No
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    From - To
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Billing Party
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vehicle Type
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Weight (KG)
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Freight
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Amount
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredLRs.map((lr) => (
-                  <tr key={lr.tran_id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {lr.manual_lr_no}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                      {formatDate(lr.lr_date)}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {lr.from_city} - {lr.to_city || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {lr.billing_party_name || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {lr.vehicle_type || '-'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                      {lr.chrg_wt || 0}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                      {formatCurrency(lr.freight_amount)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      {formatCurrency(lr.lr_total_amount)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => handleEdit(lr)}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        Edit Financials
-                      </button>
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      LR No
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      From - To
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Billing Party
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Vehicle Type
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Vehicle Number
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Freight
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Amount
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedLRs.map((lr) => (
+                    <tr key={lr.tran_id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {lr.manual_lr_no}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                        {formatDate(lr.lr_date)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {lr.from_city} - {lr.to_city || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {lr.billing_party_name || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        {lr.vehicle_type || '-'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                        {lr.vehicle_number || '-'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                        {formatCurrency(lr.freight_amount)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
+                        {formatCurrency(lr.lr_total_amount)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => handleEdit(lr)}
+                          className="text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          Edit Financials
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredLRs.length > recordsPerPage && (
+              <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200">
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <span>
+                    Showing {startIndex + 1} to {Math.min(endIndex, filteredLRs.length)} of {filteredLRs.length} records
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                          currentPage === page
+                            ? 'bg-green-600 text-white'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
