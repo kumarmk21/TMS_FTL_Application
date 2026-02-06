@@ -228,54 +228,124 @@ export function LRPrint() {
         {`
           @page {
             size: A4 landscape;
-            margin: 0;
+            margin: 8mm;
           }
 
           @media print {
             body {
               margin: 0;
               padding: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+
+            .no-print {
+              display: none !important;
             }
 
             .print-container {
-              width: 297mm;
-              height: 210mm;
+              width: 100%;
+              height: auto;
               margin: 0;
               padding: 0;
               page-break-after: always;
+              overflow: visible;
             }
 
             .print-content {
-              width: 297mm;
-              height: 210mm;
-              padding: 10mm;
+              width: 100%;
+              height: auto;
+              padding: 8mm;
               box-sizing: border-box;
-              font-size: 10pt;
+              font-size: 8pt;
+              line-height: 1.3;
             }
 
             .print-content h1 {
-              font-size: 16pt;
+              font-size: 11pt;
+              margin-bottom: 2px;
+              line-height: 1.2;
             }
 
             .print-content h3 {
-              font-size: 11pt;
+              font-size: 9pt;
+              margin-bottom: 3px;
+              line-height: 1.2;
             }
 
             .print-content .text-sm {
-              font-size: 9pt;
+              font-size: 7.5pt;
+              line-height: 1.3;
             }
 
             .print-content .text-xs {
-              font-size: 8pt;
+              font-size: 7pt;
+              line-height: 1.3;
             }
 
             .print-content .logo-img {
-              height: 48px;
+              height: 35px;
+              max-height: 35px;
+            }
+
+            .print-content .header-section {
+              margin-bottom: 6px;
+              padding-bottom: 4px;
+            }
+
+            .print-content .section-heading {
+              font-size: 8.5pt;
+              font-weight: 600;
+              margin-bottom: 2px;
+              padding-bottom: 1px;
+              border-bottom: 1px solid #333;
+            }
+
+            .print-content .detail-section {
+              margin-bottom: 6px;
+            }
+
+            .print-content .detail-grid {
+              display: grid;
+              gap: 4px;
+            }
+
+            .print-content .disclaimer-box {
+              margin-top: 6px;
+              margin-bottom: 6px;
+              padding: 6px;
+              border: 1px solid #333;
+              background-color: #f5f5f5;
+            }
+
+            .print-content .disclaimer-text {
+              font-size: 6.5pt;
+              line-height: 1.3;
+            }
+
+            .print-content .signature-section {
+              margin-top: 8px;
+              padding-top: 6px;
+            }
+
+            .print-content .signature-space {
+              margin-bottom: 15px;
+            }
+
+            .print-content .footer-text {
+              margin-top: 4px;
+              padding-top: 4px;
+              font-size: 6.5pt;
+            }
+
+            .print-content p {
+              margin: 0;
+              padding: 0;
             }
           }
         `}
       </style>
-      <div className="bg-white rounded-lg shadow-md p-6 print:hidden">
+      <div className="bg-white rounded-lg shadow-md p-6 print:hidden no-print">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">LR Print</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -378,30 +448,30 @@ export function LRPrint() {
       </div>
 
       {loading && (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
+        <div className="bg-white rounded-lg shadow-md p-12 text-center no-print">
           <div className="text-gray-500">Loading LR data...</div>
         </div>
       )}
 
       {lrData && selectedCompany && !loading && (
         <div ref={printRef} className="bg-white rounded-lg shadow-md p-8 print:shadow-none print:p-0 print-container">
-          <div className="border-2 border-gray-800 p-6 print:p-3 print:border print-content">
-            <div className="flex items-start justify-between mb-4 pb-3 border-b-2 border-gray-300 print:mb-2 print:pb-2 print:border-b">
-              <div className="flex-1">
+          <div className="border-2 border-gray-800 p-6 print:border print-content">
+            <div className="flex items-start justify-between mb-4 pb-3 border-b-2 border-gray-300 header-section">
+              <div className="flex-1" style={{ maxWidth: '60%' }}>
                 {selectedCompany.logo_url && (
                   <img
                     src={selectedCompany.logo_url}
                     alt={selectedCompany.company_name}
-                    className="h-16 object-contain mb-2 print:h-12 print:mb-1 logo-img"
+                    className="h-16 object-contain mb-2 logo-img"
                   />
                 )}
-                <h1 className="text-2xl font-bold text-gray-900 print:text-lg print:mb-1">
+                <h1 className="text-2xl font-bold text-gray-900">
                   {selectedCompany.company_name}
                 </h1>
                 {selectedCompany.company_tagline && (
-                  <p className="text-sm text-gray-600 italic print:text-xs">{selectedCompany.company_tagline}</p>
+                  <p className="text-sm text-gray-600 italic">{selectedCompany.company_tagline}</p>
                 )}
-                <div className="mt-2 text-sm text-gray-700 print:mt-1 print:text-xs">
+                <div className="mt-2 text-sm text-gray-700">
                   {selectedCompany.company_address && (
                     <p>{selectedCompany.company_address}</p>
                   )}
@@ -423,43 +493,43 @@ export function LRPrint() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900 mb-2 print:text-lg print:mb-1">LORRY RECEIPT</div>
-                <div className="text-lg font-semibold text-gray-800 print:text-base">
+                <div className="text-2xl font-bold text-gray-900 mb-2">LORRY RECEIPT</div>
+                <div className="text-lg font-semibold text-gray-800">
                   LR No: {lrData.manual_lr_no}
                 </div>
-                <div className="text-sm text-gray-600 print:text-xs">
+                <div className="text-sm text-gray-600">
                   Date: {formatDate(lrData.lr_date)}
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6 mb-4 print:gap-3 print:mb-2">
+            <div className="grid grid-cols-2 gap-6 mb-4 detail-section">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2 border-b border-gray-300 pb-1 print:text-sm print:mb-1 print:pb-0">
+                <h3 className="section-heading">
                   Consignor Details
                 </h3>
-                <div className="text-sm space-y-1 print:text-xs print:space-y-0">
+                <div className="text-sm space-y-1">
                   <p className="font-medium">{lrData.consignor || '-'}</p>
                   <p className="text-gray-600">From: {lrData.from_city || '-'}</p>
                 </div>
               </div>
 
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2 border-b border-gray-300 pb-1 print:text-sm print:mb-1 print:pb-0">
+                <h3 className="section-heading">
                   Consignee Details
                 </h3>
-                <div className="text-sm space-y-1 print:text-xs print:space-y-0">
+                <div className="text-sm space-y-1">
                   <p className="font-medium">{lrData.consignee || '-'}</p>
                   <p className="text-gray-600">To: {lrData.to_city || '-'}</p>
                 </div>
               </div>
             </div>
 
-            <div className="mb-4 print:mb-2">
-              <h3 className="font-semibold text-gray-900 mb-2 border-b border-gray-300 pb-1 print:text-sm print:mb-1 print:pb-0">
+            <div className="mb-4 detail-section">
+              <h3 className="section-heading">
                 Billing Party Details
               </h3>
-              <div className="text-sm grid grid-cols-2 gap-4 print:text-xs print:gap-2">
+              <div className="text-sm grid grid-cols-2 gap-4 detail-grid">
                 <div>
                   <p className="font-medium">{lrData.billing_party_name || '-'}</p>
                   <p className="text-gray-600">{lrData.bill_to_address || '-'}</p>
@@ -473,11 +543,11 @@ export function LRPrint() {
               </div>
             </div>
 
-            <div className="mb-4 print:mb-2">
-              <h3 className="font-semibold text-gray-900 mb-2 border-b border-gray-300 pb-1 print:text-xs print:mb-1 print:pb-0">
+            <div className="mb-4 detail-section">
+              <h3 className="section-heading">
                 Shipment Details
               </h3>
-              <div className="grid grid-cols-4 gap-4 text-sm print:gap-2 print:text-xs">
+              <div className="grid grid-cols-4 gap-4 text-sm detail-grid">
                 <div>
                   <p className="text-gray-600">Vehicle Type</p>
                   <p className="font-medium">{lrData.vehicle_type || '-'}</p>
@@ -497,11 +567,11 @@ export function LRPrint() {
               </div>
             </div>
 
-            <div className="mb-4 print:mb-2">
-              <h3 className="font-semibold text-gray-900 mb-2 border-b border-gray-300 pb-1 print:text-xs print:mb-1 print:pb-0">
+            <div className="mb-4 detail-section">
+              <h3 className="section-heading">
                 Package & Weight Details
               </h3>
-              <div className="grid grid-cols-4 gap-4 text-sm print:gap-2 print:text-xs">
+              <div className="grid grid-cols-4 gap-4 text-sm detail-grid">
                 <div>
                   <p className="text-gray-600">No. of Packages</p>
                   <p className="font-medium">{lrData.no_of_pkgs || '-'}</p>
@@ -521,11 +591,11 @@ export function LRPrint() {
               </div>
             </div>
 
-            <div className="mb-4 print:mb-2">
-              <h3 className="font-semibold text-gray-900 mb-2 border-b border-gray-300 pb-1 print:text-xs print:mb-1 print:pb-0">
+            <div className="mb-4 detail-section">
+              <h3 className="section-heading">
                 Invoice & E-Way Bill
               </h3>
-              <div className="grid grid-cols-4 gap-4 text-sm print:gap-2 print:text-xs">
+              <div className="grid grid-cols-4 gap-4 text-sm detail-grid">
                 <div>
                   <p className="text-gray-600">Invoice No.</p>
                   <p className="font-medium">{lrData.invoice_number || '-'}</p>
@@ -545,11 +615,11 @@ export function LRPrint() {
               </div>
             </div>
 
-            <div className="mb-4 print:mb-2">
-              <h3 className="font-semibold text-gray-900 mb-2 border-b border-gray-300 pb-1 print:text-xs print:mb-1 print:pb-0">
+            <div className="mb-4 detail-section">
+              <h3 className="section-heading">
                 Additional Information
               </h3>
-              <div className="grid grid-cols-4 gap-4 text-sm print:gap-2 print:text-xs">
+              <div className="grid grid-cols-4 gap-4 text-sm detail-grid">
                 <div>
                   <p className="text-gray-600">Loading Date</p>
                   <p className="font-medium">{formatDate(lrData.loading_date)}</p>
@@ -569,11 +639,11 @@ export function LRPrint() {
               </div>
             </div>
 
-            <div className="mt-6 mb-6 p-4 border-2 border-gray-400 bg-gray-50 print:mt-3 print:mb-3 print:p-3 print:border">
-              <h3 className="font-bold text-gray-900 mb-2 text-center uppercase print:text-sm print:mb-1">
+            <div className="mt-6 mb-6 p-4 border-2 border-gray-400 bg-gray-50 disclaimer-box">
+              <h3 className="font-bold text-gray-900 mb-2 text-center uppercase" style={{ fontSize: '8.5pt' }}>
                 DISCLAIMER / DECLARATION BY CONSIGNOR
               </h3>
-              <div className="text-xs text-gray-800 leading-relaxed text-justify space-y-2 print:text-[8pt] print:space-y-1 print:leading-relaxed">
+              <div className="text-xs text-gray-800 leading-relaxed text-justify space-y-1 disclaimer-text">
                 <p>
                   The Consignor hereby declares and warrants that the consignment covered under this Lorry Receipt does not contain any goods which are prohibited, restricted, hazardous, illegal, contraband, or banned under any applicable law, rule, regulation, or notification in force, including but not limited to those prescribed by statutory authorities from time to time.
                 </p>
@@ -589,34 +659,34 @@ export function LRPrint() {
                 <p>
                   By handing over the consignment and accepting this Lorry Receipt, the Consignor unconditionally agrees to and accepts the above terms and conditions.
                 </p>
-                <p className="font-bold text-center mt-3 uppercase">
+                <p className="font-bold text-center mt-2 uppercase">
                   READ, UNDERSTOOD, AND ACCEPTED BY THE CONSIGNOR
                 </p>
               </div>
             </div>
 
-            <div className="mt-8 pt-6 border-t-2 border-gray-300 grid grid-cols-3 gap-8 print:mt-4 print:pt-3 print:gap-4">
+            <div className="mt-8 pt-6 border-t-2 border-gray-300 grid grid-cols-3 gap-8 signature-section">
               <div>
-                <p className="text-sm text-gray-600 mb-8 print:text-xs print:mb-6">For {selectedCompany.company_name}</p>
-                <div className="border-t border-gray-400 pt-2 print:pt-1">
-                  <p className="text-sm font-medium print:text-xs">Authorized Signatory</p>
+                <p className="text-sm text-gray-600 mb-8 signature-space">For {selectedCompany.company_name}</p>
+                <div className="border-t border-gray-400 pt-2">
+                  <p className="text-sm font-medium">Authorized Signatory</p>
                 </div>
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-8 print:text-xs print:mb-6">Consignor Signature</p>
-                <div className="border-t border-gray-400 pt-2 print:pt-1">
-                  <p className="text-sm font-medium print:text-xs">Signature & Stamp</p>
+                <p className="text-sm text-gray-600 mb-8 signature-space">Consignor Signature</p>
+                <div className="border-t border-gray-400 pt-2">
+                  <p className="text-sm font-medium">Signature & Stamp</p>
                 </div>
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-8 print:text-xs print:mb-6">Received by Consignee</p>
-                <div className="border-t border-gray-400 pt-2 print:pt-1">
-                  <p className="text-sm font-medium print:text-xs">Signature & Stamp</p>
+                <p className="text-sm text-gray-600 mb-8 signature-space">Received by Consignee</p>
+                <div className="border-t border-gray-400 pt-2">
+                  <p className="text-sm font-medium">Signature & Stamp</p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-gray-300 text-xs text-gray-500 text-center print:mt-2 print:pt-2 print:text-[8pt]">
+            <div className="mt-4 pt-4 border-t border-gray-300 text-xs text-gray-500 text-center footer-text">
               <p>This is a computer-generated document and does not require a physical signature.</p>
               <p className="mt-1">
                 For any queries, please contact: {selectedCompany.contact_number || '-'} | {selectedCompany.email || '-'}
@@ -627,13 +697,13 @@ export function LRPrint() {
       )}
 
       {!lrData && !loading && selectedLR && (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
+        <div className="bg-white rounded-lg shadow-md p-12 text-center no-print">
           <div className="text-gray-500">No LR data found</div>
         </div>
       )}
 
       {!selectedLR && !loading && (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
+        <div className="bg-white rounded-lg shadow-md p-12 text-center no-print">
           <div className="text-gray-500">
             {!selectedBranch
               ? 'Please select a branch to view available LR numbers'
