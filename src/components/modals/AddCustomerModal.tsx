@@ -82,19 +82,19 @@ export function AddCustomerModal({ isOpen, onClose, onSuccess }: AddCustomerModa
       const { data, error } = await supabase
         .from('customer_master')
         .select('customer_id')
-        .order('customer_id', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1);
 
       if (error) throw error;
 
-      let nextId = 'CUST001';
+      let nextId = 'SH0000001';
       if (data && data.length > 0) {
         const lastId = data[0].customer_id;
-        const match = lastId.match(/^CUST(\d+)$/);
+        const match = lastId.match(/^SH(\d+)$/);
         if (match) {
           const lastNumber = parseInt(match[1], 10);
           const nextNumber = lastNumber + 1;
-          nextId = `CUST${String(nextNumber).padStart(3, '0')}`;
+          nextId = `SH${String(nextNumber).padStart(7, '0')}`;
         }
       }
 
