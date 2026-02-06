@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Printer, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import html2pdf from 'html2pdf.js';
+// @ts-ignore
+import html2canvas from 'html2canvas';
+// @ts-ignore
+import { jsPDF } from 'jspdf';
 
 interface Branch {
   id: string;
@@ -206,41 +209,59 @@ export function LRPrint() {
   };
 
   const handleDownloadPDF = async () => {
-    const element = document.querySelector('.lr-print-content');
+    const element = document.querySelector('.lr-print-content') as HTMLElement;
     if (!element) return;
 
     const filename = lrData?.manual_lr_no
       ? `LR_${lrData.manual_lr_no}.pdf`
       : 'lorry_receipt.pdf';
 
-    const opt = {
-      margin: [5, 5, 5, 5],
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 3,
-        useCORS: true,
-        logging: false,
-        letterRendering: true,
-        allowTaint: true,
-        scrollY: -window.scrollY,
-        scrollX: -window.scrollX,
-        windowHeight: element.scrollHeight + 100,
-        height: element.scrollHeight + 100
-      },
-      jsPDF: {
-        unit: 'mm',
-        format: 'a4',
-        orientation: 'landscape',
-        compress: true
-      },
-      pagebreak: {
-        mode: 'avoid-all',
-        avoid: ['tr', 'td', 'th', 'img', '.page-break-avoid']
-      }
-    };
+    const pageWidth = 297;
+    const pageHeight = 210;
+    const margin = 5;
+    const contentWidth = pageWidth - margin * 2;
+    const contentHeight = pageHeight - margin * 2;
 
-    await html2pdf().set(opt).from(element).save();
+    const canvas = await html2canvas(element, {
+      scale: 3,
+      useCORS: true,
+      logging: false,
+      letterRendering: true,
+      allowTaint: true,
+      scrollY: -window.scrollY,
+      scrollX: -window.scrollX,
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
+    });
+
+    const imgAspect = canvas.width / canvas.height;
+    const pageAspect = contentWidth / contentHeight;
+
+    let drawWidth: number;
+    let drawHeight: number;
+    let xOffset: number;
+    let yOffset: number;
+
+    if (imgAspect > pageAspect) {
+      drawWidth = contentWidth;
+      drawHeight = contentWidth / imgAspect;
+      xOffset = margin;
+      yOffset = margin + (contentHeight - drawHeight) / 2;
+    } else {
+      drawHeight = contentHeight;
+      drawWidth = contentHeight * imgAspect;
+      xOffset = margin + (contentWidth - drawWidth) / 2;
+      yOffset = margin;
+    }
+
+    pdf.addImage(imgData, 'JPEG', xOffset, yOffset, drawWidth, drawHeight);
+    pdf.save(filename);
   };
 
   const formatDate = (date: string | null) => {
