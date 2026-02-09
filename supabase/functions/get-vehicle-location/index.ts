@@ -172,6 +172,11 @@ Deno.serve(async (req: Request) => {
 
     const tripData = await ftResponse.json();
     console.log("FreightTiger API Response:", JSON.stringify(tripData, null, 2));
+    console.log("FreightTiger API Response Keys:", Object.keys(tripData));
+    if (tripData.data) {
+      console.log("tripData.data type:", Array.isArray(tripData.data) ? 'array' : typeof tripData.data);
+      console.log("tripData.data keys:", Object.keys(tripData.data));
+    }
 
     if (tripData && tripData.data) {
       const trips = Array.isArray(tripData.data) ? tripData.data : [tripData.data];
@@ -182,7 +187,8 @@ Deno.serve(async (req: Request) => {
       const errors: any[] = [];
 
       for (const trip of trips) {
-        console.log("Processing trip:", JSON.stringify(trip, null, 2));
+        console.log("Processing trip - Keys:", Object.keys(trip));
+        console.log("Processing trip - Full data:", JSON.stringify(trip, null, 2));
 
         const extractedTripId = trip.trip_id || trip.id || trip.feed_unique_id;
         console.log("Extracted trip_id:", extractedTripId);
