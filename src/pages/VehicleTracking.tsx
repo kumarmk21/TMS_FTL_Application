@@ -117,12 +117,16 @@ export function VehicleTracking() {
     try {
       setRefreshingLR(lr.tran_id);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
+      if (!lr.driver_number) {
+        throw new Error('Driver number not available for this LR');
       }
 
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-vehicle-location?driver_number=${lr.driver_number}`;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session. Please login again.');
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-vehicle-location?driver_number=${encodeURIComponent(lr.driver_number)}`;
 
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -132,22 +136,23 @@ export function VehicleTracking() {
         },
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to refresh location');
-      }
-
       const result = await response.json();
+
+      if (!response.ok) {
+        const errorMsg = result.details || result.error || 'Failed to refresh location';
+        throw new Error(errorMsg);
+      }
 
       if (result.success) {
         alert('Location refreshed successfully!');
         await fetchLREntries();
       } else {
-        throw new Error(result.error || 'Failed to refresh location');
+        const errorMsg = result.details || result.error || 'Failed to refresh location';
+        throw new Error(errorMsg);
       }
     } catch (error: any) {
       console.error('Error refreshing location:', error);
-      alert(`Failed to refresh location: ${error.message}`);
+      alert(`Failed to refresh location:\n\n${error.message}\n\nDriver: ${lr.driver_number || 'N/A'}`);
     } finally {
       setRefreshingLR(null);
     }
@@ -157,9 +162,13 @@ export function VehicleTracking() {
     try {
       setAddingTrip(lr.tran_id);
 
+      if (!lr.driver_number || !lr.vehicle_number) {
+        throw new Error('Driver number and vehicle number are required for trip tracking');
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error('No active session');
+        throw new Error('No active session. Please login again.');
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-freight-tiger-trip`;
@@ -176,22 +185,23 @@ export function VehicleTracking() {
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to add trip');
-      }
-
       const result = await response.json();
+
+      if (!response.ok) {
+        const errorMsg = result.details || result.error || 'Failed to add trip to FreightTiger';
+        throw new Error(errorMsg);
+      }
 
       if (result.success) {
         alert('Trip added to FreightTiger successfully!');
         await fetchLREntries();
       } else {
-        throw new Error(result.error || 'Failed to add trip');
+        const errorMsg = result.details || result.error || 'Failed to add trip to FreightTiger';
+        throw new Error(errorMsg);
       }
     } catch (error: any) {
       console.error('Error adding trip:', error);
-      alert(`Failed to add trip: ${error.message}`);
+      alert(`Failed to add trip to FreightTiger:\n\n${error.message}\n\nLR: ${lr.manual_lr_no}\nDriver: ${lr.driver_number || 'N/A'}\nVehicle: ${lr.vehicle_number || 'N/A'}`);
     } finally {
       setAddingTrip(null);
     }

@@ -38,15 +38,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: lr } = await supabase
+    const { data: lr, error: lrError } = await supabase
       .from("booking_lr")
-      .select(`
-        *,
-        origin:city_master!booking_lr_origin_id_fkey(*),
-        destination:city_master!booking_lr_destination_id_fkey(*)
-      `)
+      .select("*")
       .eq("tran_id", payload.lr_id)
-      .single();
+      .maybeSingle();
+
+    if (lrError) {
+      console.error("Error fetching LR:", lrError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Error fetching LR data",
+          details: lrError.message
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
     if (!lr) {
       return new Response(
@@ -64,17 +78,35 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: config } = await supabase
+    const { data: config, error: configError } = await supabase
       .from("freight_tiger_config")
       .select("api_token, integration_url, prod_url")
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
+
+    if (configError) {
+      console.error("Error fetching config:", configError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Error fetching FreightTiger configuration",
+          details: configError.message
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
     if (!config) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "FreightTiger configuration not found"
+          error: "FreightTiger configuration not found. Please configure FreightTiger settings first."
         }),
         {
           status: 404,
@@ -90,23 +122,26 @@ Deno.serve(async (req: Request) => {
     const ftApiUrl = `${useProduction ? config.prod_url : config.integration_url}/saas/trip/add?token=${config.api_token}`;
 
     const tripPayload = {
-      trip_id: payload.trip_id || lr.manual_lr_no,
+      feed_unique_id: payload.trip_id || lr.manual_lr_no,
       driver_number: lr.driver_number,
       vehicle_number: lr.vehicle_number,
-      origin: lr.origin?.city_name || lr.from_city,
-      destination: lr.destination?.city_name || lr.to_city,
+      origin_city: lr.from_city,
+      destination_city: lr.to_city,
       start_date: lr.loading_date || lr.lr_date,
       expected_delivery_date: lr.est_del_date,
       customer_name: lr.billing_party_name,
-      consignor: lr.consignor,
-      consignee: lr.consignee,
-      no_of_packages: lr.no_of_pkgs,
+      consignor_name: lr.consignor,
+      consignee_name: lr.consignee,
+      package_count: lr.no_of_pkgs,
       weight: lr.act_wt,
       invoice_number: lr.invoice_number,
       invoice_value: lr.invoice_value,
-      eway_bill: lr.eway_bill_number,
+      eway_bill_number: lr.eway_bill_number,
+      lr_number: lr.manual_lr_no,
       ...payload.additional_data
     };
+
+    console.log("Sending trip payload to FreightTiger:", JSON.stringify(tripPayload));
 
     const ftResponse = await fetch(ftApiUrl, {
       method: "POST",

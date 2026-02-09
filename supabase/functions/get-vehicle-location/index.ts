@@ -39,17 +39,35 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: config } = await supabase
+    const { data: config, error: configError } = await supabase
       .from("freight_tiger_config")
       .select("api_token, prod_url")
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
+
+    if (configError) {
+      console.error("Error fetching config:", configError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Error fetching FreightTiger configuration",
+          details: configError.message
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
     if (!config) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "FreightTiger configuration not found"
+          error: "FreightTiger configuration not found. Please configure FreightTiger settings first."
         }),
         {
           status: 404,
