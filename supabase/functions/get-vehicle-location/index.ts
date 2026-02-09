@@ -179,14 +179,25 @@ Deno.serve(async (req: Request) => {
 
       let savedTrips = 0;
       let savedLocations = 0;
+      const errors: any[] = [];
 
       for (const trip of trips) {
         console.log("Processing trip:", JSON.stringify(trip, null, 2));
 
+        const extractedTripId = trip.trip_id || trip.id || trip.feed_unique_id;
+        console.log("Extracted trip_id:", extractedTripId);
+
+        if (!extractedTripId) {
+          const error = "No trip_id found in trip data";
+          console.error(error, "Trip keys:", Object.keys(trip));
+          errors.push({ error, trip_keys: Object.keys(trip) });
+          continue;
+        }
+
         const tripRecord: any = {
-          trip_id: trip.trip_id || trip.id,
+          trip_id: extractedTripId,
           driver_number: driverNumber,
-          vehicle_number: trip.vehicle?.registration_number || trip.vehicle_number,
+          vehicle_number: trip.vehicle?.registration_number || trip.vehicle_number || trip.vehicle?.number,
           trip_data: trip,
           status: trip.status || "active",
         };
@@ -194,6 +205,8 @@ Deno.serve(async (req: Request) => {
         if (lrId) {
           tripRecord.lr_id = lrId;
         }
+
+        console.log("Trip record to save:", JSON.stringify(tripRecord, null, 2));
 
         const { error: tripError } = await supabase
           .from("freight_tiger_trips")
@@ -203,6 +216,7 @@ Deno.serve(async (req: Request) => {
 
         if (tripError) {
           console.error("Error saving trip:", tripError);
+          errors.push({ error: tripError.message, code: tripError.code, details: tripError.details });
         } else {
           savedTrips++;
           console.log("Trip saved successfully");
@@ -245,6 +259,7 @@ Deno.serve(async (req: Request) => {
           trips_found: trips.length,
           trips_saved: savedTrips,
           locations_saved: savedLocations,
+          errors: errors.length > 0 ? errors : undefined,
           raw_data: tripData
         }),
         {

@@ -153,9 +153,10 @@ export function VehicleTracking() {
       }
 
       console.log('Full API Response:', result);
+      console.log('Raw FreightTiger Data:', result.raw_data);
 
       if (result.success) {
-        const msg = `Location refreshed successfully!\n\nTrips Found: ${result.trips_found || 0}\nTrips Saved: ${result.trips_saved || 0}\nLocations Saved: ${result.locations_saved || 0}`;
+        const msg = `Location refreshed successfully!\n\nTrips Found: ${result.trips_found || 0}\nTrips Saved: ${result.trips_saved || 0}\nLocations Saved: ${result.locations_saved || 0}\n\nPlease check browser console for detailed FreightTiger response.`;
         alert(msg);
         await fetchLREntries();
       } else {
