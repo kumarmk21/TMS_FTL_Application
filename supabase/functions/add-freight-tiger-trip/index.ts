@@ -136,7 +136,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const useProduction = payload.use_production !== false;
-    const ftApiUrl = `${useProduction ? config.prod_url : config.integration_url}/saas/trip/add?token=${config.api_token}`;
+    const ftApiUrl = `${useProduction ? config.prod_url : config.integration_url}/saas/trip/add`;
 
     const formatDate = (dateStr: string | null) => {
       if (!dateStr) return null;
@@ -219,6 +219,7 @@ Deno.serve(async (req: Request) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": config.api_token,
         },
         body: JSON.stringify(tripPayload),
       });
