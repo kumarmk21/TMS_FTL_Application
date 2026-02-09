@@ -81,13 +81,18 @@ Deno.serve(async (req: Request) => {
 
     const ftApiUrl = `${config.prod_url}/saas/trip/driver/${driverNumber}`;
 
+    console.log(`Fetching trip for driver: ${driverNumber}`);
+    console.log(`API URL: ${ftApiUrl}`);
+
     const ftResponse = await fetch(ftApiUrl, {
       method: "GET",
       headers: {
-        "Authorization": config.api_token,
+        "Authorization": `Bearer ${config.api_token}`,
         "Content-Type": "application/json",
       },
     });
+
+    console.log(`FreightTiger API response status: ${ftResponse.status}`);
 
     if (!ftResponse.ok) {
       const errorText = await ftResponse.text();
