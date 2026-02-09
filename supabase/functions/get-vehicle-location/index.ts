@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
     const ftResponse = await fetch(ftApiUrl, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${config.api_token}`,
+        "Authorization": config.api_token,
         "Content-Type": "application/json",
       },
     });
