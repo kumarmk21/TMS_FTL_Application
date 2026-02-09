@@ -137,11 +137,19 @@ export function VehicleTracking() {
         },
       });
 
+      console.log('Refresh Location Response Status:', response.status);
+
       const result = await response.json();
+      console.log('Refresh Location Response:', result);
 
       if (!response.ok) {
         const errorMsg = result.details || result.error || 'Failed to refresh location';
-        throw new Error(errorMsg);
+        console.error('Refresh Location Error:', {
+          status: response.status,
+          error: errorMsg,
+          fullResponse: result
+        });
+        throw new Error(`[${response.status}] ${errorMsg}`);
       }
 
       if (result.success) {

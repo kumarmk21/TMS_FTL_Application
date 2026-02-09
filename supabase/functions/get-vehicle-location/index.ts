@@ -16,12 +16,19 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log("=== Get Vehicle Location Request Started ===");
+    console.log("Request URL:", req.url);
+    console.log("Request method:", req.method);
+    console.log("Request headers:", JSON.stringify(Object.fromEntries(req.headers.entries())));
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const url = new URL(req.url);
     const driverNumber = url.searchParams.get("driver_number");
+
+    console.log("Driver number:", driverNumber);
 
     if (!driverNumber) {
       return new Response(
