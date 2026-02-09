@@ -75,8 +75,10 @@ Deno.serve(async (req: Request) => {
 
     const url = new URL(req.url);
     const driverNumber = url.searchParams.get("driver_number");
+    const lrId = url.searchParams.get("lr_id");
 
     console.log("Driver number:", driverNumber);
+    console.log("LR ID:", lrId);
 
     if (!driverNumber) {
       return new Response(
@@ -174,15 +176,21 @@ Deno.serve(async (req: Request) => {
       const trips = Array.isArray(tripData.data) ? tripData.data : [tripData.data];
 
       for (const trip of trips) {
+        const tripRecord: any = {
+          trip_id: trip.trip_id || trip.id,
+          driver_number: driverNumber,
+          vehicle_number: trip.vehicle?.registration_number || trip.vehicle_number,
+          trip_data: trip,
+          status: trip.status || "active",
+        };
+
+        if (lrId) {
+          tripRecord.lr_id = lrId;
+        }
+
         await supabase
           .from("freight_tiger_trips")
-          .upsert({
-            trip_id: trip.trip_id || trip.id,
-            driver_number: driverNumber,
-            vehicle_number: trip.vehicle?.registration_number || trip.vehicle_number,
-            trip_data: trip,
-            status: trip.status || "active",
-          }, {
+          .upsert(tripRecord, {
             onConflict: "trip_id"
           });
 

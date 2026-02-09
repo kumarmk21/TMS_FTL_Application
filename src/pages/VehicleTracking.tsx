@@ -126,7 +126,7 @@ export function VehicleTracking() {
         throw new Error('No active session. Please login again.');
       }
 
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-vehicle-location?driver_number=${encodeURIComponent(lr.driver_number)}`;
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-vehicle-location?driver_number=${encodeURIComponent(lr.driver_number)}&lr_id=${encodeURIComponent(lr.tran_id)}`;
 
       const response = await fetch(apiUrl, {
         method: 'GET',
