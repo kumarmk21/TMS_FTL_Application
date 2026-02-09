@@ -152,12 +152,16 @@ export function VehicleTracking() {
         throw new Error(`[${response.status}] ${errorMsg}`);
       }
 
+      console.log('Full API Response:', result);
+
       if (result.success) {
-        alert('Location refreshed successfully!');
+        const msg = `Location refreshed successfully!\n\nTrips Found: ${result.trips_found || 0}\nTrips Saved: ${result.trips_saved || 0}\nLocations Saved: ${result.locations_saved || 0}`;
+        alert(msg);
         await fetchLREntries();
       } else {
-        const errorMsg = result.details || result.error || 'Failed to refresh location';
-        throw new Error(errorMsg);
+        const errorMsg = result.message || result.error || 'Failed to refresh location';
+        console.error('FreightTiger Response:', result.raw_response);
+        alert(`${errorMsg}\n\nCheck browser console for full response details.`);
       }
     } catch (error: any) {
       console.error('Error refreshing location:', error);

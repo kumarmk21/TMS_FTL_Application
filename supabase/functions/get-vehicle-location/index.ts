@@ -171,11 +171,18 @@ Deno.serve(async (req: Request) => {
     }
 
     const tripData = await ftResponse.json();
+    console.log("FreightTiger API Response:", JSON.stringify(tripData, null, 2));
 
     if (tripData && tripData.data) {
       const trips = Array.isArray(tripData.data) ? tripData.data : [tripData.data];
+      console.log(`Found ${trips.length} trips`);
+
+      let savedTrips = 0;
+      let savedLocations = 0;
 
       for (const trip of trips) {
+        console.log("Processing trip:", JSON.stringify(trip, null, 2));
+
         const tripRecord: any = {
           trip_id: trip.trip_id || trip.id,
           driver_number: driverNumber,
@@ -188,15 +195,24 @@ Deno.serve(async (req: Request) => {
           tripRecord.lr_id = lrId;
         }
 
-        await supabase
+        const { error: tripError } = await supabase
           .from("freight_tiger_trips")
           .upsert(tripRecord, {
             onConflict: "trip_id"
           });
 
+        if (tripError) {
+          console.error("Error saving trip:", tripError);
+        } else {
+          savedTrips++;
+          console.log("Trip saved successfully");
+        }
+
         if (trip.latest_location || trip.location) {
           const location = trip.latest_location || trip.location;
-          await supabase
+          console.log("Processing location:", JSON.stringify(location, null, 2));
+
+          const { error: locError } = await supabase
             .from("vehicle_locations")
             .insert({
               trip_id: trip.trip_id || trip.id,
@@ -208,22 +224,53 @@ Deno.serve(async (req: Request) => {
               speed: location.speed,
               location_data: location,
             });
+
+          if (locError) {
+            console.error("Error saving location:", locError);
+          } else {
+            savedLocations++;
+            console.log("Location saved successfully");
+          }
+        } else {
+          console.log("No location data found in trip");
         }
       }
-    }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: tripData
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+      console.log(`Summary: ${savedTrips} trips saved, ${savedLocations} locations saved`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Location data processed successfully",
+          trips_found: trips.length,
+          trips_saved: savedTrips,
+          locations_saved: savedLocations,
+          raw_data: tripData
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    } else {
+      console.log("No trip data in response or tripData.data is empty");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: "No trip data found for this driver in FreightTiger",
+          raw_response: tripData
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
   } catch (error) {
     console.error("Error fetching vehicle location:", error);
