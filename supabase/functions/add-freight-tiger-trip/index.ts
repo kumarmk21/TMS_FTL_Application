@@ -118,30 +118,82 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (!lr.driver_number || !lr.vehicle_number || !lr.from_city || !lr.to_city) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Missing required fields for FreightTiger",
+          details: "Driver number, vehicle number, origin city, and destination city are required"
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
     const useProduction = payload.use_production !== false;
     const ftApiUrl = `${useProduction ? config.prod_url : config.integration_url}/saas/trip/add?token=${config.api_token}`;
 
-    const tripPayload = {
+    const tripPayload: any = {
       feed_unique_id: payload.trip_id || lr.manual_lr_no,
       driver_number: lr.driver_number,
       vehicle_number: lr.vehicle_number,
       origin_city: lr.from_city,
       destination_city: lr.to_city,
       start_date: lr.loading_date || lr.lr_date,
-      expected_delivery_date: lr.est_del_date,
-      customer_name: lr.billing_party_name,
-      consignor_name: lr.consignor,
-      consignee_name: lr.consignee,
-      package_count: lr.no_of_pkgs,
-      weight: lr.act_wt,
-      invoice_number: lr.invoice_number,
-      invoice_value: lr.invoice_value,
-      eway_bill_number: lr.eway_bill_number,
-      lr_number: lr.manual_lr_no,
-      ...payload.additional_data
     };
 
+    if (lr.est_del_date) {
+      tripPayload.expected_delivery_date = lr.est_del_date;
+    }
+
+    if (lr.billing_party_name) {
+      tripPayload.customer_name = lr.billing_party_name;
+    }
+
+    if (lr.consignor) {
+      tripPayload.consignor_name = lr.consignor;
+    }
+
+    if (lr.consignee) {
+      tripPayload.consignee_name = lr.consignee;
+    }
+
+    if (lr.no_of_pkgs && lr.no_of_pkgs > 0) {
+      tripPayload.package_count = lr.no_of_pkgs;
+    }
+
+    if (lr.act_wt && parseFloat(lr.act_wt) > 0) {
+      tripPayload.weight = parseFloat(lr.act_wt);
+    }
+
+    if (lr.invoice_number && lr.invoice_number !== "0") {
+      tripPayload.invoice_number = lr.invoice_number;
+    }
+
+    if (lr.invoice_value && parseFloat(lr.invoice_value) > 0) {
+      tripPayload.invoice_value = parseFloat(lr.invoice_value);
+    }
+
+    if (lr.eway_bill_number && lr.eway_bill_number !== "0") {
+      tripPayload.eway_bill_number = lr.eway_bill_number;
+    }
+
+    if (lr.manual_lr_no) {
+      tripPayload.lr_number = lr.manual_lr_no;
+    }
+
+    if (payload.additional_data) {
+      Object.assign(tripPayload, payload.additional_data);
+    }
+
     console.log("Sending trip payload to FreightTiger:", JSON.stringify(tripPayload));
+
+    console.log("Calling FreightTiger API:", ftApiUrl);
 
     const ftResponse = await fetch(ftApiUrl, {
       method: "POST",
@@ -151,14 +203,27 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify(tripPayload),
     });
 
+    console.log("FreightTiger API response status:", ftResponse.status);
+
+    const responseText = await ftResponse.text();
+    console.log("FreightTiger API response:", responseText);
+
     if (!ftResponse.ok) {
-      const errorText = await ftResponse.text();
-      console.error("FreightTiger API error:", errorText);
+      let errorDetails = responseText;
+      try {
+        const errorJson = JSON.parse(responseText);
+        errorDetails = errorJson.message || errorJson.error || responseText;
+      } catch (e) {
+        errorDetails = responseText || `HTTP ${ftResponse.status}: ${ftResponse.statusText}`;
+      }
+
+      console.error("FreightTiger API error:", errorDetails);
       return new Response(
         JSON.stringify({
           success: false,
           error: "Failed to add trip to FreightTiger",
-          details: errorText
+          details: errorDetails,
+          status_code: ftResponse.status
         }),
         {
           status: ftResponse.status,
@@ -170,7 +235,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const result = await ftResponse.json();
+    const result = JSON.parse(responseText);
 
     await supabase
       .from("freight_tiger_trips")
