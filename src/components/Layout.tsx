@@ -46,6 +46,7 @@ import CustomerMISReport from '../pages/CustomerMISReport';
 import { LRTracking } from '../pages/LRTracking';
 import GenerateWarehouseBill from '../pages/GenerateWarehouseBill';
 import WarehouseBillPrint from '../pages/WarehouseBillPrint';
+import { VehicleTracking } from '../pages/VehicleTracking';
 
 export interface MenuItem {
   id: string;
@@ -117,6 +118,7 @@ const menuItems: MenuItem[] = [
       { id: 'customer-enquiry', label: 'Customer Order/Enquiry' },
       { id: 'truck-dispatch', label: 'Truck Dispatch' },
       { id: 'truck-arrival', label: 'Truck Arrival' },
+      { id: 'vehicle-tracking', label: 'Vehicle Tracking' },
       { id: 'pod-upload', label: 'POD Upload' },
     ],
   },
@@ -235,6 +237,8 @@ export function Layout() {
         return <CustomerMISReport />;
       case 'lr-tracking':
         return <LRTracking />;
+      case 'vehicle-tracking':
+        return <VehicleTracking />;
       default:
         return <Dashboard />;
     }

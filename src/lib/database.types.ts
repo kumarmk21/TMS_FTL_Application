@@ -252,3 +252,41 @@ export interface DocType {
   created_at: string;
   created_by: string;
 }
+
+export interface FreightTigerConfig {
+  id: string;
+  config_name: string;
+  api_token: string;
+  integration_url: string;
+  prod_url: string;
+  webhook_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FreightTigerTrip {
+  id: string;
+  trip_id: string;
+  lr_id: string | null;
+  driver_number: string;
+  vehicle_number: string;
+  trip_data: Json;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleLocation {
+  id: string;
+  trip_id: string | null;
+  lr_id: string | null;
+  driver_number: string | null;
+  vehicle_number: string | null;
+  latitude: number;
+  longitude: number;
+  location_time: string;
+  speed: number | null;
+  location_data: Json;
+  created_at: string;
+}
