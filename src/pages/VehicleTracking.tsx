@@ -187,21 +187,55 @@ export function VehicleTracking() {
 
       const result = await response.json();
 
+      console.log('FreightTiger API Response:', result);
+
       if (!response.ok) {
-        const errorMsg = result.details || result.error || 'Failed to add trip to FreightTiger';
-        throw new Error(errorMsg);
+        console.error('FreightTiger API Error Response:', result);
+
+        let errorMsg = 'Failed to add trip to FreightTiger';
+        if (result.details) {
+          errorMsg = result.details;
+        } else if (result.error) {
+          errorMsg = result.error;
+        }
+
+        if (result.raw_response) {
+          console.error('Raw FreightTiger Response:', result.raw_response);
+        }
+
+        const fullError = `${errorMsg}\n\nStatus: ${result.status_code || response.status}\nLR: ${lr.manual_lr_no}\nDriver: ${lr.driver_number}\nVehicle: ${lr.vehicle_number}`;
+
+        throw new Error(fullError);
       }
 
       if (result.success) {
         alert('Trip added to FreightTiger successfully!');
         await fetchLREntries();
       } else {
-        const errorMsg = result.details || result.error || 'Failed to add trip to FreightTiger';
-        throw new Error(errorMsg);
+        console.error('FreightTiger Error:', result);
+
+        let errorMsg = 'Failed to add trip to FreightTiger';
+        if (result.details) {
+          errorMsg = result.details;
+        } else if (result.error) {
+          errorMsg = result.error;
+        }
+
+        const fullError = `${errorMsg}\n\nLR: ${lr.manual_lr_no}\nDriver: ${lr.driver_number}\nVehicle: ${lr.vehicle_number}`;
+
+        throw new Error(fullError);
       }
     } catch (error: any) {
-      console.error('Error adding trip:', error);
-      alert(`Failed to add trip to FreightTiger:\n\n${error.message}\n\nLR: ${lr.manual_lr_no}\nDriver: ${lr.driver_number || 'N/A'}\nVehicle: ${lr.vehicle_number || 'N/A'}`);
+      console.error('Error adding trip to FreightTiger:', error);
+      console.error('LR Details:', {
+        lr_number: lr.manual_lr_no,
+        driver: lr.driver_number,
+        vehicle: lr.vehicle_number,
+        from: lr.from_city,
+        to: lr.to_city
+      });
+
+      alert(`Failed to add trip to FreightTiger:\n\n${error.message}`);
     } finally {
       setAddingTrip(null);
     }

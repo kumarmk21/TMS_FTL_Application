@@ -138,17 +138,31 @@ Deno.serve(async (req: Request) => {
     const useProduction = payload.use_production !== false;
     const ftApiUrl = `${useProduction ? config.prod_url : config.integration_url}/saas/trip/add?token=${config.api_token}`;
 
+    const formatDate = (dateStr: string | null) => {
+      if (!dateStr) return null;
+      try {
+        const date = new Date(dateStr);
+        return date.toISOString().split('T')[0];
+      } catch (e) {
+        return dateStr;
+      }
+    };
+
     const tripPayload: any = {
       feed_unique_id: payload.trip_id || lr.manual_lr_no,
       driver_number: lr.driver_number,
       vehicle_number: lr.vehicle_number,
       origin_city: lr.from_city,
       destination_city: lr.to_city,
-      start_date: lr.loading_date || lr.lr_date,
     };
 
+    const startDate = lr.loading_date || lr.lr_date;
+    if (startDate) {
+      tripPayload.start_date = formatDate(startDate);
+    }
+
     if (lr.est_del_date) {
-      tripPayload.expected_delivery_date = lr.est_del_date;
+      tripPayload.expected_delivery_date = formatDate(lr.est_del_date);
     }
 
     if (lr.billing_party_name) {
@@ -193,37 +207,69 @@ Deno.serve(async (req: Request) => {
 
     console.log("Sending trip payload to FreightTiger:", JSON.stringify(tripPayload));
 
-    console.log("Calling FreightTiger API:", ftApiUrl);
+    const urlWithoutToken = ftApiUrl.replace(/token=[^&]+/, 'token=***');
+    console.log("Calling FreightTiger API:", urlWithoutToken);
+    console.log("Trip payload:", JSON.stringify(tripPayload, null, 2));
 
-    const ftResponse = await fetch(ftApiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(tripPayload),
-    });
+    let ftResponse;
+    let responseText;
 
-    console.log("FreightTiger API response status:", ftResponse.status);
+    try {
+      ftResponse = await fetch(ftApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(tripPayload),
+      });
 
-    const responseText = await ftResponse.text();
-    console.log("FreightTiger API response:", responseText);
+      console.log("FreightTiger API response status:", ftResponse.status);
+      console.log("FreightTiger API response headers:", JSON.stringify(Object.fromEntries(ftResponse.headers.entries())));
+
+      responseText = await ftResponse.text();
+      console.log("FreightTiger API raw response:", responseText);
+
+    } catch (fetchError: any) {
+      console.error("Fetch error:", fetchError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Network error connecting to FreightTiger",
+          details: `${fetchError.message}. Please check if FreightTiger API is accessible.`,
+          network_error: true
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
     if (!ftResponse.ok) {
       let errorDetails = responseText;
+      let parsedError: any = null;
+
       try {
-        const errorJson = JSON.parse(responseText);
-        errorDetails = errorJson.message || errorJson.error || responseText;
+        parsedError = JSON.parse(responseText);
+        errorDetails = parsedError.message || parsedError.error || parsedError.data?.message || responseText;
       } catch (e) {
         errorDetails = responseText || `HTTP ${ftResponse.status}: ${ftResponse.statusText}`;
       }
 
-      console.error("FreightTiger API error:", errorDetails);
+      console.error("FreightTiger API error - Status:", ftResponse.status);
+      console.error("FreightTiger API error - Details:", errorDetails);
+      console.error("FreightTiger API error - Full response:", responseText);
+
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Failed to add trip to FreightTiger",
+          error: `FreightTiger API Error (${ftResponse.status})`,
           details: errorDetails,
-          status_code: ftResponse.status
+          status_code: ftResponse.status,
+          raw_response: responseText.substring(0, 500)
         }),
         {
           status: ftResponse.status,
@@ -235,7 +281,28 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const result = JSON.parse(responseText);
+    let result;
+    try {
+      result = JSON.parse(responseText);
+      console.log("FreightTiger API success response:", JSON.stringify(result, null, 2));
+    } catch (e) {
+      console.error("Failed to parse FreightTiger response:", responseText);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Invalid response from FreightTiger",
+          details: "Received non-JSON response from FreightTiger API",
+          raw_response: responseText.substring(0, 500)
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
     await supabase
       .from("freight_tiger_trips")
