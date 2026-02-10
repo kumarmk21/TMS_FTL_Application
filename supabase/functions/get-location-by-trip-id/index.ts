@@ -95,8 +95,8 @@ Deno.serve(async (req: Request) => {
 
     const { data: thcData, error: thcError } = await supabase
       .from("thc_details")
-      .select("ft_trip_id, lr_no, vehicle_number, driver_number")
-      .eq("lr_no", lrId)
+      .select("ft_trip_id, lr_number, tran_id, vehicle_number, driver_number")
+      .eq("tran_id", lrId)
       .maybeSingle();
 
     if (thcError) {
@@ -297,7 +297,7 @@ Deno.serve(async (req: Request) => {
           const { error: thcUpdateError } = await supabase
             .from("thc_details")
             .update({ current_location: currentLocationText })
-            .eq("lr_no", lrId);
+            .eq("tran_id", lrId);
 
           if (thcUpdateError) {
             console.error("Error updating THC current_location:", thcUpdateError);

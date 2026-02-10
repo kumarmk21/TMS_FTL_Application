@@ -69,7 +69,7 @@ export function VehicleTracking() {
           const { data: thc } = await supabase
             .from('thc_details')
             .select('current_location, ft_trip_id')
-            .eq('lr_no', lr.tran_id)
+            .eq('tran_id', lr.tran_id)
             .maybeSingle();
 
           const { data: location } = await supabase
