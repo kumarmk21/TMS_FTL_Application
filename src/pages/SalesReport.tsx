@@ -34,6 +34,8 @@ interface BookingLR {
   pay_basis: string;
   invoice_number: string;
   invoice_value: number;
+  bill_no: string;
+  bill_date: string;
   created_at: string;
 }
 
@@ -183,6 +185,10 @@ export default function SalesReport() {
         'LR Date': item.lr_date
           ? new Date(item.lr_date).toLocaleDateString('en-IN')
           : '',
+        'Freight Bill Number': item.bill_no || '',
+        'Bill Date': item.bill_date
+          ? new Date(item.bill_date).toLocaleDateString('en-IN')
+          : '',
         'Branch': item.booking_branch || '',
         'Consignor': item.consignor || '',
         'Consignee': item.consignee || '',
@@ -216,6 +222,8 @@ export default function SalesReport() {
         'Sr. No.': '',
         'LR Number': '',
         'LR Date': '',
+        'Freight Bill Number': '',
+        'Bill Date': '',
         'Branch': '',
         'Consignor': '',
         'Consignee': '',
@@ -249,6 +257,8 @@ export default function SalesReport() {
       const colWidths = [
         { wch: 8 },
         { wch: 15 },
+        { wch: 12 },
+        { wch: 20 },
         { wch: 12 },
         { wch: 12 },
         { wch: 25 },
