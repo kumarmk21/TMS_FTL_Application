@@ -512,10 +512,13 @@ export default function SalesReport() {
                   Branch
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  Consignor
+                  Billing Party
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                  Consignee
+                  Bill No.
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                  Bill Date
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                   Route
@@ -540,7 +543,7 @@ export default function SalesReport() {
             <tbody className="divide-y divide-gray-200">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
                     No records found
                   </td>
                 </tr>
@@ -559,10 +562,15 @@ export default function SalesReport() {
                       {item.booking_branch}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {item.consignor || '-'}
+                      {item.billing_party_name || '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {item.consignee || '-'}
+                      {item.bill_no || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">
+                      {item.bill_date
+                        ? new Date(item.bill_date).toLocaleDateString('en-IN')
+                        : '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {item.from_city} - {item.to_city || '-'}
