@@ -117,16 +117,12 @@ export function VehicleTracking() {
     try {
       setRefreshingLR(lr.tran_id);
 
-      if (!lr.driver_number) {
-        throw new Error('Driver number not available for this LR');
-      }
-
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('No active session. Please login again.');
       }
 
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-vehicle-location?driver_number=${encodeURIComponent(lr.driver_number)}&lr_id=${encodeURIComponent(lr.tran_id)}`;
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-location-by-trip-id?lr_id=${encodeURIComponent(lr.tran_id)}`;
 
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -163,7 +159,7 @@ export function VehicleTracking() {
       }
 
       if (result.success) {
-        const msg = `Location refreshed successfully!\n\nTrips Found: ${result.trips_found || 0}\nTrips Saved: ${result.trips_saved || 0}\nLocations Saved: ${result.locations_saved || 0}\n\nPlease check browser console for detailed FreightTiger response.`;
+        const msg = `Location refreshed successfully!\n\nFT Trip ID: ${result.ft_trip_id || 'N/A'}\nTrips Found: ${result.trips_found || 0}\nTrips Saved: ${result.trips_saved || 0}\nLocations Saved: ${result.locations_saved || 0}\n\nPlease check browser console for detailed FreightTiger response.`;
         alert(msg);
         await fetchLREntries();
       } else {
@@ -173,7 +169,7 @@ export function VehicleTracking() {
       }
     } catch (error: any) {
       console.error('Error refreshing location:', error);
-      alert(`Failed to refresh location:\n\n${error.message}\n\nDriver: ${lr.driver_number || 'N/A'}`);
+      alert(`Failed to refresh location:\n\n${error.message}\n\nLR: ${lr.manual_lr_no || 'N/A'}`);
     } finally {
       setRefreshingLR(null);
     }
