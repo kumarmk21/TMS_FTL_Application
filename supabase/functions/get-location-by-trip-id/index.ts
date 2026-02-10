@@ -289,6 +289,22 @@ Deno.serve(async (req: Request) => {
             savedLocations++;
             console.log("Location saved successfully");
           }
+
+          const currentLocationText = location.address ||
+                                      location.location_name ||
+                                      `${location.latitude || location.lat}, ${location.longitude || location.lng || location.lon}`;
+
+          const { error: thcUpdateError } = await supabase
+            .from("thc_details")
+            .update({ current_location: currentLocationText })
+            .eq("lr_no", lrId);
+
+          if (thcUpdateError) {
+            console.error("Error updating THC current_location:", thcUpdateError);
+            errors.push({ error: thcUpdateError.message, code: thcUpdateError.code });
+          } else {
+            console.log("THC current_location updated successfully");
+          }
         } else {
           console.log("No location data found in trip");
         }

@@ -17,6 +17,7 @@ interface LRWithLocation {
   consignor: string;
   consignee: string;
   no_of_pkgs: number;
+  current_location?: string;
   latest_location?: {
     latitude: number;
     longitude: number;
@@ -64,6 +65,12 @@ export function VehicleTracking() {
 
       const lrsWithLocations = await Promise.all(
         (lrs || []).map(async (lr) => {
+          const { data: thc } = await supabase
+            .from('thc_details')
+            .select('current_location')
+            .eq('lr_no', lr.tran_id)
+            .maybeSingle();
+
           const { data: location } = await supabase
             .from('vehicle_locations')
             .select('latitude, longitude, location_time, speed')
@@ -80,6 +87,7 @@ export function VehicleTracking() {
 
           return {
             ...lr,
+            current_location: thc?.current_location,
             latest_location: location || undefined,
             trip_id: trip?.trip_id,
             trip_status: trip?.status,
@@ -87,7 +95,9 @@ export function VehicleTracking() {
         })
       );
 
-      setLrEntries(lrsWithLocations);
+      const entriesWithLocation = lrsWithLocations.filter(lr => lr.current_location);
+
+      setLrEntries(entriesWithLocation);
     } catch (error: any) {
       console.error('Error fetching LR entries:', error);
       alert(`Failed to fetch LR entries: ${error.message}`);
@@ -334,7 +344,8 @@ export function VehicleTracking() {
       ) : filteredEntries.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <Navigation className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No active shipments found</p>
+          <p className="text-gray-600">No shipments with location data found</p>
+          <p className="text-sm text-gray-500 mt-2">Refresh location data to see tracked shipments here</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -389,13 +400,29 @@ export function VehicleTracking() {
                   </div>
                 </div>
 
-                {lr.latest_location ? (
+                {lr.current_location && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-blue-600 mt-0.5" />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-blue-900 mb-1">
+                          Current Location
+                        </div>
+                        <div className="text-sm text-blue-700">
+                          {lr.current_location}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {lr.latest_location && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                     <div className="flex items-start gap-2">
                       <MapPin className="h-4 w-4 text-green-600 mt-0.5" />
                       <div className="flex-1">
                         <div className="text-sm font-medium text-green-900 mb-1">
-                          Location Available
+                          GPS Coordinates
                         </div>
                         <div className="text-xs text-green-700 space-y-1">
                           <div>
@@ -411,13 +438,6 @@ export function VehicleTracking() {
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <MapPin className="h-4 w-4" />
-                      <span>No location data available</span>
                     </div>
                   </div>
                 )}
