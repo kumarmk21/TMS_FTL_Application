@@ -18,6 +18,7 @@ interface LRWithLocation {
   consignee: string;
   no_of_pkgs: number;
   current_location?: string;
+  ft_trip_id?: string;
   latest_location?: {
     latitude: number;
     longitude: number;
@@ -67,7 +68,7 @@ export function VehicleTracking() {
         (lrs || []).map(async (lr) => {
           const { data: thc } = await supabase
             .from('thc_details')
-            .select('current_location')
+            .select('current_location, ft_trip_id')
             .eq('lr_no', lr.tran_id)
             .maybeSingle();
 
@@ -88,6 +89,7 @@ export function VehicleTracking() {
           return {
             ...lr,
             current_location: thc?.current_location,
+            ft_trip_id: thc?.ft_trip_id,
             latest_location: location || undefined,
             trip_id: trip?.trip_id,
             trip_status: trip?.status,
@@ -95,9 +97,9 @@ export function VehicleTracking() {
         })
       );
 
-      const entriesWithLocation = lrsWithLocations.filter(lr => lr.current_location);
+      const entriesWithTripId = lrsWithLocations.filter(lr => lr.ft_trip_id);
 
-      setLrEntries(entriesWithLocation);
+      setLrEntries(entriesWithTripId);
     } catch (error: any) {
       console.error('Error fetching LR entries:', error);
       alert(`Failed to fetch LR entries: ${error.message}`);
@@ -320,18 +322,18 @@ export function VehicleTracking() {
             Refresh All
           </button>
         </div>
-        <div className="mt-3 flex items-center gap-4 text-sm text-gray-600">
+        <div className="mt-3 flex items-center gap-4 text-sm text-gray-600 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
             <span>Location Available</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-            <span>No Location Data</span>
+            <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+            <span>Awaiting Location Refresh</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span>FreightTiger Active</span>
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <span>GPS Coordinates</span>
           </div>
         </div>
       </div>
@@ -344,8 +346,8 @@ export function VehicleTracking() {
       ) : filteredEntries.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <Navigation className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No shipments with location data found</p>
-          <p className="text-sm text-gray-500 mt-2">Refresh location data to see tracked shipments here</p>
+          <p className="text-gray-600">No FreightTiger tracked shipments found</p>
+          <p className="text-sm text-gray-500 mt-2">Add trips to FreightTiger from Truck Dispatch to see them here</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -400,7 +402,7 @@ export function VehicleTracking() {
                   </div>
                 </div>
 
-                {lr.current_location && (
+                {lr.current_location ? (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <div className="flex items-start gap-2">
                       <MapPin className="h-4 w-4 text-blue-600 mt-0.5" />
@@ -410,6 +412,20 @@ export function VehicleTracking() {
                         </div>
                         <div className="text-sm text-blue-700">
                           {lr.current_location}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-orange-600 mt-0.5" />
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-orange-900 mb-1">
+                          Location Not Fetched Yet
+                        </div>
+                        <div className="text-xs text-orange-700">
+                          Click "Refresh" below to fetch the latest location from FreightTiger
                         </div>
                       </div>
                     </div>
