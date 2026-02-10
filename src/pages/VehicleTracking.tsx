@@ -37,10 +37,11 @@ export function VehicleTracking() {
   const [searchTerm, setSearchTerm] = useState('');
   const [refreshingLR, setRefreshingLR] = useState<string | null>(null);
   const [addingTrip, setAddingTrip] = useState<string | null>(null);
+  const [showDelivered, setShowDelivered] = useState(true);
 
   useEffect(() => {
     fetchLREntries();
-  }, [profile]);
+  }, [profile, showDelivered]);
 
   useEffect(() => {
     filterEntries();
@@ -53,8 +54,11 @@ export function VehicleTracking() {
       let query = supabase
         .from('booking_lr')
         .select('*')
-        .in('lr_status', ['In Transit', 'Dispatched', 'Out for Delivery'])
         .order('lr_date', { ascending: false });
+
+      if (!showDelivered) {
+        query = query.in('lr_status', ['In Transit', 'Dispatched', 'Out for Delivery']);
+      }
 
       if (profile?.role === 'user' && profile?.branch_code) {
         query = query.eq('booking_branch', profile.branch_code);
@@ -322,19 +326,30 @@ export function VehicleTracking() {
             Refresh All
           </button>
         </div>
-        <div className="mt-3 flex items-center gap-4 text-sm text-gray-600 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span>Location Available</span>
+        <div className="mt-3 flex items-center justify-between gap-4 text-sm text-gray-600 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+              <span>Location Available</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+              <span>Awaiting Location Refresh</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              <span>GPS Coordinates</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-            <span>Awaiting Location Refresh</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span>GPS Coordinates</span>
-          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showDelivered}
+              onChange={(e) => setShowDelivered(e.target.checked)}
+              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+            />
+            <span className="text-gray-700 font-medium">Show Delivered Trips</span>
+          </label>
         </div>
       </div>
 
