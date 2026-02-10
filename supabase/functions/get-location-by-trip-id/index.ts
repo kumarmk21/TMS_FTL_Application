@@ -117,11 +117,43 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!thcData || !thcData.ft_trip_id) {
+    let ftTripId = thcData?.ft_trip_id;
+    let vehicleNumber = thcData?.vehicle_number;
+    let driverNumber = thcData?.driver_number;
+
+    if (!ftTripId) {
+      console.log("ft_trip_id not found in thc_details, checking freight_tiger_trips table");
+
+      const { data: ftTrip, error: ftTripError } = await supabase
+        .from("freight_tiger_trips")
+        .select("trip_id, vehicle_number, driver_number")
+        .eq("lr_id", lrId)
+        .maybeSingle();
+
+      if (ftTripError) {
+        console.error("Error fetching freight_tiger_trips data:", ftTripError);
+      }
+
+      if (ftTrip) {
+        ftTripId = ftTrip.trip_id;
+        vehicleNumber = vehicleNumber || ftTrip.vehicle_number;
+        driverNumber = driverNumber || ftTrip.driver_number;
+        console.log("Found trip_id in freight_tiger_trips:", ftTripId);
+      }
+    }
+
+    if (!ftTripId) {
+      const { data: bookingLr } = await supabase
+        .from("booking_lr")
+        .select("manual_lr_no, vehicle_number, driver_number")
+        .eq("tran_id", lrId)
+        .maybeSingle();
+
       return new Response(
         JSON.stringify({
           success: false,
-          error: "No FreightTiger Trip ID found for this LR. Please generate THC first."
+          error: "No FreightTiger Trip ID found for this LR. Please add trip to FreightTiger first.",
+          lr_number: bookingLr?.manual_lr_no || "Unknown"
         }),
         {
           status: 404,
@@ -133,7 +165,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log("Found ft_trip_id:", thcData.ft_trip_id);
+    console.log("Found ft_trip_id:", ftTripId);
 
     const { data: config, error: configError } = await supabase
       .from("freight_tiger_config")
@@ -175,9 +207,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const ftApiUrl = `${config.prod_url}/saas/trips?trip_id=${thcData.ft_trip_id}&page=1&size=100`;
+    const ftApiUrl = `${config.prod_url}/saas/trips?trip_id=${ftTripId}&page=1&size=100`;
 
-    console.log(`Fetching trip data for ft_trip_id: ${thcData.ft_trip_id}`);
+    console.log(`Fetching trip data for ft_trip_id: ${ftTripId}`);
     console.log(`API URL: ${ftApiUrl}`);
 
     const authHeader = config.api_token.startsWith('Bearer ')
@@ -240,8 +272,8 @@ Deno.serve(async (req: Request) => {
 
         const tripRecord: any = {
           trip_id: extractedTripId,
-          driver_number: thcData.driver_number || trip.driver?.phone || trip.driver_number,
-          vehicle_number: thcData.vehicle_number || trip.vehicle?.registration_number || trip.vehicle_number,
+          driver_number: driverNumber || trip.driver?.phone || trip.driver_number,
+          vehicle_number: vehicleNumber || trip.vehicle?.registration_number || trip.vehicle_number,
           trip_data: trip,
           status: trip.status || "active",
           lr_id: lrId,
@@ -269,8 +301,8 @@ Deno.serve(async (req: Request) => {
 
           const locationRecord = {
             trip_id: extractedTripId,
-            driver_number: thcData.driver_number || trip.driver?.phone || trip.driver_number,
-            vehicle_number: thcData.vehicle_number || trip.vehicle?.registration_number || trip.vehicle_number,
+            driver_number: driverNumber || trip.driver?.phone || trip.driver_number,
+            vehicle_number: vehicleNumber || trip.vehicle?.registration_number || trip.vehicle_number,
             latitude: location.latitude || location.lat,
             longitude: location.longitude || location.lng || location.lon,
             location_time: location.timestamp || location.time || new Date().toISOString(),
@@ -294,16 +326,18 @@ Deno.serve(async (req: Request) => {
                                       location.location_name ||
                                       `${location.latitude || location.lat}, ${location.longitude || location.lng || location.lon}`;
 
-          const { error: thcUpdateError } = await supabase
-            .from("thc_details")
-            .update({ current_location: currentLocationText })
-            .eq("tran_id", lrId);
+          if (thcData) {
+            const { error: thcUpdateError } = await supabase
+              .from("thc_details")
+              .update({ current_location: currentLocationText })
+              .eq("tran_id", lrId);
 
-          if (thcUpdateError) {
-            console.error("Error updating THC current_location:", thcUpdateError);
-            errors.push({ error: thcUpdateError.message, code: thcUpdateError.code });
-          } else {
-            console.log("THC current_location updated successfully");
+            if (thcUpdateError) {
+              console.error("Error updating THC current_location:", thcUpdateError);
+              errors.push({ error: thcUpdateError.message, code: thcUpdateError.code });
+            } else {
+              console.log("THC current_location updated successfully");
+            }
           }
         } else {
           console.log("No location data found in trip");
@@ -316,7 +350,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           message: "Location data processed successfully",
-          ft_trip_id: thcData.ft_trip_id,
+          ft_trip_id: ftTripId,
           trips_found: trips.length,
           trips_saved: savedTrips,
           locations_saved: savedLocations,
@@ -336,7 +370,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           success: false,
           message: "No trip data found for this FreightTiger Trip ID",
-          ft_trip_id: thcData.ft_trip_id,
+          ft_trip_id: ftTripId,
           raw_response: tripData
         }),
         {

@@ -93,7 +93,7 @@ export function VehicleTracking() {
           return {
             ...lr,
             current_location: thc?.current_location,
-            ft_trip_id: thc?.ft_trip_id,
+            ft_trip_id: thc?.ft_trip_id || trip?.trip_id,
             latest_location: location || undefined,
             trip_id: trip?.trip_id,
             trip_status: trip?.status,
@@ -101,9 +101,7 @@ export function VehicleTracking() {
         })
       );
 
-      const entriesWithTripId = lrsWithLocations.filter(lr => lr.ft_trip_id);
-
-      setLrEntries(entriesWithTripId);
+      setLrEntries(lrsWithLocations);
     } catch (error: any) {
       console.error('Error fetching LR entries:', error);
       alert(`Failed to fetch LR entries: ${error.message}`);
