@@ -212,14 +212,14 @@ Deno.serve(async (req: Request) => {
     console.log(`Fetching trip data for ft_trip_id: ${ftTripId}`);
     console.log(`API URL: ${ftApiUrl}`);
 
-    const authHeader = config.api_token.startsWith('Bearer ')
+    const ftAuthHeader = config.api_token.startsWith('Bearer ')
       ? config.api_token
       : `Bearer ${config.api_token}`;
 
     const ftResponse = await fetch(ftApiUrl, {
       method: "GET",
       headers: {
-        "Authorization": authHeader,
+        "Authorization": ftAuthHeader,
         "Content-Type": "application/json",
       },
     });
