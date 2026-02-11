@@ -90,6 +90,7 @@ const menuItems: MenuItem[] = [
       { id: 'lr-entry', label: 'LR Entry' },
       { id: 'lr-financial-edit', label: 'LR Financial Edit' },
       { id: 'generate-bill', label: 'Generate Customer Bill' },
+      { id: 'generate-warehouse-bill', label: 'Generate Warehouse Bill' },
       { id: 'bill-edit', label: 'Customer Bill Edit' },
       { id: 'bill-submission', label: 'Customer Bill Submission' },
     ],
@@ -101,7 +102,6 @@ const menuItems: MenuItem[] = [
     subItems: [
       { id: 'truck-balance-payment', label: 'Truck Balance Payment' },
       { id: 'admin-expenses', label: 'Admin Expenses' },
-      { id: 'generate-warehouse-bill', label: 'Generate Warehouse Bill' },
       { id: 'generate-advance-bank-file', label: 'Generate Advance Bank File' },
       { id: 'regenerate-advance-bank-file', label: 'Advance Bank Payment File Regenerate' },
       { id: 'generate-balance-bank-file', label: 'Generate Balance Bank File' },
