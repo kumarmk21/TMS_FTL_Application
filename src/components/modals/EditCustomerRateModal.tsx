@@ -469,6 +469,7 @@ export default function EditCustomerRateModal({
                 <option value="Warehousing Services">Warehousing Services</option>
                 <option value="FTL Services">FTL Services</option>
                 <option value="Door Delivery Services">Door Delivery Services</option>
+                <option value="Loading Unloading">Loading Unloading</option>
                 <option value="Express">Express</option>
                 <option value="Standard">Standard</option>
                 <option value="Economy">Economy</option>
