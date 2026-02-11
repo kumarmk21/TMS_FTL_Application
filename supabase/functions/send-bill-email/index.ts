@@ -9,6 +9,7 @@ const corsHeaders = {
 
 interface BillEmailRequest {
   billId: string;
+  billType?: 'lr' | 'warehouse';
 }
 
 Deno.serve(async (req: Request) => {
@@ -36,7 +37,7 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { billId }: BillEmailRequest = await req.json();
+    const { billId, billType = 'lr' }: BillEmailRequest = await req.json();
 
     if (!billId) {
       return new Response(
@@ -48,35 +49,63 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const [companyResult, billResult] = await Promise.all([
-      supabase.from('company_master').select('*').limit(1).maybeSingle(),
-      supabase
+    const companyResult = await supabase.from('company_master').select('*').limit(1).maybeSingle();
+
+    if (companyResult.error) throw companyResult.error;
+
+    let bill: any = null;
+    let billingPartyCode: string = '';
+
+    if (billType === 'warehouse') {
+      const warehouseBillResult = await supabase
+        .from('warehouse_bill')
+        .select('*')
+        .eq('bill_id', billId)
+        .maybeSingle();
+
+      if (warehouseBillResult.error) throw warehouseBillResult.error;
+
+      if (!warehouseBillResult.data) {
+        return new Response(
+          JSON.stringify({ error: 'Warehouse bill not found' }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      bill = warehouseBillResult.data;
+      billingPartyCode = bill.billing_party_code;
+    } else {
+      const lrBillResult = await supabase
         .from('lr_bill')
         .select('*')
         .eq('bill_id', billId)
-        .maybeSingle()
-    ]);
+        .maybeSingle();
 
-    if (companyResult.error) throw companyResult.error;
-    if (billResult.error) throw billResult.error;
+      if (lrBillResult.error) throw lrBillResult.error;
 
-    if (!billResult.data) {
-      return new Response(
-        JSON.stringify({ error: 'Bill not found' }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      if (!lrBillResult.data) {
+        return new Response(
+          JSON.stringify({ error: 'LR bill not found' }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      bill = lrBillResult.data;
+      billingPartyCode = bill.billing_party_code;
     }
 
     const company = companyResult.data;
-    const bill = billResult.data;
 
     const customerResult = await supabase
       .from('customer_master')
       .select('customer_email, customer_name')
-      .eq('customer_id', bill.billing_party_code)
+      .eq('customer_id', billingPartyCode)
       .maybeSingle();
 
     if (customerResult.error) throw customerResult.error;
@@ -92,7 +121,7 @@ Deno.serve(async (req: Request) => {
     }
 
     let lrDetails = null;
-    if (bill.lr_bill_number) {
+    if (billType === 'lr' && bill.lr_bill_number) {
       const lrResult = await supabase
         .from('booking_lr')
         .select('manual_lr_no, lr_date, act_del_date, from_city, to_city, vehicle_type, vehicle_number, invoice_number, invoice_date, invoice_value, eway_bill_number')
@@ -108,6 +137,12 @@ Deno.serve(async (req: Request) => {
       if (!dateString) return '-';
       return new Date(dateString).toLocaleDateString('en-IN');
     };
+
+    const billNumber = billType === 'warehouse' ? bill.bill_number : bill.lr_bill_number;
+    const billDate = billType === 'warehouse' ? bill.bill_date : bill.lr_bill_date;
+    const billDueDate = billType === 'warehouse' ? bill.bill_due_date : bill.lr_bill_due_date;
+    const billAmount = billType === 'warehouse' ? bill.total_amount : bill.bill_amount;
+    const subTotal = billType === 'warehouse' ? bill.sub_total : bill.sub_total;
 
     const emailHtml = `
 <!DOCTYPE html>
@@ -146,23 +181,29 @@ Deno.serve(async (req: Request) => {
       </div>
     </div>
 
-    <h1 style="text-align: center; color: #1f2937; margin-bottom: 30px;">TAX INVOICE</h1>
+    <h1 style="text-align: center; color: #1f2937; margin-bottom: 30px;">TAX INVOICE ${billType === 'warehouse' ? '- WAREHOUSE SERVICES' : ''}</h1>
 
     <div class="section">
       <div class="info-grid">
         <div>
           <div class="info-item">
             <span class="label">Bill Number:</span>
-            <span class="value">${bill.lr_bill_number || '-'}</span>
+            <span class="value">${billNumber || '-'}</span>
           </div>
           <div class="info-item">
             <span class="label">Bill Date:</span>
-            <span class="value">${formatDate(bill.lr_bill_date)}</span>
+            <span class="value">${formatDate(billDate)}</span>
           </div>
           <div class="info-item">
             <span class="label">Due Date:</span>
-            <span class="value">${formatDate(bill.lr_bill_due_date)}</span>
+            <span class="value">${formatDate(billDueDate)}</span>
           </div>
+          ${billType === 'warehouse' && bill.bill_period ? `
+          <div class="info-item">
+            <span class="label">Bill Period:</span>
+            <span class="value">${bill.bill_period}</span>
+          </div>
+          ` : ''}
         </div>
         <div>
           <div class="info-item">
@@ -239,11 +280,26 @@ Deno.serve(async (req: Request) => {
             </tr>
           </thead>
           <tbody>
+            ${billType === 'warehouse' ? `
+            <tr>
+              <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${bill.service_type || 'Warehouse Charges'}</td>
+              <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">${bill.sac_code || '-'}</td>
+              <td style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">${(bill.warehouse_charges || 0).toFixed(2)}</td>
+            </tr>
+            ${bill.other_charges > 0 ? `
+            <tr>
+              <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">Other Charges</td>
+              <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">-</td>
+              <td style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">${(bill.other_charges || 0).toFixed(2)}</td>
+            </tr>
+            ` : ''}
+            ` : `
             <tr>
               <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${bill.sac_description || 'Transportation Charges'}</td>
               <td style="padding: 12px; text-align: center; border-bottom: 1px solid #e5e7eb;">${bill.sac_code || '-'}</td>
-              <td style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">${(bill.sub_total || 0).toFixed(2)}</td>
+              <td style="padding: 12px; text-align: right; border-bottom: 1px solid #e5e7eb;">${(subTotal || 0).toFixed(2)}</td>
             </tr>
+            `}
           </tbody>
         </table>
       </div>
@@ -251,7 +307,7 @@ Deno.serve(async (req: Request) => {
 
     <div class="bill-amount">
       <div style="color: #065f46; font-size: 16px; font-weight: 600; margin-bottom: 8px;">Total Amount</div>
-      <div class="amount">₹${(bill.bill_amount || 0).toFixed(2)}</div>
+      <div class="amount">₹${(billAmount || 0).toFixed(2)}</div>
     </div>
 
     ${company?.bank_name ? `
@@ -314,7 +370,7 @@ Deno.serve(async (req: Request) => {
     const info = await transporter.sendMail({
       from: `"${senderName}" <${fromEmail}>`,
       to: customerResult.data.customer_email,
-      subject: `Tax Invoice - ${bill.lr_bill_number} from ${company?.company_name || 'DLS Logistics'}`,
+      subject: `Tax Invoice - ${billNumber} from ${company?.company_name || 'DLS Logistics'}`,
       html: emailHtml,
     });
 
