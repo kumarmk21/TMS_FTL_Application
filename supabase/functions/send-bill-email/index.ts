@@ -350,6 +350,9 @@ Deno.serve(async (req: Request) => {
     console.log('SMTP Port:', smtpPort);
     console.log('From:', fromEmail);
     console.log('To:', customerResult.data.customer_email);
+    if (company?.email) {
+      console.log('CC:', company.email);
+    }
 
     const port = parseInt(smtpPort);
     const transporter = nodemailer.createTransport({
@@ -367,12 +370,18 @@ Deno.serve(async (req: Request) => {
       }
     });
 
-    const info = await transporter.sendMail({
+    const mailOptions: any = {
       from: `"${senderName}" <${fromEmail}>`,
       to: customerResult.data.customer_email,
       subject: `Tax Invoice - ${billNumber} from ${company?.company_name || 'DLS Logistics'}`,
       html: emailHtml,
-    });
+    };
+
+    if (company?.email) {
+      mailOptions.cc = company.email;
+    }
+
+    const info = await transporter.sendMail(mailOptions);
 
     console.log('Email sent successfully!');
     console.log('Message ID:', info.messageId);
