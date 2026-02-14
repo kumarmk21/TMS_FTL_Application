@@ -111,8 +111,8 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
 
   const handlePrint = () => {
     const originalTitle = document.title;
-    if (bill?.billing_party_code && bill?.lr_bill_number) {
-      document.title = `${bill.billing_party_code}_${bill.lr_bill_number}`;
+    if (bill?.billing_party_name && bill?.lr_bill_number) {
+      document.title = `${bill.billing_party_name.replace(/[^a-zA-Z0-9]/g, '_')}_${bill.lr_bill_number}`;
     }
     window.print();
     setTimeout(() => {
@@ -129,17 +129,18 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
       : 'lr_bill.pdf';
 
     const opt = {
-      margin: [10, 10, 10, 10],
+      margin: [8, 8, 8, 8],
       filename: filename,
-      image: { type: 'jpeg', quality: 0.95 },
+      image: { type: 'jpeg', quality: 0.98 },
       html2canvas: {
-        scale: 2,
+        scale: 2.5,
         useCORS: true,
         logging: false,
         letterRendering: true,
         allowTaint: true,
         scrollY: 0,
-        scrollX: 0
+        scrollX: 0,
+        windowWidth: 800
       },
       jsPDF: {
         unit: 'mm',
@@ -148,10 +149,8 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
         compress: true
       },
       pagebreak: {
-        mode: ['avoid-all', 'css', 'legacy'],
-        before: '.page-break-before',
-        after: '.page-break-after',
-        avoid: ['tr', 'td', 'th', 'img']
+        mode: 'avoid-all',
+        avoid: ['tr', 'td', 'th', 'img', 'div']
       }
     };
 
@@ -202,27 +201,27 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
           </div>
         </div>
 
-        <div className="p-8 bill-print-content">
-          <div className="bg-white" style={{ maxWidth: '190mm', minHeight: '277mm', margin: '0 auto', padding: '0' }}>
-            <div className="space-y-6">
-              <div className="border-b-2 border-gray-300 pb-6">
-                <div className="flex items-start justify-between mb-4">
+        <div className="p-4 bill-print-content">
+          <div className="bg-white" style={{ maxWidth: '190mm', margin: '0 auto', padding: '0', fontSize: '11px' }}>
+            <div className="space-y-2">
+              <div className="border-b border-gray-300 pb-2">
+                <div className="flex items-start justify-between mb-2">
                   {company?.logo_url && (
                     <img
                       src={company.logo_url}
                       alt={company.company_name}
-                      className="h-20 w-auto object-contain"
+                      className="h-14 w-auto object-contain"
                     />
                   )}
                   <div className="text-right">
-                    <h1 className="text-3xl font-bold text-gray-900">{company?.company_name}</h1>
+                    <h1 className="text-xl font-bold text-gray-900">{company?.company_name}</h1>
                     {company?.company_tagline && (
-                      <p className="text-sm text-gray-600 italic mt-1">{company.company_tagline}</p>
+                      <p className="text-xs text-gray-600 italic">{company.company_tagline}</p>
                     )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <p className="text-gray-700">
                       <span className="font-semibold">Address:</span>{' '}
@@ -266,53 +265,53 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                 </div>
               </div>
 
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">TAX INVOICE</h2>
+              <div className="text-center mb-2">
+                <h2 className="text-lg font-bold text-gray-900">TAX INVOICE</h2>
               </div>
 
-              <div className="grid grid-cols-2 gap-6 mb-6">
-                <div className="border border-gray-300 p-4 rounded">
-                  <h3 className="font-semibold text-gray-900 mb-3">Bill Details</h3>
-                  <p className="text-sm text-gray-700 mb-1">
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <div className="border border-gray-300 p-2 rounded">
+                  <h3 className="font-semibold text-xs text-gray-900 mb-1">Bill Details</h3>
+                  <p className="text-xs text-gray-700 mb-0.5">
                     <span className="font-medium">Bill Number:</span>{' '}
                     {bill?.lr_bill_number || '-'}
                   </p>
-                  <p className="text-sm text-gray-700 mb-1">
+                  <p className="text-xs text-gray-700 mb-0.5">
                     <span className="font-medium">Bill Date:</span>{' '}
                     {formatDate(bill?.lr_bill_date || null)}
                   </p>
-                  <p className="text-sm text-gray-700 mb-1">
+                  <p className="text-xs text-gray-700 mb-0.5">
                     <span className="font-medium">Due Date:</span>{' '}
                     {formatDate(bill?.lr_bill_due_date || null)}
                   </p>
-                  <p className="text-sm text-gray-700">
+                  <p className="text-xs text-gray-700">
                     <span className="font-medium">Credit Days:</span>{' '}
                     {bill?.credit_days || '-'}
                   </p>
                 </div>
 
-                <div className="border border-gray-300 p-4 rounded">
-                  <h3 className="font-semibold text-gray-900 mb-3">Bill To</h3>
-                  <p className="text-sm font-semibold text-gray-900 mb-1">
+                <div className="border border-gray-300 p-2 rounded">
+                  <h3 className="font-semibold text-xs text-gray-900 mb-1">Bill To</h3>
+                  <p className="text-xs font-semibold text-gray-900 mb-0.5">
                     {bill?.billing_party_name || '-'}
                   </p>
-                  <p className="text-sm text-gray-700 mb-1">
+                  <p className="text-xs text-gray-700 mb-0.5">
                     {bill?.bill_to_address || '-'}
                   </p>
-                  <p className="text-sm text-gray-700 mb-1">
+                  <p className="text-xs text-gray-700 mb-0.5">
                     <span className="font-medium">State:</span>{' '}
                     {bill?.bill_to_state || '-'}
                   </p>
-                  <p className="text-sm text-gray-700">
+                  <p className="text-xs text-gray-700">
                     <span className="font-medium">GSTIN:</span>{' '}
                     {bill?.bill_to_gstin || '-'}
                   </p>
                 </div>
               </div>
 
-              <div className="border border-gray-300 rounded p-4 mb-6">
-                <h3 className="font-semibold text-gray-900 mb-3">LR Details</h3>
-                <div className="grid grid-cols-4 gap-x-6 gap-y-3 text-sm">
+              <div className="border border-gray-300 rounded p-2 mb-2">
+                <h3 className="font-semibold text-xs text-gray-900 mb-1">LR Details</h3>
+                <div className="grid grid-cols-4 gap-x-3 gap-y-1 text-xs">
                   <div>
                     <span className="font-medium text-gray-700">LR No:</span>
                     <p className="text-gray-900">{lrDetails?.manual_lr_no || '-'}</p>
@@ -360,30 +359,30 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                 </div>
               </div>
 
-              <div className="border border-gray-300 rounded overflow-hidden mb-6">
+              <div className="border border-gray-300 rounded overflow-hidden mb-2">
                 <table className="min-w-full">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b border-gray-300">
+                      <th className="px-2 py-1.5 text-left text-xs font-semibold text-gray-900 border-b border-gray-300">
                         Description
                       </th>
-                      <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 border-b border-gray-300">
+                      <th className="px-2 py-1.5 text-center text-xs font-semibold text-gray-900 border-b border-gray-300">
                         SAC Code
                       </th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 border-b border-gray-300">
+                      <th className="px-2 py-1.5 text-right text-xs font-semibold text-gray-900 border-b border-gray-300">
                         Amount (₹)
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="border-b border-gray-200">
-                      <td className="px-4 py-3 text-sm text-gray-700">
+                      <td className="px-2 py-1.5 text-xs text-gray-700">
                         {bill?.sac_description || 'Transportation Charges'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-center text-gray-700">
+                      <td className="px-2 py-1.5 text-xs text-center text-gray-700">
                         {bill?.sac_code || '-'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                      <td className="px-2 py-1.5 text-xs text-right text-gray-900">
                         {(bill?.sub_total || 0).toFixed(2)}
                       </td>
                     </tr>
@@ -391,21 +390,21 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                 </table>
               </div>
 
-              <div className="flex justify-end mb-6">
-                <div className="w-80 border border-gray-300 rounded overflow-hidden">
-                  <div className="bg-gray-100 px-4 py-3 flex justify-between items-center">
-                    <span className="font-semibold text-gray-900">Total Amount</span>
-                    <span className="text-xl font-bold text-gray-900">
+              <div className="flex justify-end mb-2">
+                <div className="w-64 border border-gray-300 rounded overflow-hidden">
+                  <div className="bg-gray-100 px-2 py-1.5 flex justify-between items-center">
+                    <span className="font-semibold text-xs text-gray-900">Total Amount</span>
+                    <span className="text-base font-bold text-gray-900">
                       ₹{(bill?.bill_amount || 0).toFixed(2)}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-12 pt-6 border-t border-gray-300">
-                <div className="mb-8">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Bank Details</h3>
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+              <div className="mt-3 pt-2 border-t border-gray-300">
+                <div className="mb-3">
+                  <h3 className="text-xs font-semibold text-gray-900 mb-1">Bank Details</h3>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <p className="text-gray-700">
                       <span className="font-medium">Bank Name:</span>{' '}
                       {company?.bank_name || '-'}
@@ -426,33 +425,33 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                 </div>
 
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-900 mb-8">
+                  <p className="text-xs font-semibold text-gray-900 mb-2">
                     For {company?.company_name}
                   </p>
-                  <div className="mt-8 flex items-end justify-end gap-4">
+                  <div className="mt-2 flex items-end justify-end gap-2">
                     <div className="relative">
                       <img
                         src="/signature.jpg"
                         alt="Authorized Signature"
-                        className="h-16 w-auto object-contain"
+                        className="h-12 w-auto object-contain"
                       />
                     </div>
                     <div className="relative">
                       <img
                         src="/round_stamp.jpg"
                         alt="Company Seal"
-                        className="h-20 w-20 object-contain"
+                        className="h-14 w-14 object-contain"
                       />
                     </div>
                   </div>
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-700">Authorized Signatory</p>
+                  <div className="mt-1">
+                    <p className="text-xs text-gray-700">Authorized Signatory</p>
                   </div>
                 </div>
               </div>
 
               {(company?.bill_footer1 || company?.bill_footer2 || company?.bill_footer3) && (
-                <div className="mt-8 pt-6 border-t border-gray-300 space-y-2">
+                <div className="mt-2 pt-2 border-t border-gray-300 space-y-1">
                   {company?.bill_footer1 && (
                     <p className="text-xs text-gray-700 text-center break-words whitespace-pre-wrap">
                       {company.bill_footer1}
@@ -490,10 +489,11 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
             top: 0;
             width: 100%;
             padding: 0;
+            font-size: 10px !important;
           }
           @page {
             size: A4 portrait;
-            margin: 20mm;
+            margin: 15mm;
           }
         }
       `}</style>

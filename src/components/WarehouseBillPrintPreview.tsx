@@ -88,8 +88,8 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
 
   const handlePrint = () => {
     const originalTitle = document.title;
-    if (bill?.billing_party_code && bill?.bill_number) {
-      document.title = `${bill.billing_party_code}_${bill.bill_number}`;
+    if (bill?.billing_party_name && bill?.bill_number) {
+      document.title = `${bill.billing_party_name.replace(/[^a-zA-Z0-9]/g, '_')}_${bill.bill_number}`;
     }
     window.print();
     setTimeout(() => {
@@ -101,24 +101,23 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
     const element = document.querySelector('.bill-print-content');
     if (!element) return;
 
-    const filename = bill?.billing_party_code && bill?.bill_number
-      ? `${bill.billing_party_code}_${bill.bill_number}.pdf`
+    const filename = bill?.billing_party_name && bill?.bill_number
+      ? `${bill.billing_party_name.replace(/[^a-zA-Z0-9]/g, '_')}_${bill.bill_number}.pdf`
       : 'warehouse_bill.pdf';
 
     const opt = {
-      margin: [5, 5, 5, 5],
+      margin: [8, 8, 8, 8],
       filename: filename,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: {
-        scale: 3,
+        scale: 2.5,
         useCORS: true,
         logging: false,
         letterRendering: true,
         allowTaint: true,
-        scrollY: -window.scrollY,
-        scrollX: -window.scrollX,
-        windowHeight: element.scrollHeight + 100,
-        height: element.scrollHeight + 100
+        scrollY: 0,
+        scrollX: 0,
+        windowWidth: 800
       },
       jsPDF: {
         unit: 'mm',
@@ -128,7 +127,7 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
       },
       pagebreak: {
         mode: 'avoid-all',
-        avoid: ['tr', 'td', 'th', 'img', '.page-break-avoid']
+        avoid: ['tr', 'td', 'th', 'img', 'div']
       }
     };
 
