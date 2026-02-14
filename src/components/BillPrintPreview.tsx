@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { X, Printer } from 'lucide-react';
+import { X, Printer, Download } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 
 interface CompanyDetails {
   logo_url: string | null;
@@ -119,6 +120,44 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
     }, 100);
   };
 
+  const handleDownloadPDF = async () => {
+    const element = document.querySelector('.bill-print-content');
+    if (!element) return;
+
+    const filename = bill?.billing_party_code && bill?.lr_bill_number
+      ? `${bill.billing_party_code}_${bill.lr_bill_number}.pdf`
+      : 'lr_bill.pdf';
+
+    const opt = {
+      margin: [5, 5, 5, 5],
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 3,
+        useCORS: true,
+        logging: false,
+        letterRendering: true,
+        allowTaint: true,
+        scrollY: -window.scrollY,
+        scrollX: -window.scrollX,
+        windowHeight: element.scrollHeight + 100,
+        height: element.scrollHeight + 100
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait',
+        compress: true
+      },
+      pagebreak: {
+        mode: 'avoid-all',
+        avoid: ['tr', 'td', 'th', 'img', '.page-break-avoid']
+      }
+    };
+
+    await html2pdf().set(opt).from(element).save();
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-IN');
@@ -140,6 +179,13 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between print:hidden">
           <h2 className="text-xl font-semibold text-gray-800">Bill Preview</h2>
           <div className="flex items-center gap-3">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download PDF
+            </button>
             <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
