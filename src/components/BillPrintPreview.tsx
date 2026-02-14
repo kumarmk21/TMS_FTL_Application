@@ -124,24 +124,22 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
     const element = document.querySelector('.bill-print-content');
     if (!element) return;
 
-    const filename = bill?.billing_party_code && bill?.lr_bill_number
-      ? `${bill.billing_party_code}_${bill.lr_bill_number}.pdf`
+    const filename = bill?.billing_party_name && bill?.lr_bill_number
+      ? `${bill.billing_party_name.replace(/[^a-zA-Z0-9]/g, '_')}_${bill.lr_bill_number}.pdf`
       : 'lr_bill.pdf';
 
     const opt = {
-      margin: [5, 5, 5, 5],
+      margin: [10, 10, 10, 10],
       filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: 'jpeg', quality: 0.95 },
       html2canvas: {
-        scale: 3,
+        scale: 2,
         useCORS: true,
         logging: false,
         letterRendering: true,
         allowTaint: true,
-        scrollY: -window.scrollY,
-        scrollX: -window.scrollX,
-        windowHeight: element.scrollHeight + 100,
-        height: element.scrollHeight + 100
+        scrollY: 0,
+        scrollX: 0
       },
       jsPDF: {
         unit: 'mm',
@@ -150,8 +148,10 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
         compress: true
       },
       pagebreak: {
-        mode: 'avoid-all',
-        avoid: ['tr', 'td', 'th', 'img', '.page-break-avoid']
+        mode: ['avoid-all', 'css', 'legacy'],
+        before: '.page-break-before',
+        after: '.page-break-after',
+        avoid: ['tr', 'td', 'th', 'img']
       }
     };
 
@@ -203,7 +203,7 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
         </div>
 
         <div className="p-8 bill-print-content">
-          <div className="bg-white" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto' }}>
+          <div className="bg-white" style={{ maxWidth: '190mm', minHeight: '277mm', margin: '0 auto', padding: '0' }}>
             <div className="space-y-6">
               <div className="border-b-2 border-gray-300 pb-6">
                 <div className="flex items-start justify-between mb-4">
