@@ -47,6 +47,7 @@ import { LRTracking } from '../pages/LRTracking';
 import GenerateWarehouseBill from '../pages/GenerateWarehouseBill';
 import WarehouseBillPrint from '../pages/WarehouseBillPrint';
 import CustomerBillEdit from '../pages/CustomerBillEdit';
+import IncomeExpenseReport from '../pages/IncomeExpenseReport';
 
 export interface MenuItem {
   id: string;
@@ -139,6 +140,7 @@ const menuItems: MenuItem[] = [
     label: 'MIS/Reports',
     icon: <BarChart3 className="w-5 h-5" />,
     subItems: [
+      { id: 'income-expense-report', label: 'Income/Expense Report' },
       { id: 'sales-report', label: 'Sales Report' },
       { id: 'customer-mis-report', label: 'Customer MIS Report' },
       { id: 'pending-pod', label: 'Pending POD' },
@@ -232,6 +234,8 @@ export function Layout() {
         return <GenerateAdvanceBankFile />;
       case 'regenerate-advance-bank-file':
         return <RegenerateAdvanceBankFile />;
+      case 'income-expense-report':
+        return <IncomeExpenseReport />;
       case 'sales-report':
         return <SalesReport />;
       case 'customer-mis-report':
