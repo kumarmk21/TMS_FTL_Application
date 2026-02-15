@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Search, Edit2, FileText, Warehouse, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { EditLRBillModal } from '../components/modals/EditLRBillModal';
+import { EditWarehouseBillModal } from '../components/modals/EditWarehouseBillModal';
 
 interface LRBill {
   bill_id: string;
@@ -37,6 +39,8 @@ export default function CustomerBillEdit() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [editingLRBill, setEditingLRBill] = useState<{ billId: string; tranId: string } | null>(null);
+  const [editingWarehouseBill, setEditingWarehouseBill] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBills();
@@ -180,9 +184,22 @@ export default function CustomerBillEdit() {
   };
 
   const handleEditBill = (bill: Bill) => {
-    // TODO: Implement edit functionality
-    console.log('Edit bill:', bill);
-    alert(`Edit functionality for ${bill.bill_type} Bill: ${getBillNumber(bill)} will be implemented soon.`);
+    if (bill.bill_type === 'LR') {
+      const lrBill = bill as LRBill;
+      setEditingLRBill({ billId: lrBill.bill_id, tranId: lrBill.tran_id });
+    } else {
+      const warehouseBill = bill as WarehouseBill;
+      setEditingWarehouseBill(warehouseBill.bill_id);
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setEditingLRBill(null);
+    setEditingWarehouseBill(null);
+  };
+
+  const handleEditSuccess = () => {
+    fetchBills();
   };
 
   const filteredBills = bills.filter((bill) => {
@@ -385,6 +402,23 @@ export default function CustomerBillEdit() {
       <div className="mt-4 text-sm text-gray-600">
         Showing {filteredBills.length} of {bills.length} bills (excluding collected bills)
       </div>
+
+      {editingLRBill && (
+        <EditLRBillModal
+          billId={editingLRBill.billId}
+          tranId={editingLRBill.tranId}
+          onClose={handleCloseEditModal}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
+      {editingWarehouseBill && (
+        <EditWarehouseBillModal
+          billId={editingWarehouseBill}
+          onClose={handleCloseEditModal}
+          onSuccess={handleEditSuccess}
+        />
+      )}
     </div>
   );
 }
