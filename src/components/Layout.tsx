@@ -46,6 +46,7 @@ import CustomerMISReport from '../pages/CustomerMISReport';
 import { LRTracking } from '../pages/LRTracking';
 import GenerateWarehouseBill from '../pages/GenerateWarehouseBill';
 import WarehouseBillPrint from '../pages/WarehouseBillPrint';
+import CustomerBillEdit from '../pages/CustomerBillEdit';
 
 export interface MenuItem {
   id: string;
@@ -217,6 +218,8 @@ export function Layout() {
         return <GenerateCustomerBill />;
       case 'generate-warehouse-bill':
         return <GenerateWarehouseBill />;
+      case 'bill-edit':
+        return <CustomerBillEdit />;
       case 'lr-print':
         return <LRPrint />;
       case 'bill-print':
