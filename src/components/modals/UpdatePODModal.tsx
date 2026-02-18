@@ -19,6 +19,9 @@ interface THCDetails {
   thc_id: string | null;
   thc_date: string | null;
   thc_vendor: string | null;
+  thc_net_payable_amount: number;
+  thc_advance_amount: number;
+  thc_balance_amount: number;
 }
 
 interface UpdatePODModalProps {
@@ -31,26 +34,65 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
     thc_id: null,
     thc_date: null,
     thc_vendor: null,
+    thc_net_payable_amount: 0,
+    thc_advance_amount: 0,
+    thc_balance_amount: 0,
   });
   const [podRecdDate, setPodRecdDate] = useState('');
   const [podRecdType, setPodRecdType] = useState('');
   const [podCourierNumber, setPodCourierNumber] = useState('');
   const [podFile, setPodFile] = useState<File | null>(null);
+  const [thcUnloadingCharges, setThcUnloadingCharges] = useState<string>('0');
+  const [thcDetentionCharges, setThcDetentionCharges] = useState<string>('0');
+  const [thcDeductionDelay, setThcDeductionDelay] = useState<string>('0');
+  const [thcDeductionDamage, setThcDeductionDamage] = useState<string>('0');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loadingTHC, setLoadingTHC] = useState(true);
+  const [statusUUIDs, setStatusUUIDs] = useState<{
+    hardcopyPod: string | null;
+    onTime: string | null;
+    delay: string | null;
+  }>({
+    hardcopyPod: null,
+    onTime: null,
+    delay: null,
+  });
 
   useEffect(() => {
+    fetchStatusUUIDs();
     fetchTHCDetails();
   }, [record.manual_lr_no]);
+
+  const fetchStatusUUIDs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('status_master')
+        .select('id, status_name')
+        .in('status_name', ['HARDCOPYPOD', 'ON TIME', 'DELAY']);
+
+      if (error) throw error;
+
+      if (data) {
+        const uuids = {
+          hardcopyPod: data.find(s => s.status_name === 'HARDCOPYPOD')?.id || null,
+          onTime: data.find(s => s.status_name === 'ON TIME')?.id || null,
+          delay: data.find(s => s.status_name === 'DELAY')?.id || null,
+        };
+        setStatusUUIDs(uuids);
+      }
+    } catch (error) {
+      console.error('Error fetching status UUIDs:', error);
+    }
+  };
 
   const fetchTHCDetails = async () => {
     try {
       setLoadingTHC(true);
       const { data, error } = await supabase
         .from('thc_details')
-        .select('thc_id, thc_date, thc_vendor')
+        .select('thc_id, thc_date, thc_vendor, thc_net_payable_amount, thc_advance_amount, thc_balance_amount')
         .eq('lr_number', record.manual_lr_no)
         .maybeSingle();
 
@@ -61,6 +103,9 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
           thc_id: data.thc_id,
           thc_date: data.thc_date,
           thc_vendor: data.thc_vendor,
+          thc_net_payable_amount: data.thc_net_payable_amount || 0,
+          thc_advance_amount: data.thc_advance_amount || 0,
+          thc_balance_amount: data.thc_balance_amount || 0,
         });
       }
     } catch (error) {
@@ -118,6 +163,15 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
     return true;
   };
 
+  const calculateNewBalanceAmount = () => {
+    const unloading = parseFloat(thcUnloadingCharges) || 0;
+    const detention = parseFloat(thcDetentionCharges) || 0;
+    const deductionDelay = parseFloat(thcDeductionDelay) || 0;
+    const deductionDamage = parseFloat(thcDeductionDamage) || 0;
+
+    return thcDetails.thc_balance_amount + unloading + detention - deductionDelay - deductionDamage;
+  };
+
   const uploadPODFile = async () => {
     if (!podFile) return null;
 
@@ -169,6 +223,44 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
         .eq('tran_id', record.tran_id);
 
       if (updateError) throw updateError;
+
+      if (thcDetails.thc_id && statusUUIDs.hardcopyPod) {
+        const newBalanceAmount = calculateNewBalanceAmount();
+        const podDate = new Date(podRecdDate);
+        const bthDueDate = new Date(podDate);
+        bthDueDate.setDate(bthDueDate.getDate() + 45);
+
+        let thcStatusOpsId = statusUUIDs.onTime;
+        if (record.act_del_date && record.est_del_date) {
+          const actDelDate = new Date(record.act_del_date);
+          const estDelDate = new Date(record.est_del_date);
+          if (actDelDate > estDelDate) {
+            thcStatusOpsId = statusUUIDs.delay;
+          }
+        }
+
+        const thcUpdateData: any = {
+          thc_status_fin: statusUUIDs.hardcopyPod,
+          thc_status_ops: thcStatusOpsId,
+          thc_unloading_charges: parseFloat(thcUnloadingCharges) || 0,
+          thc_detention_charges: parseFloat(thcDetentionCharges) || 0,
+          thc_deduction_delay: parseFloat(thcDeductionDelay) || 0,
+          thc_deduction_damage: parseFloat(thcDeductionDamage) || 0,
+          thc_balance_amount: newBalanceAmount,
+          bth_due_date: bthDueDate.toISOString().split('T')[0],
+        };
+
+        if (record.act_del_date) {
+          thcUpdateData.unloading_date = record.act_del_date;
+        }
+
+        const { error: thcUpdateError } = await supabase
+          .from('thc_details')
+          .update(thcUpdateData)
+          .eq('thc_id', thcDetails.thc_id);
+
+        if (thcUpdateError) throw thcUpdateError;
+      }
 
       setSuccess(true);
       setTimeout(() => {
@@ -265,7 +357,7 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
               {loadingTHC ? (
                 <p className="text-sm text-slate-600">Loading THC details...</p>
               ) : (
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">THC ID</label>
                     <p className="text-sm text-slate-900">{thcDetails.thc_id || '-'}</p>
@@ -279,6 +371,18 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">THC Vendor</label>
                     <p className="text-sm text-slate-900">{thcDetails.thc_vendor || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Net Payable Amount</label>
+                    <p className="text-sm text-slate-900">₹{thcDetails.thc_net_payable_amount?.toFixed(2) || '0.00'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Advance Amount</label>
+                    <p className="text-sm text-slate-900">₹{thcDetails.thc_advance_amount?.toFixed(2) || '0.00'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Balance Amount</label>
+                    <p className="text-sm text-slate-900">₹{thcDetails.thc_balance_amount?.toFixed(2) || '0.00'}</p>
                   </div>
                 </div>
               )}
@@ -359,6 +463,83 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
                 )}
               </div>
             </div>
+
+            {thcDetails.thc_id && (
+              <div className="border-t border-slate-200 pt-6">
+                <h3 className="text-sm font-semibold text-slate-700 mb-4">THC Balance Adjustments</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Unloading Charges <span className="text-green-600 text-xs">(Addition +)</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={thcUnloadingCharges}
+                      onChange={(e) => setThcUnloadingCharges(e.target.value)}
+                      placeholder="Enter amount"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Detention Charges <span className="text-green-600 text-xs">(Addition +)</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={thcDetentionCharges}
+                      onChange={(e) => setThcDetentionCharges(e.target.value)}
+                      placeholder="Enter amount"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Deduction - Delay <span className="text-red-600 text-xs">(Subtraction -)</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={thcDeductionDelay}
+                      onChange={(e) => setThcDeductionDelay(e.target.value)}
+                      placeholder="Enter amount"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Deduction - Damage <span className="text-red-600 text-xs">(Subtraction -)</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={thcDeductionDamage}
+                      onChange={(e) => setThcDeductionDamage(e.target.value)}
+                      placeholder="Enter amount"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="col-span-1 md:col-span-2">
+                    <div className="bg-slate-900 text-white p-4 rounded-lg">
+                      <label className="block text-sm font-semibold mb-2">
+                        New THC Balance Amount (Calculated)
+                      </label>
+                      <p className="text-2xl font-bold">
+                        ₹{calculateNewBalanceAmount().toFixed(2)}
+                      </p>
+                      <p className="text-xs text-slate-300 mt-2">
+                        Original: ₹{thcDetails.thc_balance_amount?.toFixed(2) || '0.00'} + Unloading + Detention - Delay - Damage
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 justify-end mt-6 pt-6 border-t border-slate-200">
