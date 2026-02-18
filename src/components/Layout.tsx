@@ -48,6 +48,7 @@ import GenerateWarehouseBill from '../pages/GenerateWarehouseBill';
 import WarehouseBillPrint from '../pages/WarehouseBillPrint';
 import CustomerBillEdit from '../pages/CustomerBillEdit';
 import IncomeExpenseReport from '../pages/IncomeExpenseReport';
+import PODUpload from '../pages/PODUpload';
 
 export interface MenuItem {
   id: string;
@@ -212,6 +213,8 @@ export function Layout() {
         return <TruckDispatch />;
       case 'truck-arrival':
         return <TruckArrival />;
+      case 'pod-upload':
+        return <PODUpload />;
       case 'lr-entry':
         return <LREntry />;
       case 'lr-financial-edit':
