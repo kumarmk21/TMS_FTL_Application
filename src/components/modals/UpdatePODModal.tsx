@@ -92,17 +92,26 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
       setLoadingTHC(true);
       const { data, error } = await supabase
         .from('thc_details')
-        .select('thc_id, thc_date, thc_vendor, thc_net_payable_amount, thc_advance_amount, thc_balance_amount')
+        .select(`
+          thc_id,
+          thc_date,
+          thc_vendor,
+          thc_net_payable_amount,
+          thc_advance_amount,
+          thc_balance_amount,
+          vendor_master!thc_details_thc_vendor_fkey(vendor_name)
+        `)
         .eq('lr_number', record.manual_lr_no)
         .maybeSingle();
 
       if (error) throw error;
 
       if (data) {
+        const vendorName = data.vendor_master?.vendor_name || data.thc_vendor || '-';
         setThcDetails({
           thc_id: data.thc_id,
           thc_date: data.thc_date,
-          thc_vendor: data.thc_vendor,
+          thc_vendor: vendorName,
           thc_net_payable_amount: data.thc_net_payable_amount || 0,
           thc_advance_amount: data.thc_advance_amount || 0,
           thc_balance_amount: data.thc_balance_amount || 0,
