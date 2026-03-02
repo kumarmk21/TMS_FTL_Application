@@ -17,6 +17,7 @@ interface PODRecord {
 
 interface THCDetails {
   thc_id: string | null;
+  thc_id_number: string | null;
   thc_date: string | null;
   thc_vendor: string | null;
   thc_net_payable_amount: number;
@@ -32,6 +33,7 @@ interface UpdatePODModalProps {
 export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps) {
   const [thcDetails, setThcDetails] = useState<THCDetails>({
     thc_id: null,
+    thc_id_number: null,
     thc_date: null,
     thc_vendor: null,
     thc_net_payable_amount: 0,
@@ -94,6 +96,7 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
         .from('thc_details')
         .select(`
           thc_id,
+          thc_id_number,
           thc_date,
           thc_vendor,
           thc_net_payable_amount,
@@ -110,6 +113,7 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
         const vendorName = data.vendor_master?.vendor_name || data.thc_vendor || '-';
         setThcDetails({
           thc_id: data.thc_id,
+          thc_id_number: data.thc_id_number,
           thc_date: data.thc_date,
           thc_vendor: vendorName,
           thc_net_payable_amount: data.thc_net_payable_amount || 0,
@@ -377,7 +381,7 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">THC ID</label>
-                    <p className="text-sm text-slate-900">{thcDetails.thc_id || '-'}</p>
+                    <p className="text-sm text-slate-900">{thcDetails.thc_id_number || '-'}</p>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">THC Date</label>
