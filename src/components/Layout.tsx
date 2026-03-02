@@ -129,7 +129,7 @@ const menuItems: MenuItem[] = [
     icon: <Printer className="w-5 h-5" />,
     subItems: [
       { id: 'lr-print', label: 'LR Print' },
-      { id: 'bill-print', label: 'Bill Print' },
+      { id: 'bill-print', label: 'Transportation Bill Print' },
       { id: 'warehouse-bill-print', label: 'Warehouse Bill Print' },
       { id: 'thc-print', label: 'THC Print' },
       { id: 'lr-life-cycle', label: 'LR Life Cycle' },
