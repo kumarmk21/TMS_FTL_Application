@@ -160,6 +160,13 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
       }
     }
 
+    if (podRecdType === 'Hand Delivery') {
+      if (!podFile) {
+        setError('POD Document upload is required for hand delivery');
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -212,9 +219,10 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
 
       if (podRecdType === 'By Courier') {
         updateData.pod_courier_number = podCourierNumber;
-        if (podUploadPath) {
-          updateData.pod_upload = podUploadPath;
-        }
+      }
+
+      if (podUploadPath) {
+        updateData.pod_upload = podUploadPath;
       }
 
       const { error: updateError } = await supabase
@@ -421,45 +429,45 @@ export default function UpdatePODModal({ record, onClose }: UpdatePODModalProps)
                 </div>
 
                 {podRecdType === 'By Courier' && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        POD Courier Number <span className="text-red-600">*</span>
-                      </label>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      POD Courier Number <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={podCourierNumber}
+                      onChange={(e) => setPodCourierNumber(e.target.value)}
+                      placeholder="Enter courier tracking number"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                )}
+
+                {(podRecdType === 'By Courier' || podRecdType === 'Hand Delivery') && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      Upload POD Document <span className="text-red-600">*</span>
+                    </label>
+                    <div className="relative">
                       <input
-                        type="text"
-                        value={podCourierNumber}
-                        onChange={(e) => setPodCourierNumber(e.target.value)}
-                        placeholder="Enter courier tracking number"
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={handleFileChange}
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
                         required
                       />
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        Upload POD Document <span className="text-red-600">*</span>
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          onChange={handleFileChange}
-                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
-                          required
-                        />
-                      </div>
-                      {podFile && (
-                        <p className="mt-2 text-xs text-slate-600 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3 text-green-600" />
-                          {podFile.name} ({(podFile.size / 1024).toFixed(2)} KB)
-                        </p>
-                      )}
-                      <p className="mt-1 text-xs text-slate-500">
-                        Accepted formats: PDF, JPG, JPEG, PNG (Max 5MB)
+                    {podFile && (
+                      <p className="mt-2 text-xs text-slate-600 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3 text-green-600" />
+                        {podFile.name} ({(podFile.size / 1024).toFixed(2)} KB)
                       </p>
-                    </div>
-                  </>
+                    )}
+                    <p className="mt-1 text-xs text-slate-500">
+                      Accepted formats: PDF, JPG, JPEG, PNG (Max 5MB)
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
