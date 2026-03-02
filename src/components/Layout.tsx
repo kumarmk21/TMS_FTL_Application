@@ -94,7 +94,7 @@ const menuItems: MenuItem[] = [
       { id: 'lr-financial-edit', label: 'LR Financial Edit' },
       { id: 'generate-bill', label: 'Generate Customer Bill' },
       { id: 'generate-warehouse-bill', label: 'Generate Warehouse Bill' },
-      { id: 'bill-edit', label: 'Customer Bill Edit' },
+      { id: 'bill-edit', label: 'Warehousing Bill Edit' },
       { id: 'bill-submission', label: 'Customer Bill Submission' },
     ],
   },
