@@ -134,10 +134,14 @@ export function BillCancelRegenerate() {
           bill_status: 'Cancelled',
           cancelled_at: new Date().toISOString(),
           cancelled_by: profile?.id,
+          cancellation_reason: cancelReason.trim(),
         })
         .eq('bill_id', selectedBill.bill_id);
 
-      if (billError) throw billError;
+      if (billError) {
+        console.error('Bill update error:', billError);
+        throw billError;
+      }
 
       const { error: lrError } = await supabase
         .from('booking_lr')
@@ -147,7 +151,10 @@ export function BillCancelRegenerate() {
         })
         .eq('lr_bill_id', selectedBill.bill_id);
 
-      if (lrError) throw lrError;
+      if (lrError) {
+        console.error('LR update error:', lrError);
+        throw lrError;
+      }
 
       alert('Bill cancelled successfully. All LRs are now available for re-billing.');
       setShowCancelConfirm(false);
@@ -155,9 +162,9 @@ export function BillCancelRegenerate() {
       setSelectedBill(null);
       setLrRecords([]);
       fetchBills();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error cancelling bill:', error);
-      alert('Failed to cancel bill');
+      alert(`Failed to cancel bill: ${error.message || JSON.stringify(error)}`);
     } finally {
       setLoading(false);
     }
