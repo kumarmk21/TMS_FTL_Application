@@ -122,7 +122,12 @@ export function Dashboard() {
 
       const statusMap = new Map<string, number>();
       lrStatusResult.data?.forEach(lr => {
-        const status = lr.lr_status || 'Unknown';
+        let status = lr.lr_status || 'Unknown';
+
+        if (status.toUpperCase().startsWith('DELIVERED')) {
+          status = 'Delivered';
+        }
+
         statusMap.set(status, (statusMap.get(status) || 0) + 1);
       });
 
