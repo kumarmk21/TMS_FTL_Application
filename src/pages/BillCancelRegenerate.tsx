@@ -5,11 +5,11 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface BillRecord {
   bill_id: string;
-  bill_number: string;
-  bill_date: string;
-  customer_code: string;
-  customer_name: string;
-  total_amount: number;
+  lr_bill_number: string;
+  lr_bill_date: string;
+  billing_party_code: string;
+  billing_party_name: string;
+  bill_amount: number;
   bill_status: string;
   cancelled_at: string | null;
   cancelled_by: string | null;
@@ -49,16 +49,16 @@ export function BillCancelRegenerate() {
         .from('lr_bill')
         .select(`
           bill_id,
-          bill_number,
-          bill_date,
-          customer_code,
-          customer_name,
-          total_amount,
+          lr_bill_number,
+          lr_bill_date,
+          billing_party_code,
+          billing_party_name,
+          bill_amount,
           bill_status,
           cancelled_at,
           cancelled_by
         `)
-        .order('bill_date', { ascending: false });
+        .order('lr_bill_date', { ascending: false });
 
       if (statusFilter === 'active') {
         query = query.or('bill_status.is.null,bill_status.neq.Cancelled');
@@ -217,23 +217,17 @@ export function BillCancelRegenerate() {
       const { data: newBill, error: newBillError } = await supabase
         .from('lr_bill')
         .insert({
-          customer_code: currentBill.customer_code,
-          customer_name: currentBill.customer_name,
-          bill_date: new Date().toISOString().split('T')[0],
+          lr_bill_date: new Date().toISOString().split('T')[0],
           billing_party_code: currentBill.billing_party_code,
           billing_party_name: currentBill.billing_party_name,
-          billing_party_gstin: currentBill.billing_party_gstin,
-          billing_party_address: currentBill.billing_party_address,
-          billing_party_state: currentBill.billing_party_state,
-          billing_party_state_code: currentBill.billing_party_state_code,
-          consignee_code: currentBill.consignee_code,
-          consignee_name: currentBill.consignee_name,
-          consignee_gstin: currentBill.consignee_gstin,
-          consignee_address: currentBill.consignee_address,
-          consignee_state: currentBill.consignee_state,
-          consignee_state_code: currentBill.consignee_state_code,
+          bill_to_gstin: currentBill.bill_to_gstin,
+          bill_to_address: currentBill.bill_to_address,
+          bill_to_state: currentBill.bill_to_state,
           bill_generation_branch: currentBill.bill_generation_branch,
-          total_amount: totalAmount,
+          bill_amount: totalAmount,
+          sub_total: totalAmount,
+          sac_code: currentBill.sac_code,
+          sac_description: currentBill.sac_description,
           bill_status: 'Active',
           created_by: profile?.id,
         })
@@ -252,7 +246,7 @@ export function BillCancelRegenerate() {
 
       if (lrUpdateError) throw lrUpdateError;
 
-      alert(`Bill regenerated successfully! New Bill Number: ${newBill.bill_number}`);
+      alert(`Bill regenerated successfully! New Bill Number: ${newBill.lr_bill_number}`);
       setShowRegenerateConfirm(false);
       setSelectedBill(null);
       setLrRecords([]);
@@ -266,9 +260,9 @@ export function BillCancelRegenerate() {
   };
 
   const filteredBills = bills.filter(bill =>
-    bill.bill_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.customer_code.toLowerCase().includes(searchTerm.toLowerCase())
+    bill.lr_bill_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bill.billing_party_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bill.billing_party_code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const formatCurrency = (amount: number) => {
@@ -360,14 +354,14 @@ export function BillCancelRegenerate() {
               ) : (
                 filteredBills.map((bill) => (
                   <tr key={bill.bill_id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{bill.bill_number}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(bill.bill_date)}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{bill.lr_bill_number}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{formatDate(bill.lr_bill_date)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      <div className="font-medium">{bill.customer_name}</div>
-                      <div className="text-xs text-gray-500">{bill.customer_code}</div>
+                      <div className="font-medium">{bill.billing_party_name}</div>
+                      <div className="text-xs text-gray-500">{bill.billing_party_code}</div>
                     </td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
-                      {formatCurrency(bill.total_amount || 0)}
+                      {formatCurrency(bill.bill_amount || 0)}
                     </td>
                     <td className="px-4 py-3 text-sm text-center text-gray-600">{bill.lr_count}</td>
                     <td className="px-4 py-3 text-center">
@@ -404,9 +398,9 @@ export function BillCancelRegenerate() {
           <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Bill Details - {selectedBill.bill_number}</h2>
+                <h2 className="text-xl font-bold text-gray-900">Bill Details - {selectedBill.lr_bill_number}</h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  {selectedBill.customer_name} | {formatDate(selectedBill.bill_date)}
+                  {selectedBill.billing_party_name} | {formatDate(selectedBill.lr_bill_date)}
                 </p>
               </div>
               <button
@@ -426,7 +420,7 @@ export function BillCancelRegenerate() {
               <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
                 <div>
                   <p className="text-xs text-gray-500">Total Amount</p>
-                  <p className="text-lg font-bold text-gray-900">{formatCurrency(selectedBill.total_amount || 0)}</p>
+                  <p className="text-lg font-bold text-gray-900">{formatCurrency(selectedBill.bill_amount || 0)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">LR Count</p>
