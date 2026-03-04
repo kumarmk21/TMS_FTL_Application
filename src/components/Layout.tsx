@@ -49,6 +49,7 @@ import WarehouseBillPrint from '../pages/WarehouseBillPrint';
 import CustomerBillEdit from '../pages/CustomerBillEdit';
 import IncomeExpenseReport from '../pages/IncomeExpenseReport';
 import PODUpload from '../pages/PODUpload';
+import { BillCancelRegenerate } from '../pages/BillCancelRegenerate';
 
 export interface MenuItem {
   id: string;
@@ -93,6 +94,7 @@ const menuItems: MenuItem[] = [
       { id: 'lr-entry', label: 'LR Entry' },
       { id: 'lr-financial-edit', label: 'LR Financial Edit' },
       { id: 'generate-bill', label: 'Generate Customer Bill' },
+      { id: 'bill-cancel-regenerate', label: 'Bill Cancel/Regenerate' },
       { id: 'generate-warehouse-bill', label: 'Generate Warehouse Bill' },
       { id: 'bill-edit', label: 'Warehousing Bill Edit' },
       { id: 'bill-submission', label: 'Customer Bill Submission' },
@@ -221,6 +223,8 @@ export function Layout() {
         return <LRFinancialEdit />;
       case 'generate-bill':
         return <GenerateCustomerBill />;
+      case 'bill-cancel-regenerate':
+        return <BillCancelRegenerate />;
       case 'generate-warehouse-bill':
         return <GenerateWarehouseBill />;
       case 'bill-edit':
