@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 interface BillRecord {
-  bill_id: number;
+  bill_id: string;
   bill_number: string;
   bill_date: string;
   customer_code: string;
@@ -17,7 +17,7 @@ interface BillRecord {
 }
 
 interface LRRecord {
-  lr_id: number;
+  lr_id: string;
   manual_lr_no: string;
   lr_date: string;
   from_city: string;
@@ -68,14 +68,21 @@ export function BillCancelRegenerate() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching bills:', error);
+        throw error;
+      }
 
       const billsWithCount = await Promise.all(
         (data || []).map(async (bill) => {
-          const { count } = await supabase
+          const { count, error: countError } = await supabase
             .from('booking_lr')
             .select('*', { count: 'exact', head: true })
             .eq('lr_bill_id', bill.bill_id);
+
+          if (countError) {
+            console.error('Error counting LRs:', countError);
+          }
 
           return {
             ...bill,
@@ -85,15 +92,15 @@ export function BillCancelRegenerate() {
       );
 
       setBills(billsWithCount);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching bills:', error);
-      alert('Failed to fetch bills');
+      alert(`Failed to fetch bills: ${error.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchLRsForBill = async (billId: number) => {
+  const fetchLRsForBill = async (billId: string) => {
     try {
       const { data, error } = await supabase
         .from('booking_lr')
