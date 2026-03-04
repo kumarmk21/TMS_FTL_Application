@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileX, RefreshCw, Search, Calendar, DollarSign, AlertCircle, CheckCircle, XCircle, Edit } from 'lucide-react';
+import { FileX, RefreshCw, Search, Calendar, DollarSign, AlertCircle, CheckCircle, XCircle, CreditCard as Edit } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
