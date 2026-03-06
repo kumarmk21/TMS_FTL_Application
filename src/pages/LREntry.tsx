@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Upload, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import * as XLSX from 'xlsx';
 
 interface Branch {
   id: string;
@@ -520,20 +521,252 @@ export function LREntry() {
       lr.to_city?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const downloadTemplate = () => {
+    const template = [
+      {
+        'LR No Type': 'system_generated',
+        'Manual LR No': '',
+        'Enquiry ID': '',
+        'LR Date': '2026-03-06',
+        'Booking Branch': 'BRANCH001',
+        'Origin City': 'Mumbai',
+        'Destination City': 'Delhi',
+        'From City': 'Mumbai',
+        'To City': 'Delhi',
+        'EDD (Estimated Delivery Date)': '2026-03-10',
+        'Pay Basis': 'To Pay',
+        'Booking Type': 'Full Truck Load',
+        'Product': 'Electronics',
+        'Consignor': 'ABC Company',
+        'Consignee': 'XYZ Company',
+        'No of Packages': '100',
+        'Actual Weight': '5000',
+        'Chargeable Weight': '5000',
+        'Invoice Number': 'INV-2026-001',
+        'Invoice Date': '2026-03-05',
+        'Invoice Value': '500000',
+        'E-way Bill Number': 'EWB123456789012',
+        'E-way Bill Expiry Date': '2026-03-08',
+        'Vehicle Number': 'MH01AB1234',
+        'Driver Number': '9876543210',
+        'Driver Name': 'John Doe',
+        'Vehicle Type': 'Container 20ft',
+        'Seal No': 'SEAL12345',
+        'Billing Party Customer ID': 'CUST001',
+        'LR Email ID': 'lr@example.com',
+        'Customer Email ID': 'customer@example.com',
+        'Group ID': 'GROUP001',
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'LR Template');
+
+    const colWidths = [
+      { wch: 18 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 15 },
+      { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 15 }, { wch: 25 },
+      { wch: 12 }, { wch: 18 }, { wch: 15 }, { wch: 20 }, { wch: 20 },
+      { wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 12 },
+      { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 15 },
+      { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 25 }, { wch: 20 },
+      { wch: 20 }, { wch: 15 }
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.writeFile(wb, 'LR_Bulk_Upload_Template.xlsx');
+  };
+
+  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+
+    const file = e.target.files[0];
+    setLoading(true);
+
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+      let successCount = 0;
+      let failedCount = 0;
+      const errors: string[] = [];
+
+      for (let i = 0; i < jsonData.length; i++) {
+        const row: any = jsonData[i];
+        const rowNumber = i + 2;
+
+        try {
+          const branchCode = row['Booking Branch'];
+          const originCity = row['Origin City'];
+          const destCity = row['Destination City'];
+          const billingPartyCustomerId = row['Billing Party Customer ID'];
+
+          const { data: branchData, error: branchError } = await supabase
+            .from('branch_master')
+            .select('id, branch_code')
+            .eq('branch_code', branchCode)
+            .maybeSingle();
+
+          if (branchError || !branchData) {
+            throw new Error(`Invalid Branch Code: ${branchCode}`);
+          }
+
+          const { data: originData, error: originError } = await supabase
+            .from('city_master')
+            .select('id, city_name')
+            .eq('city_name', originCity)
+            .maybeSingle();
+
+          if (originError || !originData) {
+            throw new Error(`Invalid Origin City: ${originCity}`);
+          }
+
+          const { data: destData, error: destError } = await supabase
+            .from('city_master')
+            .select('id, city_name')
+            .eq('city_name', destCity)
+            .maybeSingle();
+
+          if (destError || !destData) {
+            throw new Error(`Invalid Destination City: ${destCity}`);
+          }
+
+          const { data: customerData, error: customerError } = await supabase
+            .from('customer_master')
+            .select('id, customer_id, customer_name')
+            .eq('customer_id', billingPartyCustomerId)
+            .maybeSingle();
+
+          if (customerError || !customerData) {
+            throw new Error(`Invalid Billing Party Customer ID: ${billingPartyCustomerId}`);
+          }
+
+          const { data: statusData, error: statusError } = await supabase
+            .from('status_master')
+            .select('status_name')
+            .in('status_name', ['In Transit', 'Booked']);
+
+          if (statusError) {
+            console.error('Error fetching statuses:', statusError);
+          }
+
+          const inTransitStatus = statusData?.find(s => s.status_name === 'In Transit')?.status_name || 'In Transit';
+          const bookedStatus = statusData?.find(s => s.status_name === 'Booked')?.status_name || 'Booked';
+
+          const lrData: any = {
+            lr_no_type: row['LR No Type'] || 'system_generated',
+            enquiry_id: row['Enquiry ID'] || null,
+            entry_datetime: new Date().toISOString(),
+            lr_date: row['LR Date'],
+            booking_branch: branchCode,
+            origin_id: originData.id,
+            destination_id: destData.id,
+            from_city: row['From City'] || originCity,
+            to_city: row['To City'] || destCity,
+            est_del_date: row['EDD (Estimated Delivery Date)'] || null,
+            pay_basis: row['Pay Basis'] || '',
+            booking_type: row['Booking Type'] || '',
+            product: row['Product'] || '',
+            consignor: row['Consignor'] || '',
+            consignee: row['Consignee'] || '',
+            no_of_pkgs: row['No of Packages'] ? parseInt(row['No of Packages']) : 0,
+            act_wt: row['Actual Weight'] ? parseFloat(row['Actual Weight']) : 0,
+            chrg_wt: row['Chargeable Weight'] ? parseFloat(row['Chargeable Weight']) : 0,
+            invoice_number: row['Invoice Number'] || '',
+            invoice_date: row['Invoice Date'] || null,
+            invoice_value: row['Invoice Value'] ? parseFloat(row['Invoice Value']) : 0,
+            eway_bill_number: row['E-way Bill Number'] || '',
+            eway_bill_exp_date: row['E-way Bill Expiry Date'] || null,
+            vehicle_number: row['Vehicle Number'] ? row['Vehicle Number'].toUpperCase().replace(/\s/g, '') : '',
+            driver_number: row['Driver Number'] || '',
+            driver_name: row['Driver Name'] || '',
+            vehicle_type: row['Vehicle Type'] || '',
+            seal_no: row['Seal No'] || '',
+            billing_party_id: customerData.id,
+            billing_party_code: customerData.customer_id,
+            billing_party_name: customerData.customer_name,
+            lr_email_id: row['LR Email ID'] || '',
+            customer_email_id: row['Customer Email ID'] || '',
+            group_id: row['Group ID'] || '',
+            lr_status: inTransitStatus,
+            lr_financial_status: bookedStatus,
+            created_by: profile?.id || null,
+          };
+
+          if (row['LR No Type'] === 'pre_printed' && row['Manual LR No']) {
+            lrData.manual_lr_no = row['Manual LR No'];
+          }
+
+          const { error: insertError } = await supabase
+            .from('booking_lr')
+            .insert([lrData]);
+
+          if (insertError) {
+            throw new Error(insertError.message);
+          }
+
+          successCount++;
+        } catch (error: any) {
+          failedCount++;
+          errors.push(`Row ${rowNumber}: ${error.message}`);
+        }
+      }
+
+      let message = `Upload Complete!\nSuccess: ${successCount}\nFailed: ${failedCount}`;
+      if (errors.length > 0) {
+        message += '\n\nErrors:\n' + errors.slice(0, 10).join('\n');
+        if (errors.length > 10) {
+          message += `\n... and ${errors.length - 10} more errors`;
+        }
+      }
+      alert(message);
+
+      await fetchLREntries();
+      e.target.value = '';
+    } catch (error: any) {
+      console.error('Error processing file:', error);
+      alert(`Failed to process file: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">LR Entry</h1>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Add LR Entry
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={downloadTemplate}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Download Template
+          </button>
+          <label className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer">
+            <Upload className="w-4 h-4" />
+            Bulk Upload
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleBulkUpload}
+              className="hidden"
+              disabled={loading}
+            />
+          </label>
+          <button
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add LR Entry
+          </button>
+        </div>
       </div>
 
       {showForm && (
