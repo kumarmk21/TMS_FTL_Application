@@ -41,6 +41,7 @@ import { TruckArrival } from '../pages/TruckArrival';
 import { THCPrint } from '../pages/THCPrint';
 import GenerateAdvanceBankFile from '../pages/GenerateAdvanceBankFile';
 import RegenerateAdvanceBankFile from '../pages/RegenerateAdvanceBankFile';
+import GenerateBalanceBankFile from '../pages/GenerateBalanceBankFile';
 import SalesReport from '../pages/SalesReport';
 import CustomerMISReport from '../pages/CustomerMISReport';
 import { LRTracking } from '../pages/LRTracking';
@@ -245,6 +246,8 @@ export function Layout() {
         return <GenerateAdvanceBankFile />;
       case 'regenerate-advance-bank-file':
         return <RegenerateAdvanceBankFile />;
+      case 'generate-balance-bank-file':
+        return <GenerateBalanceBankFile />;
       case 'income-expense-report':
         return <IncomeExpenseReport />;
       case 'sales-report':
