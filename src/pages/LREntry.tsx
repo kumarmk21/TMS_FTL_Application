@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Upload, Download } from 'lucide-react';
+import { Search, Plus, CreditCard as Edit2, Trash2, X, Upload, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import * as XLSX from 'xlsx';
