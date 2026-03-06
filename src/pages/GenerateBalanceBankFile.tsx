@@ -23,6 +23,8 @@ interface THCRecord {
   thc_advance_amount: number | null;
   bth_due_date: string | null;
   vendor_name?: string;
+  calculated_munshiyana: number;
+  calculated_balance: number;
 }
 
 export default function GenerateBalanceBankFile() {
@@ -113,10 +115,18 @@ export default function GenerateBalanceBankFile() {
 
         const vendorMap = new Map(vendorData?.map(v => [v.id, v.vendor_name]) || []);
 
-        const enrichedRecords = data.map(record => ({
-          ...record,
-          vendor_name: vendorMap.get(record.thc_vendor) || 'Unknown'
-        }));
+        const enrichedRecords = data.map(record => {
+          const thcAmount = record.thc_amount || 0;
+          const calculated_munshiyana = thcAmount < 100000.00 ? 200 : 300;
+          const calculated_balance = thcAmount - calculated_munshiyana;
+
+          return {
+            ...record,
+            vendor_name: vendorMap.get(record.thc_vendor) || 'Unknown',
+            calculated_munshiyana,
+            calculated_balance
+          };
+        });
 
         setRecords(enrichedRecords);
       } else {
@@ -161,7 +171,7 @@ export default function GenerateBalanceBankFile() {
         'N',
         '',
         record.ven_act_number || '',
-        record.thc_balance_amount?.toString() || '0',
+        record.calculated_balance.toFixed(2),
         record.vendor_name || '',
         '',
         '',
@@ -173,8 +183,8 @@ export default function GenerateBalanceBankFile() {
         '',
         record.vehicle_number || '',
         record.lr_number || '',
-        record.thc_net_payable_amount?.toString() || '0',
-        record.thc_advance_amount?.toString() || '0',
+        record.thc_amount?.toString() || '0',
+        record.calculated_munshiyana.toFixed(2),
         record.origin || '',
         record.destination || '',
         record.vehicle_type || '',
@@ -340,7 +350,7 @@ export default function GenerateBalanceBankFile() {
                   THC Amount
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Advance Amount
+                  Munshiyana Amount
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Balance Amount
@@ -424,10 +434,10 @@ export default function GenerateBalanceBankFile() {
                       {record.thc_amount?.toFixed(2) || '0.00'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
-                      {record.thc_advance_amount?.toFixed(2) || '0.00'}
+                      {record.calculated_munshiyana.toFixed(2)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                      {record.thc_balance_amount?.toFixed(2) || '0.00'}
+                      {record.calculated_balance.toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {record.ven_act_name || '-'}
