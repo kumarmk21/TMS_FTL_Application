@@ -577,6 +577,24 @@ export function LREntry() {
     XLSX.writeFile(wb, 'LR_Bulk_Upload_Template.xlsx');
   };
 
+  const excelDateToString = (serial: any): string | null => {
+    if (!serial) return null;
+    if (typeof serial === 'string') {
+      if (serial.match(/^\d{4}-\d{2}-\d{2}$/)) return serial;
+      return serial;
+    }
+    if (typeof serial === 'number') {
+      const utc_days = Math.floor(serial - 25569);
+      const utc_value = utc_days * 86400;
+      const date_info = new Date(utc_value * 1000);
+      const year = date_info.getUTCFullYear();
+      const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date_info.getUTCDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    return null;
+  };
+
   const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
 
@@ -659,13 +677,13 @@ export function LREntry() {
             lr_no_type: row['LR No Type'] || 'system_generated',
             enquiry_id: row['Enquiry ID'] || null,
             entry_datetime: new Date().toISOString(),
-            lr_date: row['LR Date'],
+            lr_date: excelDateToString(row['LR Date']),
             booking_branch: branchCode,
             origin_id: originData.id,
             destination_id: destData.id,
             from_city: row['From City'] || originCity,
             to_city: row['To City'] || destCity,
-            est_del_date: row['EDD (Estimated Delivery Date)'] || null,
+            est_del_date: excelDateToString(row['EDD (Estimated Delivery Date)']),
             pay_basis: row['Pay Basis'] || '',
             booking_type: row['Booking Type'] || '',
             product: row['Product'] || '',
@@ -675,10 +693,10 @@ export function LREntry() {
             act_wt: row['Actual Weight'] ? parseFloat(row['Actual Weight']) : 0,
             chrg_wt: row['Chargeable Weight'] ? parseFloat(row['Chargeable Weight']) : 0,
             invoice_number: row['Invoice Number'] || '',
-            invoice_date: row['Invoice Date'] || null,
+            invoice_date: excelDateToString(row['Invoice Date']),
             invoice_value: row['Invoice Value'] ? parseFloat(row['Invoice Value']) : 0,
             eway_bill_number: row['E-way Bill Number'] || '',
-            eway_bill_exp_date: row['E-way Bill Expiry Date'] || null,
+            eway_bill_exp_date: excelDateToString(row['E-way Bill Expiry Date']),
             vehicle_number: row['Vehicle Number'] ? row['Vehicle Number'].toUpperCase().replace(/\s/g, '') : '',
             driver_number: row['Driver Number'] || '',
             driver_name: row['Driver Name'] || '',
