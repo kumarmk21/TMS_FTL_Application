@@ -50,6 +50,7 @@ import CustomerBillEdit from '../pages/CustomerBillEdit';
 import IncomeExpenseReport from '../pages/IncomeExpenseReport';
 import PODUpload from '../pages/PODUpload';
 import { BillCancelRegenerate } from '../pages/BillCancelRegenerate';
+import LRBulkUpload from '../pages/LRBulkUpload';
 
 export interface MenuItem {
   id: string;
@@ -92,6 +93,7 @@ const menuItems: MenuItem[] = [
     subItems: [
       { id: 'allot-lr', label: 'Allot LR Number' },
       { id: 'lr-entry', label: 'LR Entry' },
+      { id: 'lr-bulk-upload', label: 'LR Bulk Upload' },
       { id: 'lr-financial-edit', label: 'LR Financial Edit' },
       { id: 'generate-bill', label: 'Generate Customer Bill' },
       { id: 'bill-cancel-regenerate', label: 'Bill Cancel/Regenerate' },
@@ -219,6 +221,8 @@ export function Layout() {
         return <PODUpload />;
       case 'lr-entry':
         return <LREntry />;
+      case 'lr-bulk-upload':
+        return <LRBulkUpload />;
       case 'lr-financial-edit':
         return <LRFinancialEdit />;
       case 'generate-bill':
