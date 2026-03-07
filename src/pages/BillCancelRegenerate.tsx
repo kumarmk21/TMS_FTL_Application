@@ -17,7 +17,7 @@ interface BillRecord {
 }
 
 interface LRRecord {
-  lr_id: string;
+  tran_id: string;
   manual_lr_no: string;
   lr_date: string;
   from_city: string;
@@ -105,7 +105,7 @@ export function BillCancelRegenerate() {
     try {
       const { data, error } = await supabase
         .from('booking_lr')
-        .select('lr_id, manual_lr_no, lr_date, from_city, to_city, lr_total_amount, bill_no, bill_date')
+        .select('tran_id, manual_lr_no, lr_date, from_city, to_city, lr_total_amount, bill_no, bill_date')
         .eq('bill_no', billNumber)
         .order('manual_lr_no', { ascending: true });
 
@@ -179,7 +179,7 @@ export function BillCancelRegenerate() {
     try {
       const { data: lrData, error: lrFetchError } = await supabase
         .from('booking_lr')
-        .select('lr_id, lr_total_amount')
+        .select('tran_id, lr_total_amount')
         .eq('bill_no', selectedBill.lr_bill_number);
 
       if (lrFetchError) throw lrFetchError;
@@ -254,7 +254,7 @@ export function BillCancelRegenerate() {
           bill_date: newBill.lr_bill_date,
           bill_due_date: newBill.lr_bill_due_date,
         })
-        .in('lr_id', lrData.map(lr => lr.lr_id));
+        .in('tran_id', lrData.map(lr => lr.tran_id));
 
       if (lrUpdateError) throw lrUpdateError;
 
