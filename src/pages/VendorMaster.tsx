@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, Pencil, Trash2, Search, Download, Upload } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Pencil, Trash2, Search, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AddVendorModal } from '../components/modals/AddVendorModal';
 import { EditVendorModal } from '../components/modals/EditVendorModal';
+import * as XLSX from 'xlsx';
 
 interface Vendor {
   id: string;
@@ -35,8 +36,6 @@ export function VendorMaster() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchVendors();
@@ -83,191 +82,70 @@ export function VendorMaster() {
     setShowEditModal(true);
   };
 
-  const handleDownloadTemplate = () => {
-    const csvContent = `Vendor Code,Vendor Name,Vendor Type,Booking Branch,Vendor Address,Vendor Phone,PAN,Email ID,Account No,Bank Name,IFSC Code,TDS Applicable (Y/N),TDS Category,TDS Rate (%),Status (Active/Inactive)
-VEND001,Sample Vendor Ltd,Transporter,BR001,"123 Main Street, Mumbai 400001",9876543210,ABCDE1234F,vendor@example.com,1234567890,HDFC Bank,HDFC0001234,Y,Individual,1,Active
-VEND002,Another Vendor Pvt Ltd,Admin,BR002,"456 Park Road, Delhi 110001",9876543211,FGHIJ5678K,another@example.com,9876543210,ICICI Bank,ICIC0005678,Y,Corporate,2,Active
-VEND003,Third Vendor,Transporter,,"789 Park Avenue, Bangalore 560001",9876543212,KLMNO9012P,third@example.com,1122334455,SBI Bank,SBIN0001122,N,,,Active`;
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'vendor_master_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const parseCSVLine = (line: string): string[] => {
-    const values: string[] = [];
-    let currentValue = '';
-    let insideQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      const nextChar = line[i + 1];
-
-      if (char === '"') {
-        if (insideQuotes && nextChar === '"') {
-          currentValue += '"';
-          i++;
-        } else {
-          insideQuotes = !insideQuotes;
-        }
-      } else if (char === ',' && !insideQuotes) {
-        values.push(currentValue.trim());
-        currentValue = '';
-      } else {
-        currentValue += char;
-      }
-    }
-    values.push(currentValue.trim());
-    return values;
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.name.endsWith('.csv')) {
-      alert('Please upload a CSV file');
-      return;
-    }
-
-    setUploading(true);
-
+  const handleDownloadVendorMaster = async () => {
     try {
-      const text = await file.text();
-      const lines = text.split('\n').map(line => line.replace(/\r$/, ''));
-
-      if (lines.length < 2) {
-        alert('CSV file is empty or invalid');
-        setUploading(false);
-        return;
-      }
-
-      const headers = parseCSVLine(lines[0]);
-      const vendors = [];
-      const errors = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        const values = parseCSVLine(line);
-
-        if (values.length < 15) {
-          errors.push(`Line ${i + 1}: Insufficient columns (found ${values.length}, expected 15)`);
-          continue;
-        }
-
-        const [
-          vendor_code,
-          vendor_name,
-          vendor_type,
-          ven_bk_branch,
-          vendor_address,
-          vendor_phone,
-          pan,
-          email_id,
-          account_no,
-          bank_name,
-          ifsc_code,
-          tds_applicable,
-          tds_category,
-          tds_rate,
-          status
-        ] = values;
-
-        if (!vendor_code || !vendor_name || !vendor_type || !vendor_address || !vendor_phone) {
-          const missing = [];
-          if (!vendor_code) missing.push('Code');
-          if (!vendor_name) missing.push('Name');
-          if (!vendor_type) missing.push('Type');
-          if (!vendor_address) missing.push('Address');
-          if (!vendor_phone) missing.push('Phone');
-          errors.push(`Line ${i + 1}: Missing required fields: ${missing.join(', ')}`);
-          continue;
-        }
-
-        if (vendor_type !== 'Transporter' && vendor_type !== 'Admin') {
-          errors.push(`Line ${i + 1}: Invalid Vendor Type '${vendor_type}' (must be 'Transporter' or 'Admin')`);
-          continue;
-        }
-
-        const trimmedTdsCategory = tds_category.trim();
-        if (trimmedTdsCategory && trimmedTdsCategory !== 'Individual' && trimmedTdsCategory !== 'Corporate') {
-          errors.push(`Line ${i + 1}: Invalid TDS Category '${trimmedTdsCategory}' (must be 'Individual', 'Corporate', or empty)`);
-          continue;
-        }
-
-        const trimmedTdsRate = tds_rate.trim();
-        if (trimmedTdsRate && trimmedTdsRate !== '1' && trimmedTdsRate !== '2') {
-          errors.push(`Line ${i + 1}: Invalid TDS Rate '${trimmedTdsRate}' (must be '1', '2', or empty)`);
-          continue;
-        }
-
-        vendors.push({
-          vendor_code,
-          vendor_name,
-          vendor_type,
-          ven_bk_branch: ven_bk_branch.trim() || null,
-          vendor_address,
-          vendor_phone,
-          pan: pan.trim() || null,
-          email_id: email_id.trim() || '',
-          account_no: account_no.trim() || '',
-          bank_name: bank_name.trim() || '',
-          ifsc_code: ifsc_code.trim() || null,
-          tds_applicable: tds_applicable.toUpperCase() === 'Y' ? 'Y' : 'N',
-          tds_category: trimmedTdsCategory || null,
-          tds_rate: trimmedTdsRate ? parseFloat(trimmedTdsRate) : null,
-          is_active: status.toLowerCase() === 'active'
-        });
-      }
-
-      if (vendors.length === 0) {
-        let errorMsg = 'No valid vendor records found in the file.';
-        if (errors.length > 0) {
-          errorMsg += '\n\nErrors found:\n' + errors.slice(0, 5).join('\n');
-          if (errors.length > 5) {
-            errorMsg += `\n... and ${errors.length - 5} more errors`;
-          }
-        } else {
-          errorMsg += '\n\nPlease ensure:\n1. CSV has data rows (not just headers)\n2. All required fields are filled\n3. Vendor Type is exactly "Transporter" or "Admin"';
-        }
-        alert(errorMsg);
-        setUploading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
+      const { data: vendorData, error } = await supabase
         .from('vendor_master')
-        .insert(vendors)
-        .select();
+        .select('*')
+        .order('vendor_code', { ascending: true });
 
       if (error) throw error;
 
-      let message = `Successfully uploaded ${data.length} vendor(s)!`;
-      if (errors.length > 0) {
-        message += `\n\nErrors encountered:\n${errors.join('\n')}`;
+      if (!vendorData || vendorData.length === 0) {
+        alert('No vendor data available to download');
+        return;
       }
 
-      alert(message);
-      fetchVendors();
+      const exportData = vendorData.map(vendor => ({
+        'Vendor Code': vendor.vendor_code,
+        'Vendor Name': vendor.vendor_name,
+        'Vendor Type': vendor.vendor_type,
+        'Booking Branch': vendor.ven_bk_branch || '',
+        'Vendor Address': vendor.vendor_address,
+        'Vendor Phone': vendor.vendor_phone,
+        'PAN': vendor.pan || '',
+        'Email ID': vendor.email_id || '',
+        'Account No': vendor.account_no || '',
+        'Bank Name': vendor.bank_name || '',
+        'IFSC Code': vendor.ifsc_code || '',
+        'TDS Applicable': vendor.tds_applicable,
+        'TDS Category': vendor.tds_category || '',
+        'TDS Rate (%)': vendor.tds_rate || '',
+        'Status': vendor.is_active ? 'Active' : 'Inactive',
+        'Created At': new Date(vendor.created_at).toLocaleString()
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Vendor Master');
+
+      const colWidths = [
+        { wch: 12 }, // Vendor Code
+        { wch: 30 }, // Vendor Name
+        { wch: 12 }, // Vendor Type
+        { wch: 15 }, // Booking Branch
+        { wch: 40 }, // Vendor Address
+        { wch: 15 }, // Vendor Phone
+        { wch: 12 }, // PAN
+        { wch: 25 }, // Email ID
+        { wch: 18 }, // Account No
+        { wch: 20 }, // Bank Name
+        { wch: 12 }, // IFSC Code
+        { wch: 15 }, // TDS Applicable
+        { wch: 15 }, // TDS Category
+        { wch: 12 }, // TDS Rate
+        { wch: 10 }, // Status
+        { wch: 20 }  // Created At
+      ];
+      worksheet['!cols'] = colWidths;
+
+      XLSX.writeFile(workbook, `Vendor_Master_${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (error: any) {
-      console.error('Error uploading file:', error);
-      alert(`Failed to upload vendors: ${error.message}`);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      console.error('Error downloading vendor master:', error);
+      alert('Failed to download vendor master: ' + error.message);
     }
   };
+
 
   const filteredVendors = vendors.filter((vendor) => {
     const matchesSearch =
@@ -298,19 +176,11 @@ VEND003,Third Vendor,Transporter,,"789 Park Avenue, Bangalore 560001",9876543212
         <h1 className="text-2xl font-bold text-gray-900">Vendor Master</h1>
         <div className="flex items-center gap-3">
           <button
-            onClick={handleDownloadTemplate}
+            onClick={handleDownloadVendorMaster}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
             <Download className="w-5 h-5" />
-            Download Template
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Upload className="w-5 h-5" />
-            {uploading ? 'Uploading...' : 'Upload File'}
+            Download Vendor Master XLS
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -321,14 +191,6 @@ VEND003,Third Vendor,Transporter,,"789 Park Avenue, Bangalore 560001",9876543212
           </button>
         </div>
       </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".csv"
-        onChange={handleFileUpload}
-        className="hidden"
-      />
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         <div className="p-4 border-b border-gray-200 space-y-4">
