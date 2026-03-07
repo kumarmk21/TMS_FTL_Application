@@ -104,20 +104,8 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
         setLrDetails(lrResult.data);
 
         if (lrResult.data?.pod_upload) {
-          const podPaths = lrResult.data.pod_upload.split(',').map((path: string) => path.trim());
-          const urls: string[] = [];
-
-          for (const path of podPaths) {
-            const { data } = supabase.storage
-              .from('pod-documents')
-              .getPublicUrl(path);
-
-            if (data?.publicUrl) {
-              urls.push(data.publicUrl);
-            }
-          }
-
-          setPodImageUrls(urls);
+          const podUrls = lrResult.data.pod_upload.split(',').map((url: string) => url.trim());
+          setPodImageUrls(podUrls);
         }
       }
     } catch (error) {

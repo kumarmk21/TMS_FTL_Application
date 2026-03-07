@@ -133,17 +133,7 @@ Deno.serve(async (req: Request) => {
         lrDetails = lrResult.data;
 
         if (lrResult.data?.pod_upload) {
-          const podPaths = lrResult.data.pod_upload.split(',').map((path: string) => path.trim());
-
-          for (const path of podPaths) {
-            const { data } = supabase.storage
-              .from('pod-documents')
-              .getPublicUrl(path);
-
-            if (data?.publicUrl) {
-              podImageUrls.push(data.publicUrl);
-            }
-          }
+          podImageUrls = lrResult.data.pod_upload.split(',').map((url: string) => url.trim());
         }
       }
     }
