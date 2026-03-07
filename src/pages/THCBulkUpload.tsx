@@ -86,6 +86,28 @@ export default function THCBulkUpload() {
     }
   };
 
+  const parseExcelDate = (value: any): string | null => {
+    if (!value) return null;
+
+    if (typeof value === 'number') {
+      const date = XLSX.SSF.parse_date_code(value);
+      return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString().split('T')[0];
+    }
+
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().split('T')[0];
+      }
+    }
+
+    return null;
+  };
+
   const processUpload = async () => {
     if (!file) return;
 
@@ -94,9 +116,9 @@ export default function THCBulkUpload() {
 
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = XLSX.read(data, { cellDates: true });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, dateNF: 'yyyy-mm-dd' });
 
       let successCount = 0;
       let failedCount = 0;
@@ -157,8 +179,8 @@ export default function THCBulkUpload() {
 
           const thcRecord = {
             thc_id_number: row['THC ID Number']?.toString().trim() || null,
-            thc_date: row['THC Date'] ? new Date(row['THC Date']).toISOString().split('T')[0] : null,
-            thc_entry_date: row['THC Entry Date'] ? new Date(row['THC Entry Date']).toISOString().split('T')[0] : null,
+            thc_date: parseExcelDate(row['THC Date']),
+            thc_entry_date: parseExcelDate(row['THC Entry Date']),
             tran_id: lrId,
             lr_number: row['LR Number']?.toString().trim() || null,
             thc_vendor: vendorId,
@@ -180,14 +202,14 @@ export default function THCBulkUpload() {
             thc_tds_amount: row['TDS Amount'] ? parseFloat(row['TDS Amount'].toString()) : 0,
             thc_net_payable_amount: row['Net Payable Amount'] ? parseFloat(row['Net Payable Amount'].toString()) : 0,
             thc_advance_amount: row['Advance Amount'] ? parseFloat(row['Advance Amount'].toString()) : 0,
-            thc_advance_date: row['Advance Date'] ? new Date(row['Advance Date']).toISOString().split('T')[0] : null,
+            thc_advance_date: parseExcelDate(row['Advance Date']),
             thc_advance_utr_number: row['Advance UTR Number']?.toString().trim() || null,
             thc_balance_amount: row['Balance Amount'] ? parseFloat(row['Balance Amount'].toString()) : 0,
-            thc_balance_payment_date: row['Balance Payment Date'] ? new Date(row['Balance Payment Date']).toISOString().split('T')[0] : null,
+            thc_balance_payment_date: parseExcelDate(row['Balance Payment Date']),
             thc_balance_pmt_utr_details: row['Balance UTR Details']?.toString().trim() || null,
-            ath_date: row['ATH Date'] ? new Date(row['ATH Date']).toISOString().split('T')[0] : null,
-            bth_due_date: row['BTH Due Date'] ? new Date(row['BTH Due Date']).toISOString().split('T')[0] : null,
-            unloading_date: row['Unloading Date'] ? new Date(row['Unloading Date']).toISOString().split('T')[0] : null,
+            ath_date: parseExcelDate(row['ATH Date']),
+            bth_due_date: parseExcelDate(row['BTH Due Date']),
+            unloading_date: parseExcelDate(row['Unloading Date']),
             current_location: row['Current Location']?.toString().trim() || null,
             ft_trip_id: row['FT Trip ID']?.toString().trim() || null,
             thc_status_ops: thcStatusOpsId,
