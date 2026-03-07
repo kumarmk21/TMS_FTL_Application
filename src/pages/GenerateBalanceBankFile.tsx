@@ -116,9 +116,9 @@ export default function GenerateBalanceBankFile() {
         const vendorMap = new Map(vendorData?.map(v => [v.id, v.vendor_name]) || []);
 
         const enrichedRecords = data.map(record => {
-          const thcAmount = record.thc_amount || 0;
-          const calculated_munshiyana = thcAmount < 100000.00 ? 200 : 300;
-          const calculated_balance = thcAmount - calculated_munshiyana;
+          const thcBalanceAmount = record.thc_balance_amount || 0;
+          const calculated_munshiyana = thcBalanceAmount < 100000.00 ? 200 : 300;
+          const calculated_balance = thcBalanceAmount - calculated_munshiyana;
 
           return {
             ...record,
@@ -183,7 +183,7 @@ export default function GenerateBalanceBankFile() {
         '',
         record.vehicle_number || '',
         record.lr_number || '',
-        record.thc_amount?.toString() || '0',
+        record.thc_balance_amount?.toString() || '0',
         record.calculated_munshiyana.toFixed(2),
         record.origin || '',
         record.destination || '',
@@ -216,14 +216,35 @@ export default function GenerateBalanceBankFile() {
     try {
       const selectedRecordsData = records.filter(r => selectedRecords.has(r.thc_id));
 
-      const { error: updateError } = await supabase
-        .from('thc_details')
-        .update({
-          thc_balance_payment_date: balancePaymentDate
-        })
-        .in('thc_id', Array.from(selectedRecords));
+      const { data: statusData, error: statusError } = await supabase
+        .from('status_master')
+        .select('id')
+        .eq('status_name', 'Financially Close')
+        .single();
 
-      if (updateError) throw updateError;
+      if (statusError) {
+        console.error('Error fetching status:', statusError);
+        throw new Error('Failed to fetch Financially Close status');
+      }
+
+      const updatePromises = selectedRecordsData.map(record => {
+        return supabase
+          .from('thc_details')
+          .update({
+            thc_balance_payment_date: balancePaymentDate,
+            thc_status_fin: statusData.id,
+            thc_balance_amount: record.calculated_balance
+          })
+          .eq('thc_id', record.thc_id);
+      });
+
+      const results = await Promise.all(updatePromises);
+      const errors = results.filter(r => r.error);
+
+      if (errors.length > 0) {
+        console.error('Update errors:', errors);
+        throw new Error(`Failed to update ${errors.length} records`);
+      }
 
       const now = new Date();
       const dd = String(now.getDate()).padStart(2, '0');
@@ -347,13 +368,13 @@ export default function GenerateBalanceBankFile() {
                   Vehicle Number
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  THC Amount
+                  THC Balance
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Munshiyana Amount
+                  Munshiyana
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Balance Amount
+                  Net Payable
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Account Name
@@ -431,7 +452,7 @@ export default function GenerateBalanceBankFile() {
                       {record.vehicle_number || '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
-                      {record.thc_amount?.toFixed(2) || '0.00'}
+                      {record.thc_balance_amount?.toFixed(2) || '0.00'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
                       {record.calculated_munshiyana.toFixed(2)}
