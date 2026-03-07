@@ -4,6 +4,7 @@ import { Search, Calendar, FileText, Loader2, Eye, Download } from 'lucide-react
 
 interface LRTrackingData {
   manual_lr_no: string;
+  lr_date: string;
   from_city: string;
   to_city: string;
   vehicle_type: string;
@@ -48,7 +49,7 @@ export function LRTracking() {
 
       let query = supabase
         .from('booking_lr')
-        .select('manual_lr_no, from_city, to_city, vehicle_type, billing_party_name, est_del_date, act_del_date, lr_sla_status, lr_status, lr_ops_status, lr_financial_status, pod_upload');
+        .select('manual_lr_no, lr_date, from_city, to_city, vehicle_type, billing_party_name, est_del_date, act_del_date, lr_sla_status, lr_status, lr_ops_status, lr_financial_status, pod_upload');
 
       if (searchType === 'dateRange') {
         query = query
@@ -97,6 +98,9 @@ export function LRTracking() {
               LR Number
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              LR Date
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               From City
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -130,6 +134,9 @@ export function LRTracking() {
             <tr key={index} className="hover:bg-gray-50">
               <td className="px-4 py-3 text-sm font-medium text-gray-900">
                 {lr.manual_lr_no}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-900">
+                {lr.lr_date ? new Date(lr.lr_date).toLocaleDateString('en-IN') : '-'}
               </td>
               <td className="px-4 py-3 text-sm text-gray-700">
                 {lr.from_city}
@@ -199,6 +206,9 @@ export function LRTracking() {
               LR Number
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              LR Date
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               From City
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -220,6 +230,9 @@ export function LRTracking() {
             <tr key={index} className="hover:bg-gray-50">
               <td className="px-4 py-3 text-sm font-medium text-gray-900">
                 {lr.manual_lr_no}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-900">
+                {lr.lr_date ? new Date(lr.lr_date).toLocaleDateString('en-IN') : '-'}
               </td>
               <td className="px-4 py-3 text-sm text-gray-700">
                 {lr.from_city}
@@ -254,6 +267,9 @@ export function LRTracking() {
               LR Number
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              LR Date
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               From City
             </th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -275,6 +291,9 @@ export function LRTracking() {
             <tr key={index} className="hover:bg-gray-50">
               <td className="px-4 py-3 text-sm font-medium text-gray-900">
                 {lr.manual_lr_no}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-900">
+                {lr.lr_date ? new Date(lr.lr_date).toLocaleDateString('en-IN') : '-'}
               </td>
               <td className="px-4 py-3 text-sm text-gray-700">
                 {lr.from_city}
