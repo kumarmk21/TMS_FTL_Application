@@ -62,7 +62,7 @@ The THC Bulk Upload feature allows you to import old THC (Truck Hire Challan) re
 ### Reference Fields (Optional)
 | Field | Description | Notes |
 |-------|-------------|-------|
-| LR Number | Link to existing LR | Must match existing LR in system |
+| LR Number | LR reference number | For reference only - NOT linked to booking_lr |
 | Origin | Origin city/location | Text field |
 | Destination | Destination city/location | Text field |
 | Vehicle Type | Type of vehicle | Text field |
@@ -126,10 +126,11 @@ The THC Bulk Upload feature allows you to import old THC (Truck Hire Challan) re
 - Vendor name must match an existing vendor (case-insensitive match)
 - If vendor not found, record will fail with error
 
-### LR Number Validation
-- If LR Number is provided, it must exist in the system
-- If LR not found, the THC will still be created but without LR link
-- Leave blank if THC is not linked to any LR
+### LR Number Field
+- LR Number is stored as text reference only
+- NOT linked to booking_lr table (tran_id will be null)
+- Used only for your reference and reporting
+- No validation performed on this field
 
 ### Status Validation
 - Status names must match existing statuses (case-insensitive match)
@@ -225,9 +226,6 @@ Balance Payment Date: 2024-01-25
 - Solution: Check vendor name spelling in Vendor Master
 - Ensure exact name match (case-insensitive)
 
-**"LR lookup failed"**
-- Solution: Verify LR Number exists in system
-- Or leave LR Number field blank
 
 **"Invalid date format"**
 - Solution: Use YYYY-MM-DD format

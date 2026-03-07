@@ -126,18 +126,6 @@ export default function THCBulkUpload() {
           }
 
           let lrId = null;
-          if (row['LR Number']) {
-            const { data: lrData, error: lrError } = await supabase
-              .from('booking_lr')
-              .select('tran_id')
-              .eq('lr_number', row['LR Number'].toString().trim())
-              .maybeSingle();
-
-            if (lrError) throw new Error(`LR lookup failed: ${lrError.message}`);
-            if (lrData) {
-              lrId = lrData.tran_id;
-            }
-          }
 
           let thcStatusOpsId = null;
           if (row['THC Status Operations']) {
@@ -265,7 +253,7 @@ export default function THCBulkUpload() {
                   <li>Download the template file below</li>
                   <li>Fill in your old THC records with different nomenclatures</li>
                   <li>Ensure vendor names match existing vendors in the system</li>
-                  <li>LR Number can be left blank if not linked to any LR</li>
+                  <li>LR Number is for reference only - old THCs won't be linked to LRs</li>
                   <li>All financial amounts should be numeric values</li>
                   <li>Dates should be in YYYY-MM-DD format or Excel date format</li>
                   <li>Upload the completed file using the upload button below</li>
@@ -379,7 +367,7 @@ export default function THCBulkUpload() {
           <div>
             <h3 className="font-medium text-gray-900 mb-2">Optional Fields</h3>
             <ul className="space-y-1 text-gray-600">
-              <li><span className="font-medium">LR Number:</span> Link to existing LR (if available)</li>
+              <li><span className="font-medium">LR Number:</span> For reference only (not linked)</li>
               <li><span className="font-medium">FT Trip ID:</span> FreightTiger trip reference</li>
               <li><span className="font-medium">All Financial Fields:</span> Default to 0 if blank</li>
             </ul>
