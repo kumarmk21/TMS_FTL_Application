@@ -23,7 +23,8 @@ interface LRRecord {
   from_city: string;
   to_city: string;
   lr_total_amount: number;
-  lr_financial_status: string;
+  bill_no: string | null;
+  bill_date: string | null;
 }
 
 export function BillCancelRegenerate() {
@@ -78,7 +79,7 @@ export function BillCancelRegenerate() {
           const { count, error: countError } = await supabase
             .from('booking_lr')
             .select('*', { count: 'exact', head: true })
-            .eq('lr_bill_id', bill.bill_id);
+            .eq('bill_no', bill.lr_bill_number);
 
           if (countError) {
             console.error('Error counting LRs:', countError);
@@ -100,12 +101,12 @@ export function BillCancelRegenerate() {
     }
   };
 
-  const fetchLRsForBill = async (billId: string) => {
+  const fetchLRsForBill = async (billNumber: string) => {
     try {
       const { data, error } = await supabase
         .from('booking_lr')
-        .select('lr_id, manual_lr_no, lr_date, from_city, to_city, lr_total_amount, lr_financial_status')
-        .eq('lr_bill_id', billId)
+        .select('lr_id, manual_lr_no, lr_date, from_city, to_city, lr_total_amount, bill_no, bill_date')
+        .eq('bill_no', billNumber)
         .order('manual_lr_no', { ascending: true });
 
       if (error) throw error;
@@ -117,7 +118,7 @@ export function BillCancelRegenerate() {
 
   const handleViewBill = async (bill: BillRecord) => {
     setSelectedBill(bill);
-    await fetchLRsForBill(bill.bill_id);
+    await fetchLRsForBill(bill.lr_bill_number);
   };
 
   const handleCancelBill = async () => {
@@ -146,10 +147,11 @@ export function BillCancelRegenerate() {
       const { error: lrError } = await supabase
         .from('booking_lr')
         .update({
-          lr_bill_id: null,
-          lr_financial_status: null,
+          bill_no: null,
+          bill_date: null,
+          bill_due_date: null,
         })
-        .eq('lr_bill_id', selectedBill.bill_id);
+        .eq('bill_no', selectedBill.lr_bill_number);
 
       if (lrError) {
         console.error('LR update error:', lrError);
@@ -178,7 +180,7 @@ export function BillCancelRegenerate() {
       const { data: lrData, error: lrFetchError } = await supabase
         .from('booking_lr')
         .select('lr_id, lr_total_amount')
-        .eq('lr_bill_id', selectedBill.bill_id);
+        .eq('bill_no', selectedBill.lr_bill_number);
 
       if (lrFetchError) throw lrFetchError;
 
@@ -206,6 +208,7 @@ export function BillCancelRegenerate() {
           bill_status: 'Regenerated',
           cancelled_at: new Date().toISOString(),
           cancelled_by: profile?.id,
+          original_bill_id: selectedBill.bill_id,
         })
         .eq('bill_id', selectedBill.bill_id);
 
@@ -214,10 +217,11 @@ export function BillCancelRegenerate() {
       const { error: lrUnlinkError } = await supabase
         .from('booking_lr')
         .update({
-          lr_bill_id: null,
-          lr_financial_status: null,
+          bill_no: null,
+          bill_date: null,
+          bill_due_date: null,
         })
-        .eq('lr_bill_id', selectedBill.bill_id);
+        .eq('bill_no', selectedBill.lr_bill_number);
 
       if (lrUnlinkError) throw lrUnlinkError;
 
@@ -246,8 +250,9 @@ export function BillCancelRegenerate() {
       const { error: lrUpdateError } = await supabase
         .from('booking_lr')
         .update({
-          lr_bill_id: newBill.bill_id,
-          lr_financial_status: 'Billed',
+          bill_no: newBill.lr_bill_number,
+          bill_date: newBill.lr_bill_date,
+          bill_due_date: newBill.lr_bill_due_date,
         })
         .in('lr_id', lrData.map(lr => lr.lr_id));
 
