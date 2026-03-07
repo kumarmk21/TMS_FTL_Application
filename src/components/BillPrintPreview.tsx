@@ -143,6 +143,25 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
     const element = document.querySelector('.bill-print-content');
     if (!element) return;
 
+    const clonedElement = element.cloneNode(true) as HTMLElement;
+
+    const images = clonedElement.querySelectorAll('img[data-pod-image]');
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i] as HTMLImageElement;
+      try {
+        const response = await fetch(img.src);
+        const blob = await response.blob();
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        img.src = base64;
+      } catch (error) {
+        console.error('Error converting POD image to base64:', error);
+      }
+    }
+
     const filename = bill?.billing_party_name && bill?.lr_bill_number
       ? `${bill.billing_party_name.replace(/[^a-zA-Z0-9]/g, '_')}_${bill.lr_bill_number}.pdf`
       : 'lr_bill.pdf';
@@ -154,7 +173,7 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
       html2canvas: {
         scale: 2.5,
         useCORS: true,
-        logging: false,
+        logging: true,
         letterRendering: true,
         allowTaint: true,
         scrollY: 0,
@@ -173,7 +192,7 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
       }
     };
 
-    await html2pdf().set(opt).from(element).save();
+    await html2pdf().set(opt).from(clonedElement).save();
   };
 
   const formatDate = (dateString: string | null) => {
@@ -432,6 +451,7 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                           className="w-full h-auto object-contain"
                           style={{ maxHeight: '200px' }}
                           crossOrigin="anonymous"
+                          data-pod-image="true"
                         />
                       </div>
                     ))}
