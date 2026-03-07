@@ -98,7 +98,7 @@ export default function GenerateBalanceBankFile() {
         .eq('ven_act_name', selectedAccount)
         .gt('thc_balance_amount', 0)
         .is('thc_balance_payment_date', null)
-        .order('thc_id_number', { ascending: true });
+        .order('thc_date', { ascending: true });
 
       if (error) throw error;
 
