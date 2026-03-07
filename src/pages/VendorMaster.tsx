@@ -3,7 +3,6 @@ import { Plus, Pencil, Trash2, Search, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AddVendorModal } from '../components/modals/AddVendorModal';
 import { EditVendorModal } from '../components/modals/EditVendorModal';
-import * as XLSX from 'xlsx';
 
 interface Vendor {
   id: string;
@@ -96,50 +95,71 @@ export function VendorMaster() {
         return;
       }
 
-      const exportData = vendorData.map(vendor => ({
-        'Vendor Code': vendor.vendor_code,
-        'Vendor Name': vendor.vendor_name,
-        'Vendor Type': vendor.vendor_type,
-        'Booking Branch': vendor.ven_bk_branch || '',
-        'Vendor Address': vendor.vendor_address,
-        'Vendor Phone': vendor.vendor_phone,
-        'PAN': vendor.pan || '',
-        'Email ID': vendor.email_id || '',
-        'Account No': vendor.account_no || '',
-        'Bank Name': vendor.bank_name || '',
-        'IFSC Code': vendor.ifsc_code || '',
-        'TDS Applicable': vendor.tds_applicable,
-        'TDS Category': vendor.tds_category || '',
-        'TDS Rate (%)': vendor.tds_rate || '',
-        'Status': vendor.is_active ? 'Active' : 'Inactive',
-        'Created At': new Date(vendor.created_at).toLocaleString()
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Vendor Master');
-
-      const colWidths = [
-        { wch: 12 }, // Vendor Code
-        { wch: 30 }, // Vendor Name
-        { wch: 12 }, // Vendor Type
-        { wch: 15 }, // Booking Branch
-        { wch: 40 }, // Vendor Address
-        { wch: 15 }, // Vendor Phone
-        { wch: 12 }, // PAN
-        { wch: 25 }, // Email ID
-        { wch: 18 }, // Account No
-        { wch: 20 }, // Bank Name
-        { wch: 12 }, // IFSC Code
-        { wch: 15 }, // TDS Applicable
-        { wch: 15 }, // TDS Category
-        { wch: 12 }, // TDS Rate
-        { wch: 10 }, // Status
-        { wch: 20 }  // Created At
+      const headers = [
+        'Vendor Code',
+        'Vendor Name',
+        'Vendor Type',
+        'Booking Branch',
+        'Vendor Address',
+        'Vendor Phone',
+        'PAN',
+        'Email ID',
+        'Account No',
+        'Bank Name',
+        'IFSC Code',
+        'TDS Applicable',
+        'TDS Category',
+        'TDS Rate (%)',
+        'Status',
+        'Created At'
       ];
-      worksheet['!cols'] = colWidths;
 
-      XLSX.writeFile(workbook, `Vendor_Master_${new Date().toISOString().split('T')[0]}.xlsx`);
+      const escapeCSVValue = (value: any): string => {
+        if (value === null || value === undefined) return '';
+        const stringValue = String(value);
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+          return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+        return stringValue;
+      };
+
+      const rows = vendorData.map(vendor => [
+        vendor.vendor_code,
+        vendor.vendor_name,
+        vendor.vendor_type,
+        vendor.ven_bk_branch || '',
+        vendor.vendor_address,
+        vendor.vendor_phone,
+        vendor.pan || '',
+        vendor.email_id || '',
+        vendor.account_no || '',
+        vendor.bank_name || '',
+        vendor.ifsc_code || '',
+        vendor.tds_applicable,
+        vendor.tds_category || '',
+        vendor.tds_rate || '',
+        vendor.is_active ? 'Active' : 'Inactive',
+        new Date(vendor.created_at).toLocaleString()
+      ].map(escapeCSVValue));
+
+      const csvContent = [
+        headers.map(escapeCSVValue).join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Vendor_Master_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
     } catch (error: any) {
       console.error('Error downloading vendor master:', error);
       alert('Failed to download vendor master: ' + error.message);
@@ -180,7 +200,7 @@ export function VendorMaster() {
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
             <Download className="w-5 h-5" />
-            Download Vendor Master XLS
+            Download Vendor Master CSV
           </button>
           <button
             onClick={() => setShowAddModal(true)}
