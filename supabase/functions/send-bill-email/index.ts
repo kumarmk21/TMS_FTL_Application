@@ -121,15 +121,30 @@ Deno.serve(async (req: Request) => {
     }
 
     let lrDetails = null;
+    let podImageUrls: string[] = [];
     if (billType === 'lr' && bill.lr_bill_number) {
       const lrResult = await supabase
         .from('booking_lr')
-        .select('manual_lr_no, lr_date, act_del_date, from_city, to_city, vehicle_type, vehicle_number, invoice_number, invoice_date, invoice_value, eway_bill_number')
+        .select('manual_lr_no, lr_date, act_del_date, from_city, to_city, vehicle_type, vehicle_number, invoice_number, invoice_date, invoice_value, eway_bill_number, pod_upload')
         .eq('bill_no', bill.lr_bill_number)
         .maybeSingle();
 
       if (!lrResult.error) {
         lrDetails = lrResult.data;
+
+        if (lrResult.data?.pod_upload) {
+          const podPaths = lrResult.data.pod_upload.split(',').map((path: string) => path.trim());
+
+          for (const path of podPaths) {
+            const { data } = supabase.storage
+              .from('pod-documents')
+              .getPublicUrl(path);
+
+            if (data?.publicUrl) {
+              podImageUrls.push(data.publicUrl);
+            }
+          }
+        }
       }
     }
 
@@ -264,6 +279,19 @@ Deno.serve(async (req: Request) => {
             <div class="value">${lrDetails.eway_bill_number || '-'}</div>
           </div>
         </div>
+      </div>
+    </div>
+    ` : ''}
+
+    ${podImageUrls.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Proof of Delivery (POD)</div>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+        ${podImageUrls.map((url, index) => `
+          <div style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; padding: 10px;">
+            <img src="${url}" alt="POD ${index + 1}" style="width: 100%; height: auto; max-height: 300px; object-fit: contain;" />
+          </div>
+        `).join('')}
       </div>
     </div>
     ` : ''}

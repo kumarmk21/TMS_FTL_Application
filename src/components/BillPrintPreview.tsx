@@ -57,6 +57,7 @@ interface LRDetails {
   invoice_date: string | null;
   invoice_value: number | null;
   eway_bill_number: string | null;
+  pod_upload: string | null;
 }
 
 interface BillPrintPreviewProps {
@@ -68,6 +69,7 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
   const [company, setCompany] = useState<CompanyDetails | null>(null);
   const [bill, setBill] = useState<BillDetails | null>(null);
   const [lrDetails, setLrDetails] = useState<LRDetails | null>(null);
+  const [podImageUrls, setPodImageUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -94,12 +96,29 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
       if (billResult.data?.lr_bill_number) {
         const lrResult = await supabase
           .from('booking_lr')
-          .select('manual_lr_no, lr_date, act_del_date, from_city, to_city, vehicle_type, vehicle_number, invoice_number, invoice_date, invoice_value, eway_bill_number')
+          .select('manual_lr_no, lr_date, act_del_date, from_city, to_city, vehicle_type, vehicle_number, invoice_number, invoice_date, invoice_value, eway_bill_number, pod_upload')
           .eq('bill_no', billResult.data.lr_bill_number)
           .maybeSingle();
 
         if (lrResult.error) throw lrResult.error;
         setLrDetails(lrResult.data);
+
+        if (lrResult.data?.pod_upload) {
+          const podPaths = lrResult.data.pod_upload.split(',').map((path: string) => path.trim());
+          const urls: string[] = [];
+
+          for (const path of podPaths) {
+            const { data } = supabase.storage
+              .from('pod-documents')
+              .getPublicUrl(path);
+
+            if (data?.publicUrl) {
+              urls.push(data.publicUrl);
+            }
+          }
+
+          setPodImageUrls(urls);
+        }
       }
     } catch (error) {
       console.error('Error fetching bill data:', error);
@@ -400,6 +419,25 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                   </div>
                 </div>
               </div>
+
+              {podImageUrls.length > 0 && (
+                <div className="mt-3 mb-3 border border-gray-300 rounded p-2">
+                  <h3 className="text-xs font-semibold text-gray-900 mb-2">Proof of Delivery (POD)</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {podImageUrls.map((url, index) => (
+                      <div key={index} className="border border-gray-200 rounded overflow-hidden">
+                        <img
+                          src={url}
+                          alt={`POD ${index + 1}`}
+                          className="w-full h-auto object-contain"
+                          style={{ maxHeight: '200px' }}
+                          crossOrigin="anonymous"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-3 pt-2 border-t border-gray-300">
                 <div className="mb-3">
