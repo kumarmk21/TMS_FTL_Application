@@ -7,6 +7,7 @@ interface THCRecord {
   thc_date: string | null;
   thc_id_number: string;
   lr_number: string | null;
+  lr_date: string | null;
   origin: string | null;
   destination: string | null;
   vehicle_type: string | null;
@@ -93,7 +94,8 @@ export default function GenerateBalanceBankFile() {
           vehicle_number,
           thc_net_payable_amount,
           thc_advance_amount,
-          bth_due_date
+          bth_due_date,
+          booking_lr!inner(lr_date)
         `)
         .eq('ven_act_name', selectedAccount)
         .gt('thc_balance_amount', 0)
@@ -122,6 +124,7 @@ export default function GenerateBalanceBankFile() {
 
           return {
             ...record,
+            lr_date: (record.booking_lr as any)?.lr_date || null,
             vendor_name: vendorMap.get(record.thc_vendor) || 'Unknown',
             calculated_munshiyana,
             calculated_balance
@@ -353,6 +356,9 @@ export default function GenerateBalanceBankFile() {
                   LR Number
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  LR Date
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Origin
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -399,20 +405,20 @@ export default function GenerateBalanceBankFile() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={18} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={19} className="px-4 py-12 text-center text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                     Loading records...
                   </td>
                 </tr>
               ) : !selectedAccount ? (
                 <tr>
-                  <td colSpan={18} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={19} className="px-4 py-12 text-center text-gray-500">
                     Please select a vendor account name
                   </td>
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={18} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={19} className="px-4 py-12 text-center text-gray-500">
                     No records found with pending balance payments
                   </td>
                 </tr>
@@ -435,6 +441,9 @@ export default function GenerateBalanceBankFile() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                       {record.lr_number || '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      {record.lr_date || '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                       {record.origin || '-'}
