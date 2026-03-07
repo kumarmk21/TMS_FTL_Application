@@ -53,6 +53,7 @@ import PODUpload from '../pages/PODUpload';
 import { BillCancelRegenerate } from '../pages/BillCancelRegenerate';
 import LRBulkUpload from '../pages/LRBulkUpload';
 import THCBulkUpload from '../pages/THCBulkUpload';
+import THCBulkRollback from '../pages/THCBulkRollback';
 
 export interface MenuItem {
   id: string;
@@ -128,6 +129,7 @@ const menuItems: MenuItem[] = [
       { id: 'truck-arrival', label: 'Truck Arrival' },
       { id: 'pod-upload', label: 'POD Upload' },
       { id: 'thc-bulk-upload', label: 'THC Bulk Upload' },
+      { id: 'thc-bulk-rollback', label: 'THC Bulk Rollback' },
     ],
   },
   {
@@ -224,6 +226,8 @@ export function Layout() {
         return <PODUpload />;
       case 'thc-bulk-upload':
         return <THCBulkUpload />;
+      case 'thc-bulk-rollback':
+        return <THCBulkRollback />;
       case 'lr-entry':
         return <LREntry />;
       case 'lr-bulk-upload':
