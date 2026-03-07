@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Edit2, Trash2, Loader2, Search } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Loader2, Search } from 'lucide-react';
 import { AddAccountGroupModal } from '../components/modals/AddAccountGroupModal';
 import { EditAccountGroupModal } from '../components/modals/EditAccountGroupModal';
 
