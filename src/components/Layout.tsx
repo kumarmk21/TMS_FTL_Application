@@ -54,6 +54,7 @@ import { BillCancelRegenerate } from '../pages/BillCancelRegenerate';
 import LRBulkUpload from '../pages/LRBulkUpload';
 import THCBulkUpload from '../pages/THCBulkUpload';
 import THCBulkRollback from '../pages/THCBulkRollback';
+import AccountGroupMaster from '../pages/AccountGroupMaster';
 
 export interface MenuItem {
   id: string;
@@ -86,6 +87,7 @@ const menuItems: MenuItem[] = [
       { id: 'doc-type-master', label: 'Doc Type Master' },
       { id: 'status-master', label: 'Status Master' },
       { id: 'sac-code-master', label: 'SAC Code Master' },
+      { id: 'account-group-master', label: 'Account Group Master' },
       { id: 'lr-master', label: 'LR Master' },
     ],
   },
@@ -216,6 +218,8 @@ export function Layout() {
         return <StatusMaster />;
       case 'sac-code-master':
         return <SACCodeMaster />;
+      case 'account-group-master':
+        return <AccountGroupMaster />;
       case 'customer-enquiry':
         return <OrderEnquiry />;
       case 'truck-dispatch':
