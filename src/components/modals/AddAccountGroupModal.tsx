@@ -92,6 +92,8 @@ export function AddAccountGroupModal({ onClose, onSuccess }: AddAccountGroupModa
             >
               <option value="Assets">Assets</option>
               <option value="Liabilities">Liabilities</option>
+              <option value="Income">Income</option>
+              <option value="Expenditure">Expenditure</option>
             </select>
           </div>
 
