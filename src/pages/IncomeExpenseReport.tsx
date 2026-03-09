@@ -48,7 +48,7 @@ export default function IncomeExpenseReport() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: lrData, error: lrError } = await supabase
         .from('booking_lr')
         .select(`
           tran_id,
@@ -79,7 +79,18 @@ export default function IncomeExpenseReport() {
         `)
         .order('lr_date', { ascending: false });
 
-      if (error) throw error;
+      if (lrError) throw lrError;
+
+      const { data: cancelledBills, error: billError } = await supabase
+        .from('lr_bill')
+        .select('lr_bill_number')
+        .eq('bill_status', 'Cancelled');
+
+      if (billError) throw billError;
+
+      const cancelledBillNumbers = new Set(cancelledBills?.map(b => b.lr_bill_number) || []);
+
+      const data = (lrData || []).filter(lr => !lr.bill_no || !cancelledBillNumbers.has(lr.bill_no));
 
       const formattedData: IncomeExpenseRecord[] = (data || []).map((record: any) => {
         const thc = record.thc_details?.[0];
