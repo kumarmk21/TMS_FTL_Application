@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { X, Save } from 'lucide-react';
 
-interface Company {
+interface Branch {
   id: string;
-  company_code: string;
-  company_name: string;
-  branch_id: string;
-  gstin: string;
+  branch_code: string;
+  branch_name: string;
+  branch_city: string;
 }
 
 interface SACCode {
@@ -31,7 +30,7 @@ interface EditLRBillModalProps {
 }
 
 export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBillModalProps) {
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [sacCodes, setSACCodes] = useState<SACCode[]>([]);
   const [states, setStates] = useState<State[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,20 +55,20 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
 
   const fetchData = async () => {
     try {
-      const [billData, sacCodesData, companiesData, statesData] = await Promise.all([
+      const [billData, sacCodesData, branchesData, statesData] = await Promise.all([
         supabase.from('lr_bill').select('*').eq('bill_id', billId).maybeSingle(),
         supabase.from('sac_code_master').select('*').eq('is_active', true).order('sac_code'),
-        supabase.from('company_master').select('*').order('company_name'),
+        supabase.from('branch_master').select('*').eq('is_active', true).order('branch_name'),
         supabase.from('state_master').select('*').order('state_name')
       ]);
 
       if (billData.error) throw billData.error;
       if (sacCodesData.error) throw sacCodesData.error;
-      if (companiesData.error) throw companiesData.error;
+      if (branchesData.error) throw branchesData.error;
       if (statesData.error) throw statesData.error;
 
       setSACCodes(sacCodesData.data || []);
-      setCompanies(companiesData.data || []);
+      setBranches(branchesData.data || []);
       setStates(statesData.data || []);
 
       if (billData.data) {
@@ -207,9 +206,9 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
                 required
               >
                 <option value="">Select Branch</option>
-                {companies.map(company => (
-                  <option key={company.id} value={company.id}>
-                    {company.company_name} ({company.company_code})
+                {branches.map(branch => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.branch_name} ({branch.branch_code})
                   </option>
                 ))}
               </select>
