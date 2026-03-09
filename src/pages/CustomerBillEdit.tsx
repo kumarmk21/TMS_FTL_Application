@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Search, Edit2, FileText, Warehouse, AlertCircle } from 'lucide-react';
+import { Search, CreditCard as Edit2, FileText, Warehouse, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { EditLRBillModal } from '../components/modals/EditLRBillModal';
 import { EditWarehouseBillModal } from '../components/modals/EditWarehouseBillModal';
