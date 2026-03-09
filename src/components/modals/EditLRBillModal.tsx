@@ -16,6 +16,13 @@ interface SACCode {
   sac_description: string;
 }
 
+interface State {
+  id: string;
+  state_name: string;
+  state_code: string;
+  alpha_code: string;
+}
+
 interface EditLRBillModalProps {
   billId: string;
   tranId: string;
@@ -26,6 +33,7 @@ interface EditLRBillModalProps {
 export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBillModalProps) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [sacCodes, setSACCodes] = useState<SACCode[]>([]);
+  const [states, setStates] = useState<State[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
 
@@ -34,6 +42,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
     lr_bill_due_date: '',
     lr_bill_status: 'Draft',
     bill_generation_branch: '',
+    bill_to_state: '',
     bill_sub_date: '',
     bill_sub_type: '',
     bill_sub_details: '',
@@ -47,18 +56,21 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
 
   const fetchData = async () => {
     try {
-      const [billData, sacCodesData, companiesData] = await Promise.all([
+      const [billData, sacCodesData, companiesData, statesData] = await Promise.all([
         supabase.from('lr_bill').select('*').eq('bill_id', billId).maybeSingle(),
         supabase.from('sac_code_master').select('*').eq('is_active', true).order('sac_code'),
-        supabase.from('company_master').select('*').order('company_name')
+        supabase.from('company_master').select('*').order('company_name'),
+        supabase.from('state_master').select('*').order('state_name')
       ]);
 
       if (billData.error) throw billData.error;
       if (sacCodesData.error) throw sacCodesData.error;
       if (companiesData.error) throw companiesData.error;
+      if (statesData.error) throw statesData.error;
 
       setSACCodes(sacCodesData.data || []);
       setCompanies(companiesData.data || []);
+      setStates(statesData.data || []);
 
       if (billData.data) {
         const bill = billData.data;
@@ -67,6 +79,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           lr_bill_due_date: bill.lr_bill_due_date || '',
           lr_bill_status: bill.lr_bill_status || 'Draft',
           bill_generation_branch: bill.bill_generation_branch || '',
+          bill_to_state: bill.bill_to_state || '',
           bill_sub_date: bill.bill_sub_date || '',
           bill_sub_type: bill.bill_sub_type || '',
           bill_sub_details: bill.bill_sub_details || '',
@@ -105,6 +118,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           lr_bill_due_date: formData.lr_bill_due_date || null,
           lr_bill_status: formData.lr_bill_status,
           bill_generation_branch: formData.bill_generation_branch,
+          bill_to_state: formData.bill_to_state || null,
           bill_sub_date: formData.bill_sub_date || null,
           bill_sub_type: formData.bill_sub_type || null,
           bill_sub_details: formData.bill_sub_details || null,
@@ -145,6 +159,11 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <h3 className="text-sm font-semibold text-blue-900 mb-3">Editable Fields</h3>
+            <p className="text-xs text-blue-700">You can edit the following fields: Bill Date, Bill To State, SAC Code, and Bill Generation Branch</p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -161,14 +180,20 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Bill Due Date
+                Bill To State
               </label>
-              <input
-                type="date"
-                value={formData.lr_bill_due_date}
-                onChange={(e) => setFormData({ ...formData, lr_bill_due_date: e.target.value })}
+              <select
+                value={formData.bill_to_state}
+                onChange={(e) => setFormData({ ...formData, bill_to_state: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="">Select State</option>
+                {states.map(state => (
+                  <option key={state.id} value={state.state_name}>
+                    {state.state_name} ({state.alpha_code})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
@@ -192,6 +217,36 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                SAC Code
+              </label>
+              <select
+                value={formData.sac_code}
+                onChange={(e) => setFormData({ ...formData, sac_code: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select SAC Code</option>
+                {sacCodes.map(sac => (
+                  <option key={sac.sac_id} value={sac.sac_code}>
+                    {sac.sac_code} - {sac.sac_description}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Bill Due Date
+              </label>
+              <input
+                type="date"
+                value={formData.lr_bill_due_date}
+                onChange={(e) => setFormData({ ...formData, lr_bill_due_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Bill Status
               </label>
               <select
@@ -205,29 +260,6 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
                 <option value="Overdue">Overdue</option>
                 <option value="Cancelled">Cancelled</option>
               </select>
-            </div>
-          </div>
-
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">SAC Code</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  SAC Code
-                </label>
-                <select
-                  value={formData.sac_code}
-                  onChange={(e) => setFormData({ ...formData, sac_code: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select SAC Code</option>
-                  {sacCodes.map(sac => (
-                    <option key={sac.sac_id} value={sac.sac_code}>
-                      {sac.sac_code} - {sac.sac_description}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
 
