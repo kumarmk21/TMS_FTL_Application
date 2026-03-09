@@ -43,9 +43,9 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
     lr_bill_status: 'Draft',
     bill_generation_branch: '',
     bill_to_state: '',
-    bill_sub_date: '',
-    bill_sub_type: '',
-    bill_sub_details: '',
+    lr_bill_sub_date: '',
+    lr_bill_sub_type: '',
+    lr_bill_sub_details: '',
     sac_code: '',
     remarks: ''
   });
@@ -80,11 +80,11 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           lr_bill_status: bill.lr_bill_status || 'Draft',
           bill_generation_branch: bill.bill_generation_branch || '',
           bill_to_state: bill.bill_to_state || '',
-          bill_sub_date: bill.bill_sub_date || '',
-          bill_sub_type: bill.bill_sub_type || '',
-          bill_sub_details: bill.bill_sub_details || '',
+          lr_bill_sub_date: bill.lr_bill_sub_date || '',
+          lr_bill_sub_type: bill.lr_bill_sub_type || '',
+          lr_bill_sub_details: bill.lr_bill_sub_details || '',
           sac_code: bill.sac_code || '',
-          remarks: bill.remarks || ''
+          remarks: bill.cancellation_reason || ''
         });
 
         setInitialLoad(false);
@@ -119,11 +119,11 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           lr_bill_status: formData.lr_bill_status,
           bill_generation_branch: formData.bill_generation_branch,
           bill_to_state: formData.bill_to_state || null,
-          bill_sub_date: formData.bill_sub_date || null,
-          bill_sub_type: formData.bill_sub_type || null,
-          bill_sub_details: formData.bill_sub_details || null,
+          lr_bill_sub_date: formData.lr_bill_sub_date || null,
+          lr_bill_sub_type: formData.lr_bill_sub_type || null,
+          lr_bill_sub_details: formData.lr_bill_sub_details || null,
           sac_code: formData.sac_code || null,
-          remarks: formData.remarks || null
+          cancellation_reason: formData.remarks || null
         })
         .eq('bill_id', billId);
 
@@ -272,8 +272,8 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
                 </label>
                 <input
                   type="date"
-                  value={formData.bill_sub_date}
-                  onChange={(e) => setFormData({ ...formData, bill_sub_date: e.target.value })}
+                  value={formData.lr_bill_sub_date}
+                  onChange={(e) => setFormData({ ...formData, lr_bill_sub_date: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -283,8 +283,8 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
                   Submission Type
                 </label>
                 <select
-                  value={formData.bill_sub_type}
-                  onChange={(e) => setFormData({ ...formData, bill_sub_type: e.target.value })}
+                  value={formData.lr_bill_sub_type}
+                  onChange={(e) => setFormData({ ...formData, lr_bill_sub_type: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Type</option>
@@ -302,8 +302,8 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
                 </label>
                 <input
                   type="text"
-                  value={formData.bill_sub_details}
-                  onChange={(e) => setFormData({ ...formData, bill_sub_details: e.target.value })}
+                  value={formData.lr_bill_sub_details}
+                  onChange={(e) => setFormData({ ...formData, lr_bill_sub_details: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., Email sent to finance@customer.com"
                 />
