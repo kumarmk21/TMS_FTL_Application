@@ -60,11 +60,9 @@ export default function CustomerBillEdit() {
           lr_bill_due_date,
           lr_bill_status,
           tran_id,
-          booking_lr!inner(
-            billing_party_name,
-            billing_party_code,
-            bill_amount
-          )
+          billing_party_name,
+          billing_party_code,
+          bill_amount
         `)
         .neq('lr_bill_status', 'Paid')
         .order('lr_bill_date', { ascending: false });
@@ -100,9 +98,9 @@ export default function CustomerBillEdit() {
         lr_bill_date: bill.lr_bill_date,
         lr_bill_due_date: bill.lr_bill_due_date,
         lr_bill_status: bill.lr_bill_status,
-        billing_party_name: bill.booking_lr?.billing_party_name || '-',
-        billing_party_code: bill.booking_lr?.billing_party_code || '-',
-        bill_amount: bill.booking_lr?.bill_amount || 0,
+        billing_party_name: bill.billing_party_name || '-',
+        billing_party_code: bill.billing_party_code || '-',
+        bill_amount: bill.bill_amount || 0,
         bill_type: 'LR',
         tran_id: bill.tran_id,
       }));
