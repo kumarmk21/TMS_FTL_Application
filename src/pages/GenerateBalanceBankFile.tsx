@@ -95,7 +95,7 @@ export default function GenerateBalanceBankFile() {
           thc_net_payable_amount,
           thc_advance_amount,
           bth_due_date,
-          booking_lr!inner(lr_date)
+          booking_lr(lr_date)
         `)
         .eq('ven_act_name', selectedAccount)
         .gt('thc_balance_amount', 0)
