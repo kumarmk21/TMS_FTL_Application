@@ -12,6 +12,7 @@ interface BookingLR {
   from_city: string;
   to_city: string;
   vehicle_type: string;
+  vehicle_number: string;
   consignor: string;
   consignee: string;
   billing_party_name: string;
@@ -220,6 +221,7 @@ export default function SalesReport() {
         'Origin': item.from_city || '',
         'Destination': item.to_city || '',
         'Vehicle Type': item.vehicle_type || '',
+        'Vehicle Number': item.vehicle_number || '',
         'No. of Packages': item.no_of_pkgs || 0,
         'Chargeable Weight (KG)': item.chrg_wt || 0,
         'Freight Type': item.freight_type || '',
@@ -257,6 +259,7 @@ export default function SalesReport() {
         'Origin': '',
         'Destination': '',
         'Vehicle Type': '',
+        'Vehicle Number': '',
         'No. of Packages': '',
         'Chargeable Weight (KG)': '',
         'Freight Type': '',
@@ -292,6 +295,7 @@ export default function SalesReport() {
         { wch: 25 },
         { wch: 25 },
         { wch: 25 },
+        { wch: 15 },
         { wch: 15 },
         { wch: 15 },
         { wch: 15 },
