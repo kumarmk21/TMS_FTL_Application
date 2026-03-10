@@ -105,7 +105,7 @@ const menuItems: MenuItem[] = [
       { id: 'generate-bill', label: 'Generate Customer Bill' },
       { id: 'bill-cancel-regenerate', label: 'Bill Cancel/Regenerate' },
       { id: 'generate-warehouse-bill', label: 'Generate Warehouse Bill' },
-      { id: 'bill-edit', label: 'Warehousing Bill Edit' },
+      { id: 'bill-edit', label: 'Customer Bill Edit' },
       { id: 'bill-submission', label: 'Customer Bill Submission' },
     ],
   },
