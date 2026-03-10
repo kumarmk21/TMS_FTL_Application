@@ -53,6 +53,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
     bill_generation_branch: '',
     bill_to_state: '',
     bill_to_address: '',
+    bill_to_gstin: '',
     lr_bill_sub_date: '',
     lr_bill_sub_type: '',
     lr_bill_sub_details: '',
@@ -83,7 +84,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
 
       const { data: gstData, error: gstError } = await supabase
         .from('customer_gst_master')
-        .select('bill_to_address')
+        .select('bill_to_address, gstin')
         .eq('customer_code', billingPartyCode)
         .eq('alpha_code', stateData.alpha_code)
         .eq('is_active', true)
@@ -94,8 +95,12 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
         return;
       }
 
-      if (gstData && gstData.bill_to_address) {
-        setFormData(prev => ({ ...prev, bill_to_address: gstData.bill_to_address }));
+      if (gstData) {
+        setFormData(prev => ({
+          ...prev,
+          bill_to_address: gstData.bill_to_address || '',
+          bill_to_gstin: gstData.gstin || ''
+        }));
       }
     } catch (error) {
       console.error('Error fetching bill address:', error);
@@ -130,6 +135,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           bill_generation_branch: bill.bill_generation_branch || '',
           bill_to_state: bill.bill_to_state || '',
           bill_to_address: bill.bill_to_address || '',
+          bill_to_gstin: bill.bill_to_gstin || '',
           lr_bill_sub_date: bill.lr_bill_sub_date || '',
           lr_bill_sub_type: bill.lr_bill_sub_type || '',
           lr_bill_sub_details: bill.lr_bill_sub_details || '',
@@ -170,6 +176,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           bill_generation_branch: formData.bill_generation_branch,
           bill_to_state: formData.bill_to_state || null,
           bill_to_address: formData.bill_to_address || null,
+          bill_to_gstin: formData.bill_to_gstin || null,
           lr_bill_sub_date: formData.lr_bill_sub_date || null,
           lr_bill_sub_type: formData.lr_bill_sub_type || null,
           lr_bill_sub_details: formData.lr_bill_sub_details || null,
@@ -303,6 +310,22 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
               />
               <p className="text-xs text-gray-500 mt-1">
                 This address is auto-fetched from Customer GST Master based on the selected state
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Bill To GSTIN
+              </label>
+              <input
+                type="text"
+                value={formData.bill_to_gstin}
+                onChange={(e) => setFormData({ ...formData, bill_to_gstin: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Auto-populated from Customer GST Master"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Auto-fetched from Customer GST Master based on the selected state
               </p>
             </div>
 
