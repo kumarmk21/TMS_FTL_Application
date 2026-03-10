@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { Search, Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+interface BookingLR {
+  lr_date: string | null;
+}
+
 interface THCRecord {
   thc_id: string;
   thc_date: string | null;
   thc_id_number: string;
   lr_number: string | null;
-  lr_date: string | null;
+  lr_date?: string | null;
   origin: string | null;
   destination: string | null;
   vehicle_type: string | null;
@@ -26,6 +30,7 @@ interface THCRecord {
   vendor_name?: string;
   calculated_munshiyana: number;
   calculated_balance: number;
+  booking_lr?: BookingLR | null;
 }
 
 export default function GenerateBalanceBankFile() {
@@ -122,9 +127,12 @@ export default function GenerateBalanceBankFile() {
           const calculated_munshiyana = thcBalanceAmount < 100000.00 ? 200 : 300;
           const calculated_balance = thcBalanceAmount - calculated_munshiyana;
 
+          const bookingLR = record.booking_lr as BookingLR | BookingLR[] | null;
+          const lrDate = Array.isArray(bookingLR) ? bookingLR[0]?.lr_date : bookingLR?.lr_date;
+
           return {
             ...record,
-            lr_date: (record.booking_lr as any)?.lr_date || null,
+            lr_date: lrDate || null,
             vendor_name: vendorMap.get(record.thc_vendor) || 'Unknown',
             calculated_munshiyana,
             calculated_balance
