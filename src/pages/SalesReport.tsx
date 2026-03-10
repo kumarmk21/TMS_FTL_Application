@@ -36,6 +36,8 @@ interface BookingLR {
   invoice_value: number;
   bill_no: string;
   bill_date: string;
+  bill_to_state?: string;
+  bill_to_gstin?: string;
   created_at: string;
 }
 
@@ -95,10 +97,30 @@ export default function SalesReport() {
         query = query.eq('booking_branch', profile.branch_code);
       }
 
-      const { data, error } = await query;
+      const { data: bookingLRData, error } = await query;
 
       if (error) throw error;
-      setBookingData(data || []);
+
+      const enrichedData = await Promise.all(
+        (bookingLRData || []).map(async (lr) => {
+          if (lr.bill_no) {
+            const { data: billData } = await supabase
+              .from('lr_bill')
+              .select('bill_to_state, bill_to_gstin')
+              .eq('lr_bill_number', lr.bill_no)
+              .maybeSingle();
+
+            return {
+              ...lr,
+              bill_to_state: billData?.bill_to_state || '',
+              bill_to_gstin: billData?.bill_to_gstin || '',
+            };
+          }
+          return lr;
+        })
+      );
+
+      setBookingData(enrichedData);
     } catch (error) {
       console.error('Error fetching booking data:', error);
       alert('Failed to load sales data. Please try again.');
@@ -186,6 +208,8 @@ export default function SalesReport() {
           ? new Date(item.lr_date).toLocaleDateString('en-IN')
           : '',
         'Freight Bill Number': item.bill_no || '',
+        'Bill To State': item.bill_to_state || '',
+        'Bill To GSTIN': item.bill_to_gstin || '',
         'Bill Date': item.bill_date
           ? new Date(item.bill_date).toLocaleDateString('en-IN')
           : '',
@@ -223,6 +247,8 @@ export default function SalesReport() {
         'LR Number': '',
         'LR Date': '',
         'Freight Bill Number': '',
+        'Bill To State': '',
+        'Bill To GSTIN': '',
         'Bill Date': '',
         'Branch': '',
         'Consignor': '',
@@ -259,6 +285,8 @@ export default function SalesReport() {
         { wch: 15 },
         { wch: 12 },
         { wch: 20 },
+        { wch: 15 },
+        { wch: 18 },
         { wch: 12 },
         { wch: 12 },
         { wch: 25 },
