@@ -56,6 +56,7 @@ import THCBulkUpload from '../pages/THCBulkUpload';
 import THCBulkRollback from '../pages/THCBulkRollback';
 import AccountGroupMaster from '../pages/AccountGroupMaster';
 import AccountsMaster from '../pages/AccountsMaster';
+import ConsolidateBillGeneration from '../pages/ConsolidateBillGeneration';
 
 export interface MenuItem {
   id: string;
@@ -104,6 +105,7 @@ const menuItems: MenuItem[] = [
       { id: 'lr-financial-edit', label: 'LR Financial Edit' },
       { id: 'generate-bill', label: 'Generate Customer Bill' },
       { id: 'bill-cancel-regenerate', label: 'Bill Cancel/Regenerate' },
+      { id: 'consolidate-bill', label: 'Consolidate Bill Generation' },
       { id: 'generate-warehouse-bill', label: 'Generate Warehouse Bill' },
       { id: 'bill-edit', label: 'Customer Bill Edit' },
       { id: 'bill-submission', label: 'Customer Bill Submission' },
@@ -248,6 +250,8 @@ export function Layout() {
         return <BillCancelRegenerate />;
       case 'generate-warehouse-bill':
         return <GenerateWarehouseBill />;
+      case 'consolidate-bill':
+        return <ConsolidateBillGeneration />;
       case 'bill-edit':
         return <CustomerBillEdit />;
       case 'lr-print':
