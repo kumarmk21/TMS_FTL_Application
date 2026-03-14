@@ -133,6 +133,15 @@ export default function ConsolidateBillGeneration() {
   };
 
   const generateConsolBillNo = async (): Promise<string> => {
+    const { data: companyData } = await supabase
+      .from('company_master')
+      .select('gstin')
+      .not('gstin', 'is', null)
+      .limit(1)
+      .maybeSingle();
+
+    const prefix = companyData?.gstin ? companyData.gstin.substring(0, 2) : 'CB';
+
     const { data } = await supabase
       .from('consol_bill_data')
       .select('consol_bill_no')
@@ -146,8 +155,7 @@ export default function ConsolidateBillGeneration() {
       if (match) nextNum = parseInt(match[1]) + 1;
     }
 
-    const year = new Date().getFullYear().toString().slice(-2);
-    return `CB${year}${String(nextNum).padStart(6, '0')}`;
+    return `${prefix}${String(nextNum).padStart(5, '0')}`;
   };
 
   const handleAckFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
