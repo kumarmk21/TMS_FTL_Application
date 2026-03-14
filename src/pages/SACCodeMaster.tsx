@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Edit2, Trash2, Search, FileText } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Search, FileText } from 'lucide-react';
 import AddSACCodeModal from '../components/modals/AddSACCodeModal';
 import EditSACCodeModal from '../components/modals/EditSACCodeModal';
 
@@ -8,6 +8,8 @@ interface SACCode {
   sac_id: string;
   sac_code: string;
   sac_description: string;
+  gst_rate: number;
+  rcm_applicable: boolean;
   is_active: boolean;
   created_at: string;
 }
@@ -159,6 +161,12 @@ export default function SACCodeMaster() {
                   Description
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  GST Rate (%)
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  RCM
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 {isAdmin && (
@@ -171,7 +179,7 @@ export default function SACCodeMaster() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredSacCodes.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 4 : 3} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={isAdmin ? 6 : 5} className="px-6 py-8 text-center text-gray-500">
                     {searchTerm ? 'No SAC codes found matching your search' : 'No SAC codes available'}
                   </td>
                 </tr>
@@ -183,6 +191,20 @@ export default function SACCodeMaster() {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {sac.sac_description}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {sac.gst_rate != null ? `${sac.gst_rate}%` : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          sac.rcm_applicable
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {sac.rcm_applicable ? 'Yes' : 'No'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span

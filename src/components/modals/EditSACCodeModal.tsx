@@ -6,6 +6,8 @@ interface SACCode {
   sac_id: string;
   sac_code: string;
   sac_description: string;
+  gst_rate: number;
+  rcm_applicable: boolean;
   is_active: boolean;
 }
 
@@ -20,6 +22,8 @@ export default function EditSACCodeModal({ isOpen, onClose, sacCode, onSuccess }
   const [formData, setFormData] = useState({
     sac_code: '',
     sac_description: '',
+    gst_rate: '',
+    rcm_applicable: false,
     is_active: true,
   });
   const [loading, setLoading] = useState(false);
@@ -29,6 +33,8 @@ export default function EditSACCodeModal({ isOpen, onClose, sacCode, onSuccess }
       setFormData({
         sac_code: sacCode.sac_code,
         sac_description: sacCode.sac_description,
+        gst_rate: sacCode.gst_rate != null ? String(sacCode.gst_rate) : '',
+        rcm_applicable: sacCode.rcm_applicable ?? false,
         is_active: sacCode.is_active,
       });
     }
@@ -47,6 +53,17 @@ export default function EditSACCodeModal({ isOpen, onClose, sacCode, onSuccess }
       return;
     }
 
+    if (formData.gst_rate === '' || formData.gst_rate === null) {
+      alert('Please enter GST Rate');
+      return;
+    }
+
+    const gstRateNum = parseFloat(formData.gst_rate);
+    if (isNaN(gstRateNum) || gstRateNum < 0 || gstRateNum > 100) {
+      alert('GST Rate must be between 0 and 100');
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
@@ -54,6 +71,8 @@ export default function EditSACCodeModal({ isOpen, onClose, sacCode, onSuccess }
         .update({
           sac_code: formData.sac_code.trim(),
           sac_description: formData.sac_description.trim(),
+          gst_rate: gstRateNum,
+          rcm_applicable: formData.rcm_applicable,
           is_active: formData.is_active,
           updated_at: new Date().toISOString(),
         })
@@ -117,17 +136,49 @@ export default function EditSACCodeModal({ isOpen, onClose, sacCode, onSuccess }
               />
             </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="is_active"
-                checked={formData.is_active}
-                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
-                Active
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                GST Rate (%) *
               </label>
+              <input
+                type="number"
+                value={formData.gst_rate}
+                onChange={(e) => setFormData({ ...formData, gst_rate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g., 18"
+                min="0"
+                max="100"
+                step="0.01"
+                required
+              />
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="rcm_applicable_edit"
+                  checked={formData.rcm_applicable}
+                  onChange={(e) => setFormData({ ...formData, rcm_applicable: e.target.checked })}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="rcm_applicable_edit" className="ml-2 text-sm text-gray-700">
+                  RCM Applicable
+                </label>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="is_active_edit"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="is_active_edit" className="ml-2 text-sm text-gray-700">
+                  Active
+                </label>
+              </div>
             </div>
           </div>
 
