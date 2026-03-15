@@ -192,6 +192,24 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
         return;
       }
 
+      const { error: bookingUpdateError } = await supabase
+        .from('booking_lr')
+        .update({
+          bill_date: formData.lr_bill_date,
+          bill_due_date: formData.lr_bill_due_date || null,
+          bill_to_state: formData.bill_to_state || null,
+          bill_to_address: formData.bill_to_address || null,
+          bill_to_gstin: formData.bill_to_gstin || null,
+        })
+        .eq('tran_id', tranId);
+
+      if (bookingUpdateError) {
+        console.error('Error updating booking_lr:', bookingUpdateError);
+        alert(`Error syncing to booking record: ${bookingUpdateError.message}`);
+        setLoading(false);
+        return;
+      }
+
       alert('LR bill updated successfully!');
       onSuccess();
       onClose();
