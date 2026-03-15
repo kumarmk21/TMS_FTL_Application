@@ -45,6 +45,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [billingPartyCode, setBillingPartyCode] = useState('');
+  const [lrBillNumber, setLrBillNumber] = useState('');
 
   const [formData, setFormData] = useState({
     lr_bill_date: '',
@@ -128,6 +129,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
       if (billData.data) {
         const bill = billData.data;
         setBillingPartyCode(bill.billing_party_code || '');
+        setLrBillNumber(bill.lr_bill_number || '');
         setFormData({
           lr_bill_date: bill.lr_bill_date || '',
           lr_bill_due_date: bill.lr_bill_due_date || '',
@@ -192,24 +194,35 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
         return;
       }
 
-      if (tranId && tranId !== 'null') {
-        const { error: bookingUpdateError } = await supabase
-          .from('booking_lr')
-          .update({
-            bill_date: formData.lr_bill_date,
-            bill_due_date: formData.lr_bill_due_date || null,
-            bill_to_state: formData.bill_to_state || null,
-            bill_to_address: formData.bill_to_address || null,
-            bill_to_gstin: formData.bill_to_gstin || null,
-          })
-          .eq('tran_id', tranId);
+      const bookingUpdatePayload = {
+        bill_date: formData.lr_bill_date,
+        bill_due_date: formData.lr_bill_due_date || null,
+        bill_to_state: formData.bill_to_state || null,
+        bill_to_address: formData.bill_to_address || null,
+        bill_to_gstin: formData.bill_to_gstin || null,
+      };
 
-        if (bookingUpdateError) {
-          console.error('Error updating booking_lr:', bookingUpdateError);
-          alert(`Error syncing to booking record: ${bookingUpdateError.message}`);
-          setLoading(false);
-          return;
-        }
+      let bookingUpdateError = null;
+
+      if (tranId && tranId !== 'null') {
+        const { error } = await supabase
+          .from('booking_lr')
+          .update(bookingUpdatePayload)
+          .eq('tran_id', tranId);
+        bookingUpdateError = error;
+      } else if (lrBillNumber) {
+        const { error } = await supabase
+          .from('booking_lr')
+          .update(bookingUpdatePayload)
+          .eq('bill_no', lrBillNumber);
+        bookingUpdateError = error;
+      }
+
+      if (bookingUpdateError) {
+        console.error('Error updating booking_lr:', bookingUpdateError);
+        alert(`Error syncing to booking record: ${bookingUpdateError.message}`);
+        setLoading(false);
+        return;
       }
 
       alert('LR bill updated successfully!');
