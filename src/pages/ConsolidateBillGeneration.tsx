@@ -8,6 +8,11 @@ interface BillingParty {
   billing_party_name: string;
 }
 
+interface Company {
+  company_code: string;
+  company_name: string;
+}
+
 interface GeneratedBill {
   tran_id: string;
   bill_no: string;
@@ -28,6 +33,8 @@ const CONSOL_BILL_STATUS_OPTIONS = ['Cons.Generated', 'Submitted', 'Partially Pa
 export default function ConsolidateBillGeneration() {
   const { user } = useAuth();
   const [billingParties, setBillingParties] = useState<BillingParty[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [billFromCompany, setBillFromCompany] = useState('');
   const [selectedParty, setSelectedParty] = useState('');
   const [bills, setBills] = useState<GeneratedBill[]>([]);
   const [selectedBills, setSelectedBills] = useState<Set<string>>(new Set());
@@ -45,7 +52,21 @@ export default function ConsolidateBillGeneration() {
 
   useEffect(() => {
     fetchBillingParties();
+    fetchCompanies();
   }, []);
+
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('company_master')
+        .select('company_code, company_name')
+        .order('company_name');
+      if (error) throw error;
+      setCompanies(data || []);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
+    }
+  };
 
   const fetchBillingParties = async () => {
     try {
@@ -220,6 +241,7 @@ export default function ConsolidateBillGeneration() {
           consol_bill_ack_url: ackUrl,
           consol_bill_ack_filename: ackFilenameStored,
           consol_bill_status: consolBillStatus,
+          bill_from_company: billFromCompany || null,
           created_by: user?.id,
           updated_by: user?.id,
         });
@@ -247,6 +269,7 @@ export default function ConsolidateBillGeneration() {
       setConsolBillSubDate('');
       setConsolBillSubmittedTo('');
       setConsolBillStatus('Cons.Generated');
+      setBillFromCompany('');
 
       await handleSearch();
     } catch (error) {
@@ -397,6 +420,28 @@ export default function ConsolidateBillGeneration() {
           {bills.length > 0 && selectedBills.size > 0 && (
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-base font-semibold text-gray-800 mb-4">Consol Bill Details</h2>
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 pb-1 border-b border-gray-200">Bill From</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Company <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={billFromCompany}
+                      onChange={e => setBillFromCompany(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                      <option value="">Select Company</option>
+                      {companies.map(c => (
+                        <option key={c.company_code} value={c.company_code}>
+                          {c.company_name} ({c.company_code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
