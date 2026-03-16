@@ -18,6 +18,7 @@ interface GeneratedBill {
   bill_no: string;
   manual_lr_no: string;
   bill_date: string;
+  lr_date: string;
   from_city: string;
   to_city: string;
   vehicle_type: string;
@@ -27,6 +28,9 @@ interface GeneratedBill {
   billing_party_name: string;
   bill_amount: number;
   lr_total_amount: number;
+  loading_charges: number;
+  unloading_charges: number;
+  detention_charges: number;
 }
 
 const CONSOL_BILL_STATUS_OPTIONS = ['Cons.Generated', 'Submitted', 'Partially Paid', 'Fully Paid', 'Disputed'];
@@ -112,7 +116,7 @@ export default function ConsolidateBillGeneration() {
     try {
       const { data, error } = await supabase
         .from('booking_lr')
-        .select('tran_id, bill_no, manual_lr_no, bill_date, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, billing_party_code, billing_party_name, bill_amount, lr_total_amount')
+        .select('tran_id, bill_no, manual_lr_no, bill_date, lr_date, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, billing_party_code, billing_party_name, bill_amount, lr_total_amount, loading_charges, unloading_charges, detention_charges')
         .eq('billing_party_code', selectedParty)
         .eq('lr_financial_status', 'Bill Generated')
         .not('bill_no', 'is', null)
@@ -369,18 +373,21 @@ export default function ConsolidateBillGeneration() {
                       />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LR No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LR Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From City</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To City</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle No</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">LUL Amt</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Detention Amt</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Amount</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {bills.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
                         No bills found for the selected billing party
                       </td>
                     </tr>
@@ -401,12 +408,21 @@ export default function ConsolidateBillGeneration() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{bill.manual_lr_no || bill.bill_no}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          {bill.lr_date ? new Date(bill.lr_date).toLocaleDateString('en-GB') : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {bill.bill_date ? new Date(bill.bill_date).toLocaleDateString('en-GB') : '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{bill.from_city || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{bill.to_city || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{bill.vehicle_type || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{bill.vehicle_number || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                          &#8377;{(Number(bill.loading_charges || 0) + Number(bill.unloading_charges || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                          &#8377;{Number(bill.detention_charges || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
                           &#8377;{(Number(bill.lr_total_amount) || Number(bill.bill_amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
