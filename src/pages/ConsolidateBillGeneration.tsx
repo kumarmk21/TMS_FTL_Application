@@ -16,6 +16,7 @@ interface Company {
 interface GeneratedBill {
   tran_id: string;
   bill_no: string;
+  manual_lr_no: string;
   bill_date: string;
   from_city: string;
   to_city: string;
@@ -111,7 +112,7 @@ export default function ConsolidateBillGeneration() {
     try {
       const { data, error } = await supabase
         .from('booking_lr')
-        .select('tran_id, bill_no, bill_date, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, billing_party_code, billing_party_name, bill_amount, lr_total_amount')
+        .select('tran_id, bill_no, manual_lr_no, bill_date, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, billing_party_code, billing_party_name, bill_amount, lr_total_amount')
         .eq('billing_party_code', selectedParty)
         .eq('lr_financial_status', 'Bill Generated')
         .not('bill_no', 'is', null)
@@ -367,7 +368,7 @@ export default function ConsolidateBillGeneration() {
                         className="rounded border-gray-300 text-red-600 focus:ring-red-500"
                       />
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LR No</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From City</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To City</th>
@@ -398,7 +399,7 @@ export default function ConsolidateBillGeneration() {
                             className="rounded border-gray-300 text-red-600 focus:ring-red-500"
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{bill.bill_no}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{bill.manual_lr_no || bill.bill_no}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {bill.bill_date ? new Date(bill.bill_date).toLocaleDateString('en-GB') : '-'}
                         </td>
