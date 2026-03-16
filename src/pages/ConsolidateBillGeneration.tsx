@@ -23,7 +23,7 @@ interface GeneratedBill {
   lr_total_amount: number;
 }
 
-const CONSOL_BILL_STATUS_OPTIONS = ['Draft', 'Submitted', 'Partially Paid', 'Fully Paid', 'Disputed'];
+const CONSOL_BILL_STATUS_OPTIONS = ['Cons.Generated', 'Submitted', 'Partially Paid', 'Fully Paid', 'Disputed'];
 
 export default function ConsolidateBillGeneration() {
   const { user } = useAuth();
@@ -37,7 +37,7 @@ export default function ConsolidateBillGeneration() {
   const [successMessage, setSuccessMessage] = useState('');
 
   const [consolBillDate, setConsolBillDate] = useState(new Date().toISOString().split('T')[0]);
-  const [consolBillStatus, setConsolBillStatus] = useState('Draft');
+  const [consolBillStatus, setConsolBillStatus] = useState('Cons.Generated');
   const [consolBillSubDate, setConsolBillSubDate] = useState('');
   const [consolBillSubmittedTo, setConsolBillSubmittedTo] = useState('');
   const [ackFile, setAckFile] = useState<File | null>(null);
@@ -246,7 +246,7 @@ export default function ConsolidateBillGeneration() {
       setAckFileName('');
       setConsolBillSubDate('');
       setConsolBillSubmittedTo('');
-      setConsolBillStatus('Draft');
+      setConsolBillStatus('Cons.Generated');
 
       await handleSearch();
     } catch (error) {
@@ -426,47 +426,6 @@ export default function ConsolidateBillGeneration() {
                   <div className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-900 font-semibold">
                     &#8377;{selectedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Submission Date</label>
-                  <input
-                    type="date"
-                    value={consolBillSubDate}
-                    onChange={e => setConsolBillSubDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Submitted To</label>
-                  <input
-                    type="text"
-                    value={consolBillSubmittedTo}
-                    onChange={e => setConsolBillSubmittedTo(e.target.value)}
-                    placeholder="Person / Department"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Acknowledgement (Image / PDF)</label>
-                  {ackFileName ? (
-                    <div className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
-                      <span className="text-sm text-gray-700 truncate flex-1">{ackFileName}</span>
-                      <button onClick={removeAckFile} className="text-gray-400 hover:text-red-500">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300 rounded-md cursor-pointer hover:border-red-400 hover:bg-red-50 transition-colors">
-                      <Upload className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-500">Upload file</span>
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={handleAckFileChange}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
                 </div>
               </div>
 
