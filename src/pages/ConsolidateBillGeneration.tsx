@@ -13,6 +13,14 @@ interface Company {
   company_name: string;
 }
 
+interface CustomerGST {
+  id: string;
+  customer_name: string;
+  gstin: string;
+  address: string;
+  state: string;
+}
+
 interface GeneratedBill {
   tran_id: string;
   bill_no: string;
@@ -48,6 +56,9 @@ export default function ConsolidateBillGeneration() {
   const [showResults, setShowResults] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  const [billToOptions, setBillToOptions] = useState<CustomerGST[]>([]);
+  const [billTo, setBillTo] = useState('');
+
   const [consolBillDate, setConsolBillDate] = useState(new Date().toISOString().split('T')[0]);
   const [consolBillStatus, setConsolBillStatus] = useState('Cons.Generated');
   const [consolBillSubDate, setConsolBillSubDate] = useState('');
@@ -59,6 +70,32 @@ export default function ConsolidateBillGeneration() {
     fetchBillingParties();
     fetchCompanies();
   }, []);
+
+  useEffect(() => {
+    if (!billFromCompany) {
+      setBillToOptions([]);
+      setBillTo('');
+      return;
+    }
+    const company = companies.find(c => c.company_code === billFromCompany);
+    if (!company) return;
+    fetchBillToOptions(company.company_name);
+  }, [billFromCompany, companies]);
+
+  const fetchBillToOptions = async (companyName: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('customer_gst_master')
+        .select('id, customer_name, gstin, address, state')
+        .eq('customer_name', companyName)
+        .order('gstin');
+      if (error) throw error;
+      setBillToOptions(data || []);
+      setBillTo('');
+    } catch (error) {
+      console.error('Error fetching bill-to options:', error);
+    }
+  };
 
   const fetchCompanies = async () => {
     try {
@@ -438,11 +475,11 @@ export default function ConsolidateBillGeneration() {
             <div className="bg-white rounded-lg shadow-md p-6">
               <h2 className="text-base font-semibold text-gray-800 mb-4">Consol Bill Details</h2>
               <div className="mb-4">
-                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 pb-1 border-b border-gray-200">Bill From</h3>
+                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3 pb-1 border-b border-gray-200">Bill From / Bill To</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Company <span className="text-red-500">*</span>
+                      Bill From (Company) <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={billFromCompany}
@@ -453,6 +490,30 @@ export default function ConsolidateBillGeneration() {
                       {companies.map(c => (
                         <option key={c.company_code} value={c.company_code}>
                           {c.company_name} ({c.company_code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Bill To <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={billTo}
+                      onChange={e => setBillTo(e.target.value)}
+                      disabled={!billFromCompany || billToOptions.length === 0}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 disabled:bg-gray-50 disabled:text-gray-400"
+                    >
+                      <option value="">
+                        {!billFromCompany
+                          ? 'Select Bill From first'
+                          : billToOptions.length === 0
+                          ? 'No records found'
+                          : 'Select Bill To'}
+                      </option>
+                      {billToOptions.map(g => (
+                        <option key={g.id} value={g.id}>
+                          {g.customer_name}{g.gstin ? ` — ${g.gstin}` : ''}{g.state ? ` (${g.state})` : ''}
                         </option>
                       ))}
                     </select>
