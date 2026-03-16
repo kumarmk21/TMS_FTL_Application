@@ -57,6 +57,7 @@ import THCBulkRollback from '../pages/THCBulkRollback';
 import AccountGroupMaster from '../pages/AccountGroupMaster';
 import AccountsMaster from '../pages/AccountsMaster';
 import ConsolidateBillGeneration from '../pages/ConsolidateBillGeneration';
+import ConsolBillPrint from '../pages/ConsolBillPrint';
 
 export interface MenuItem {
   id: string;
@@ -149,6 +150,7 @@ const menuItems: MenuItem[] = [
       { id: 'thc-print', label: 'THC Print' },
       { id: 'lr-life-cycle', label: 'LR Life Cycle' },
       { id: 'lr-tracking', label: 'LR Tracking' },
+      { id: 'consol-bill-print', label: 'Consol Bill Print' },
     ],
   },
   {
@@ -276,6 +278,8 @@ export function Layout() {
         return <CustomerMISReport />;
       case 'lr-tracking':
         return <LRTracking />;
+      case 'consol-bill-print':
+        return <ConsolBillPrint />;
       default:
         return <Dashboard />;
     }
