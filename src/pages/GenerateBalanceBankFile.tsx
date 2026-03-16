@@ -504,10 +504,30 @@ export default function GenerateBalanceBankFile() {
 
         {records.length > 0 && (
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-            <p className="text-sm text-gray-600">
-              Selected: <span className="font-semibold">{selectedRecords.size}</span> of{' '}
-              <span className="font-semibold">{records.length}</span> records
-            </p>
+            <div className="flex items-center gap-6">
+              <p className="text-sm text-gray-600">
+                Selected: <span className="font-semibold">{selectedRecords.size}</span> of{' '}
+                <span className="font-semibold">{records.length}</span> records
+              </p>
+              {selectedRecords.size > 0 && (
+                <div className="flex items-center gap-4 bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm">
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 font-medium">Selected Records</p>
+                    <p className="text-lg font-bold text-gray-900">{selectedRecords.size}</p>
+                  </div>
+                  <div className="w-px h-8 bg-gray-200" />
+                  <div className="text-center">
+                    <p className="text-xs text-gray-500 font-medium">Sum of Net Payable</p>
+                    <p className="text-lg font-bold text-red-600">
+                      ₹{records
+                        .filter(r => selectedRecords.has(r.thc_id))
+                        .reduce((sum, r) => sum + r.calculated_balance, 0)
+                        .toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">Balance Payment Date:</label>
