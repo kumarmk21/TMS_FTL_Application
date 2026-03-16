@@ -17,8 +17,9 @@ interface CustomerGST {
   id: string;
   customer_name: string;
   gstin: string;
-  address: string;
-  state: string;
+  bill_to_address: string;
+  state_code: string;
+  alpha_code: string;
 }
 
 interface GeneratedBill {
@@ -72,22 +73,22 @@ export default function ConsolidateBillGeneration() {
   }, []);
 
   useEffect(() => {
-    if (!billFromCompany) {
+    if (!selectedParty) {
       setBillToOptions([]);
       setBillTo('');
       return;
     }
-    const company = companies.find(c => c.company_code === billFromCompany);
-    if (!company) return;
-    fetchBillToOptions(company.company_name);
-  }, [billFromCompany, companies]);
+    const party = billingParties.find(p => p.billing_party_code === selectedParty);
+    if (!party) return;
+    fetchBillToOptions(party.billing_party_name);
+  }, [selectedParty, billingParties]);
 
-  const fetchBillToOptions = async (companyName: string) => {
+  const fetchBillToOptions = async (partyName: string) => {
     try {
       const { data, error } = await supabase
         .from('customer_gst_master')
-        .select('id, customer_name, gstin, address, state')
-        .eq('customer_name', companyName)
+        .select('id, customer_name, gstin, bill_to_address, state_code, alpha_code')
+        .eq('customer_name', partyName)
         .order('gstin');
       if (error) throw error;
       setBillToOptions(data || []);
@@ -513,7 +514,7 @@ export default function ConsolidateBillGeneration() {
                       </option>
                       {billToOptions.map(g => (
                         <option key={g.id} value={g.id}>
-                          {g.customer_name}{g.gstin ? ` — ${g.gstin}` : ''}{g.state ? ` (${g.state})` : ''}
+                          {g.customer_name}{g.gstin ? ` — ${g.gstin}` : ''}{g.state_code ? ` (${g.state_code})` : ''}
                         </option>
                       ))}
                     </select>
