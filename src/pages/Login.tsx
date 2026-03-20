@@ -99,7 +99,7 @@ export function Login() {
         </div>
 
         <p className="text-center text-sm text-gray-400 mt-6">
-          © 2024 DLS Transport. All rights reserved.
+          © 2026 DLS Transport. All rights reserved.
         </p>
       </div>
     </div>
