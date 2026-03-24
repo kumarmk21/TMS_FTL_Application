@@ -58,6 +58,7 @@ import AccountGroupMaster from '../pages/AccountGroupMaster';
 import AccountsMaster from '../pages/AccountsMaster';
 import ConsolidateBillGeneration from '../pages/ConsolidateBillGeneration';
 import ConsolBillPrint from '../pages/ConsolBillPrint';
+import BTHPaidReport from '../pages/BTHPaidReport';
 
 export interface MenuItem {
   id: string;
@@ -164,6 +165,7 @@ const menuItems: MenuItem[] = [
       { id: 'pending-pod', label: 'Pending POD' },
       { id: 'ar-report', label: 'AR Report' },
       { id: 'ap-report', label: 'AP Report' },
+      { id: 'bth-paid-report', label: 'BTH Paid Report' },
     ],
   },
 ];
@@ -280,6 +282,8 @@ export function Layout() {
         return <LRTracking />;
       case 'consol-bill-print':
         return <ConsolBillPrint />;
+      case 'bth-paid-report':
+        return <BTHPaidReport />;
       default:
         return <Dashboard />;
     }
