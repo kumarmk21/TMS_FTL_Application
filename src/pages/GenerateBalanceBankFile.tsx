@@ -2,16 +2,11 @@ import { useState, useEffect } from 'react';
 import { Search, Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-interface BookingLR {
-  lr_date: string | null;
-}
-
 interface THCRecord {
   thc_id: string;
   thc_date: string | null;
   thc_id_number: string;
   lr_number: string | null;
-  lr_date?: string | null;
   origin: string | null;
   destination: string | null;
   vehicle_type: string | null;
@@ -30,7 +25,6 @@ interface THCRecord {
   vendor_name?: string;
   calculated_munshiyana: number;
   calculated_balance: number;
-  booking_lr?: BookingLR | null;
 }
 
 export default function GenerateBalanceBankFile() {
@@ -99,8 +93,7 @@ export default function GenerateBalanceBankFile() {
           vehicle_number,
           thc_net_payable_amount,
           thc_advance_amount,
-          bth_due_date,
-          booking_lr(lr_date)
+          bth_due_date
         `)
         .eq('ven_act_name', selectedAccount)
         .gt('thc_balance_amount', 0)
@@ -127,12 +120,8 @@ export default function GenerateBalanceBankFile() {
           const calculated_munshiyana = thcBalanceAmount < 100000.00 ? 200 : 300;
           const calculated_balance = thcBalanceAmount - calculated_munshiyana;
 
-          const bookingLR = record.booking_lr as BookingLR | BookingLR[] | null;
-          const lrDate = Array.isArray(bookingLR) ? bookingLR[0]?.lr_date : bookingLR?.lr_date;
-
           return {
             ...record,
-            lr_date: lrDate || null,
             vendor_name: vendorMap.get(record.thc_vendor) || 'Unknown',
             calculated_munshiyana,
             calculated_balance
@@ -355,16 +344,13 @@ export default function GenerateBalanceBankFile() {
                   />
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  THC Date
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   THC ID
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  LR Number
+                  THC Date
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  LR Date
+                  LR Number
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Origin
@@ -413,20 +399,20 @@ export default function GenerateBalanceBankFile() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={19} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={18} className="px-4 py-12 text-center text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                     Loading records...
                   </td>
                 </tr>
               ) : !selectedAccount ? (
                 <tr>
-                  <td colSpan={19} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={18} className="px-4 py-12 text-center text-gray-500">
                     Please select a vendor account name
                   </td>
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={19} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={18} className="px-4 py-12 text-center text-gray-500">
                     No records found with pending balance payments
                   </td>
                 </tr>
@@ -441,17 +427,14 @@ export default function GenerateBalanceBankFile() {
                         className="rounded border-gray-300 text-red-600 focus:ring-red-500"
                       />
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {record.thc_date || '-'}
-                    </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                       {record.thc_id_number}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {record.lr_number || '-'}
+                      {record.thc_date || '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                      {record.lr_date || '-'}
+                      {record.lr_number || '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                       {record.origin || '-'}
