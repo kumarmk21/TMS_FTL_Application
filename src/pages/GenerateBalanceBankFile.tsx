@@ -42,6 +42,10 @@ interface ChargeEdit {
   unloading: string;
   detention: string;
   other: string;
+  delay: string;
+  damage: string;
+  munshiyana_deduction: string;
+  pod_delay: string;
   tds: string;
 }
 
@@ -163,6 +167,10 @@ export default function GenerateBalanceBankFile() {
             unloading: record.thc_unloading_charges != null ? record.thc_unloading_charges.toString() : '',
             detention: record.thc_detention_charges != null ? record.thc_detention_charges.toString() : '',
             other: record.thc_other_charges != null ? record.thc_other_charges.toString() : '',
+            delay: record.thc_deduction_delay != null ? record.thc_deduction_delay.toString() : '',
+            damage: record.thc_deduction_damage != null ? record.thc_deduction_damage.toString() : '',
+            munshiyana_deduction: record.thc_munshiyana_amount != null ? record.thc_munshiyana_amount.toString() : '',
+            pod_delay: record.thc_pod_delay_deduction != null ? record.thc_pod_delay_deduction.toString() : '',
             tds: record.thc_tds_amount != null ? record.thc_tds_amount.toString() : '',
           };
 
@@ -284,7 +292,7 @@ export default function GenerateBalanceBankFile() {
       }
 
       const updatePromises = selectedRecordsData.map(record => {
-        const edits = chargeEdits[record.thc_id] || { loading: '', unloading: '', detention: '', other: '', tds: '' };
+        const edits = chargeEdits[record.thc_id] || { loading: '', unloading: '', detention: '', other: '', delay: '', damage: '', munshiyana_deduction: '', pod_delay: '', tds: '' };
         return supabase
           .from('thc_details')
           .update({
@@ -295,6 +303,10 @@ export default function GenerateBalanceBankFile() {
             thc_unloading_charges: edits.unloading !== '' ? parseFloat(edits.unloading) : null,
             thc_detention_charges: edits.detention !== '' ? parseFloat(edits.detention) : null,
             thc_other_charges: edits.other !== '' ? parseFloat(edits.other) : null,
+            thc_deduction_delay: edits.delay !== '' ? parseFloat(edits.delay) : null,
+            thc_deduction_damage: edits.damage !== '' ? parseFloat(edits.damage) : null,
+            thc_munshiyana_amount: edits.munshiyana_deduction !== '' ? parseFloat(edits.munshiyana_deduction) : null,
+            thc_pod_delay_deduction: edits.pod_delay !== '' ? parseFloat(edits.pod_delay) : null,
             thc_tds_amount: edits.tds !== '' ? parseFloat(edits.tds) : null,
           })
           .eq('thc_id', record.thc_id);
@@ -376,14 +388,42 @@ export default function GenerateBalanceBankFile() {
   };
 
   const getEffectiveBalance = (record: THCRecord): number => {
+    const e = chargeEdits[record.thc_id] || {};
     const base = record.thc_balance_amount || 0;
-    const tdsEdit = parseFloat(chargeEdits[record.thc_id]?.tds || '0') || 0;
-    const staticDeductions =
-      (record.thc_deduction_delay || 0) +
-      (record.thc_deduction_damage || 0) +
-      (record.thc_munshiyana_amount || 0) +
-      (record.thc_pod_delay_deduction || 0);
-    return base - record.calculated_munshiyana - staticDeductions - tdsEdit;
+    const additions =
+      (parseFloat(e.loading || '0') || 0) +
+      (parseFloat(e.unloading || '0') || 0) +
+      (parseFloat(e.detention || '0') || 0) +
+      (parseFloat(e.other || '0') || 0);
+    const deductions =
+      (parseFloat(e.delay || '0') || 0) +
+      (parseFloat(e.damage || '0') || 0) +
+      (parseFloat(e.munshiyana_deduction || '0') || 0) +
+      (parseFloat(e.pod_delay || '0') || 0) +
+      (parseFloat(e.tds || '0') || 0);
+    return base - record.calculated_munshiyana + additions - deductions;
+  };
+
+  const renderDeductionInput = (record: THCRecord, field: keyof ChargeEdit, dbField: keyof THCRecord) => {
+    const isSelected = selectedRecords.has(record.thc_id);
+    const hasData = record[dbField] != null;
+    const showInput = hasData || isSelected;
+    const value = chargeEdits[record.thc_id]?.[field] ?? '';
+
+    if (!showInput) {
+      return <span className="text-gray-400">-</span>;
+    }
+
+    return (
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => updateChargeEdit(record.thc_id, field, e.target.value)}
+        className="w-24 px-2 py-1 text-sm border border-red-200 rounded focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 text-right text-red-700 bg-red-50"
+        placeholder="0"
+        min="0"
+      />
+    );
   };
 
   const renderChargeInput = (record: THCRecord, field: keyof ChargeEdit, dbField: keyof THCRecord) => {
@@ -624,17 +664,17 @@ export default function GenerateBalanceBankFile() {
                     <td className="px-4 py-3 text-right">
                       {renderChargeInput(record, 'other', 'thc_other_charges')}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-600">
-                      {record.thc_deduction_delay != null ? record.thc_deduction_delay.toFixed(2) : <span className="text-gray-400">-</span>}
+                    <td className="px-4 py-3 text-right">
+                      {renderDeductionInput(record, 'delay', 'thc_deduction_delay')}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-600">
-                      {record.thc_deduction_damage != null ? record.thc_deduction_damage.toFixed(2) : <span className="text-gray-400">-</span>}
+                    <td className="px-4 py-3 text-right">
+                      {renderDeductionInput(record, 'damage', 'thc_deduction_damage')}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-600">
-                      {record.thc_munshiyana_amount != null ? record.thc_munshiyana_amount.toFixed(2) : <span className="text-gray-400">-</span>}
+                    <td className="px-4 py-3 text-right">
+                      {renderDeductionInput(record, 'munshiyana_deduction', 'thc_munshiyana_amount')}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-600">
-                      {record.thc_pod_delay_deduction != null ? record.thc_pod_delay_deduction.toFixed(2) : <span className="text-gray-400">-</span>}
+                    <td className="px-4 py-3 text-right">
+                      {renderDeductionInput(record, 'pod_delay', 'thc_pod_delay_deduction')}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {renderTdsInput(record)}
