@@ -122,7 +122,7 @@ const menuItems: MenuItem[] = [
       { id: 'admin-expenses', label: 'Admin Expenses' },
       { id: 'generate-advance-bank-file', label: 'Generate Advance Bank File' },
       { id: 'regenerate-advance-bank-file', label: 'Advance Bank Payment File Regenerate' },
-      { id: 'generate-balance-bank-file', label: 'BTH Payment-Bank File' },
+      { id: 'generate-balance-bank-file', label: 'BTH Payment' },
       { id: 'generate-debit-note', label: 'Generate Debit Note' },
       { id: 'generate-credit-note', label: 'Generate Credit Note' },
     ],
