@@ -26,7 +26,13 @@ interface THCRecord {
   thc_unloading_charges: number | null;
   thc_detention_charges: number | null;
   thc_other_charges: number | null;
+  thc_deduction_delay: number | null;
+  thc_deduction_damage: number | null;
+  thc_munshiyana_amount: number | null;
+  thc_pod_delay_deduction: number | null;
+  thc_tds_amount: number | null;
   vendor_name?: string;
+  vendor_tds_applicable?: string | null;
   calculated_munshiyana: number;
   calculated_balance: number;
 }
@@ -36,6 +42,7 @@ interface ChargeEdit {
   unloading: string;
   detention: string;
   other: string;
+  tds: string;
 }
 
 export default function GenerateBalanceBankFile() {
@@ -110,7 +117,12 @@ export default function GenerateBalanceBankFile() {
           thc_loading_charges,
           thc_unloading_charges,
           thc_detention_charges,
-          thc_other_charges
+          thc_other_charges,
+          thc_deduction_delay,
+          thc_deduction_damage,
+          thc_munshiyana_amount,
+          thc_pod_delay_deduction,
+          thc_tds_amount
         `)
         .eq('ven_act_name', selectedAccount)
         .gt('thc_balance_amount', 0)
@@ -123,31 +135,41 @@ export default function GenerateBalanceBankFile() {
         const vendorIds = [...new Set(data.map(r => r.thc_vendor))];
         const { data: vendorData, error: vendorError } = await supabase
           .from('vendor_master')
-          .select('id, vendor_name')
+          .select('id, vendor_name, tds_applicable')
           .in('id', vendorIds);
 
         if (vendorError) {
           console.error('Vendor query error:', vendorError);
         }
 
-        const vendorMap = new Map(vendorData?.map(v => [v.id, v.vendor_name]) || []);
+        const vendorMap = new Map(vendorData?.map(v => [v.id, { name: v.vendor_name, tds_applicable: v.tds_applicable }]) || []);
 
         const initEdits: Record<string, ChargeEdit> = {};
         const enrichedRecords = data.map(record => {
           const thcBalanceAmount = record.thc_balance_amount || 0;
           const calculated_munshiyana = thcBalanceAmount < 100000.00 ? 200 : 300;
-          const calculated_balance = thcBalanceAmount - calculated_munshiyana;
+          const deductions =
+            (record.thc_deduction_delay || 0) +
+            (record.thc_deduction_damage || 0) +
+            (record.thc_munshiyana_amount || 0) +
+            (record.thc_pod_delay_deduction || 0) +
+            (record.thc_tds_amount || 0);
+          const calculated_balance = thcBalanceAmount - calculated_munshiyana - deductions;
+
+          const vendorInfo = vendorMap.get(record.thc_vendor);
 
           initEdits[record.thc_id] = {
             loading: record.thc_loading_charges != null ? record.thc_loading_charges.toString() : '',
             unloading: record.thc_unloading_charges != null ? record.thc_unloading_charges.toString() : '',
             detention: record.thc_detention_charges != null ? record.thc_detention_charges.toString() : '',
             other: record.thc_other_charges != null ? record.thc_other_charges.toString() : '',
+            tds: record.thc_tds_amount != null ? record.thc_tds_amount.toString() : '',
           };
 
           return {
             ...record,
-            vendor_name: vendorMap.get(record.thc_vendor) || 'Unknown',
+            vendor_name: vendorInfo?.name || 'Unknown',
+            vendor_tds_applicable: vendorInfo?.tds_applicable || null,
             calculated_munshiyana,
             calculated_balance
           };
@@ -205,7 +227,7 @@ export default function GenerateBalanceBankFile() {
         'N',
         '',
         record.ven_act_number || '',
-        record.calculated_balance.toFixed(2),
+        getEffectiveBalance(record).toFixed(2),
         record.vendor_name || '',
         '',
         '',
@@ -262,17 +284,18 @@ export default function GenerateBalanceBankFile() {
       }
 
       const updatePromises = selectedRecordsData.map(record => {
-        const edits = chargeEdits[record.thc_id] || { loading: '', unloading: '', detention: '', other: '' };
+        const edits = chargeEdits[record.thc_id] || { loading: '', unloading: '', detention: '', other: '', tds: '' };
         return supabase
           .from('thc_details')
           .update({
             thc_balance_payment_date: balancePaymentDate,
             thc_status_fin: statusData.id,
-            thc_balance_amount: record.calculated_balance,
+            thc_balance_amount: getEffectiveBalance(record),
             thc_loading_charges: edits.loading !== '' ? parseFloat(edits.loading) : null,
             thc_unloading_charges: edits.unloading !== '' ? parseFloat(edits.unloading) : null,
             thc_detention_charges: edits.detention !== '' ? parseFloat(edits.detention) : null,
             thc_other_charges: edits.other !== '' ? parseFloat(edits.other) : null,
+            thc_tds_amount: edits.tds !== '' ? parseFloat(edits.tds) : null,
           })
           .eq('thc_id', record.thc_id);
       });
@@ -317,6 +340,50 @@ export default function GenerateBalanceBankFile() {
       setUploadMessage(`Failed to generate bank file: ${error.message}`);
       setTimeout(() => setUploadStatus('idle'), 5000);
     }
+  };
+
+  const isTdsMandatory = (record: THCRecord): boolean => {
+    const tdsApplicable = record.vendor_tds_applicable;
+    const tdsApplies = tdsApplicable && tdsApplicable.toLowerCase() !== 'no' && tdsApplicable.toLowerCase() !== 'n' && tdsApplicable !== 'false';
+    const tdsNotDeducted = !record.thc_tds_amount;
+    return !!(tdsApplies && tdsNotDeducted);
+  };
+
+  const renderTdsInput = (record: THCRecord) => {
+    const isSelected = selectedRecords.has(record.thc_id);
+    const mandatory = isTdsMandatory(record);
+    const value = chargeEdits[record.thc_id]?.tds ?? '';
+    const hasData = record.thc_tds_amount != null;
+
+    if (!mandatory && !hasData && !isSelected) {
+      return <span className="text-gray-400">-</span>;
+    }
+
+    return (
+      <input
+        type="number"
+        value={value}
+        onChange={(e) => updateChargeEdit(record.thc_id, 'tds', e.target.value)}
+        className={`w-24 px-2 py-1 text-sm border rounded focus:outline-none focus:ring-1 text-right ${
+          mandatory && !value
+            ? 'border-red-500 bg-red-50 focus:ring-red-500 focus:border-red-500'
+            : 'border-gray-300 focus:ring-red-500 focus:border-red-500'
+        }`}
+        placeholder={mandatory ? 'Required' : '0'}
+        min="0"
+      />
+    );
+  };
+
+  const getEffectiveBalance = (record: THCRecord): number => {
+    const base = record.thc_balance_amount || 0;
+    const tdsEdit = parseFloat(chargeEdits[record.thc_id]?.tds || '0') || 0;
+    const staticDeductions =
+      (record.thc_deduction_delay || 0) +
+      (record.thc_deduction_damage || 0) +
+      (record.thc_munshiyana_amount || 0) +
+      (record.thc_pod_delay_deduction || 0);
+    return base - record.calculated_munshiyana - staticDeductions - tdsEdit;
   };
 
   const renderChargeInput = (record: THCRecord, field: keyof ChargeEdit, dbField: keyof THCRecord) => {
@@ -446,6 +513,21 @@ export default function GenerateBalanceBankFile() {
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   + Other Charges
                 </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  - Delay Deduction
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  - Damage Deduction
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  - Munshiyana Amt
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  - POD Delay Deduction
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  - TDS Amount
+                </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Net Payable
                 </th>
@@ -472,20 +554,20 @@ export default function GenerateBalanceBankFile() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={22} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={27} className="px-4 py-12 text-center text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                     Loading records...
                   </td>
                 </tr>
               ) : !selectedAccount ? (
                 <tr>
-                  <td colSpan={22} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={27} className="px-4 py-12 text-center text-gray-500">
                     Please select a vendor account name
                   </td>
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={22} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={27} className="px-4 py-12 text-center text-gray-500">
                     No records found with pending balance payments
                   </td>
                 </tr>
@@ -542,8 +624,23 @@ export default function GenerateBalanceBankFile() {
                     <td className="px-4 py-3 text-right">
                       {renderChargeInput(record, 'other', 'thc_other_charges')}
                     </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-600">
+                      {record.thc_deduction_delay != null ? record.thc_deduction_delay.toFixed(2) : <span className="text-gray-400">-</span>}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-600">
+                      {record.thc_deduction_damage != null ? record.thc_deduction_damage.toFixed(2) : <span className="text-gray-400">-</span>}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-600">
+                      {record.thc_munshiyana_amount != null ? record.thc_munshiyana_amount.toFixed(2) : <span className="text-gray-400">-</span>}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-600">
+                      {record.thc_pod_delay_deduction != null ? record.thc_pod_delay_deduction.toFixed(2) : <span className="text-gray-400">-</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {renderTdsInput(record)}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                      {record.calculated_balance.toFixed(2)}
+                      {getEffectiveBalance(record).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {record.ven_act_name || '-'}
@@ -589,7 +686,7 @@ export default function GenerateBalanceBankFile() {
                     <p className="text-lg font-bold text-red-600">
                       ₹{records
                         .filter(r => selectedRecords.has(r.thc_id))
-                        .reduce((sum, r) => sum + r.calculated_balance, 0)
+                        .reduce((sum, r) => sum + getEffectiveBalance(r), 0)
                         .toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
