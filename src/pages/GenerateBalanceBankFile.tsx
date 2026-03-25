@@ -434,9 +434,6 @@ export default function GenerateBalanceBankFile() {
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Munshiyana
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Net Payable
-                </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   + Loading Charges
                 </th>
@@ -448,6 +445,9 @@ export default function GenerateBalanceBankFile() {
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                   + Other Charges
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Net Payable
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Account Name
@@ -530,9 +530,6 @@ export default function GenerateBalanceBankFile() {
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
                       {record.calculated_munshiyana.toFixed(2)}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                      {record.calculated_balance.toFixed(2)}
-                    </td>
                     <td className="px-4 py-3 text-right">
                       {renderChargeInput(record, 'loading', 'thc_loading_charges')}
                     </td>
@@ -544,6 +541,9 @@ export default function GenerateBalanceBankFile() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       {renderChargeInput(record, 'other', 'thc_other_charges')}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                      {record.calculated_balance.toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {record.ven_act_name || '-'}
