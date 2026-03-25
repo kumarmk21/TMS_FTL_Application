@@ -165,7 +165,7 @@ const menuItems: MenuItem[] = [
       { id: 'pending-pod', label: 'Pending POD' },
       { id: 'ar-report', label: 'AR Report' },
       { id: 'ap-report', label: 'AP Report' },
-      { id: 'bth-paid-report', label: 'BTH Paid Report' },
+      { id: 'bth-paid-report', label: 'BTH Payment' },
     ],
   },
 ];

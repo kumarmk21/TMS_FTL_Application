@@ -141,7 +141,7 @@ export default function BTHPaidReport() {
           <BarChart3 className="w-6 h-6 text-red-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">BTH Paid Report</h1>
+          <h1 className="text-2xl font-bold text-gray-900">BTH Payment</h1>
           <p className="text-sm text-gray-500">View balance payment records for THC entries</p>
         </div>
       </div>
