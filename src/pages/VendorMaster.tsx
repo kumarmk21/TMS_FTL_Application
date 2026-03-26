@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Pencil, Trash2, Search, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Download, Upload, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { AddVendorModal } from '../components/modals/AddVendorModal';
 import { EditVendorModal } from '../components/modals/EditVendorModal';
+import { UploadVendorModal } from '../components/modals/UploadVendorModal';
 
 interface Vendor {
   id: string;
@@ -34,6 +36,7 @@ export function VendorMaster() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
 
   useEffect(() => {
@@ -79,6 +82,41 @@ export function VendorMaster() {
   const handleEdit = (vendor: Vendor) => {
     setSelectedVendor(vendor);
     setShowEditModal(true);
+  };
+
+  const handleDownloadTemplate = () => {
+    const template = [
+      {
+        'Vendor Code': 'VEN001',
+        'Vendor Name': 'Sample Vendor Pvt Ltd',
+        'Vendor Type': 'Admin',
+        'Booking Branch': 'BRANCH001',
+        'Vendor Address': '123 MG Road, Mumbai, Maharashtra',
+        'Vendor Phone': '9876543210',
+        'PAN': 'ABCDE1234F',
+        'Email ID': 'vendor@example.com',
+        'Account No': '1234567890123456',
+        'Bank Name': 'State Bank of India',
+        'IFSC Code': 'SBIN0001234',
+        'TDS Applicable': 'Y',
+        'TDS Category': '194C',
+        'TDS Rate (%)': '2',
+        'Status': 'Active',
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vendor Template');
+
+    ws['!cols'] = [
+      { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 16 },
+      { wch: 35 }, { wch: 14 }, { wch: 12 }, { wch: 25 },
+      { wch: 20 }, { wch: 25 }, { wch: 14 }, { wch: 16 },
+      { wch: 14 }, { wch: 14 }, { wch: 10 },
+    ];
+
+    XLSX.writeFile(wb, 'Vendor_Master_Upload_Template.xlsx');
   };
 
   const handleDownloadVendorMaster = async () => {
@@ -196,17 +234,31 @@ export function VendorMaster() {
         <h1 className="text-2xl font-bold text-gray-900">Vendor Master</h1>
         <div className="flex items-center gap-3">
           <button
+            onClick={handleDownloadTemplate}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Download Template
+          </button>
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Vendor
+          </button>
+          <button
             onClick={handleDownloadVendorMaster}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
-            <Download className="w-5 h-5" />
-            Download Vendor Master CSV
+            <Download className="w-4 h-4" />
+            Download Vendor Master
           </button>
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
             Add Vendor
           </button>
         </div>
@@ -394,6 +446,12 @@ export function VendorMaster() {
           vendor={selectedVendor}
         />
       )}
+
+      <UploadVendorModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onSuccess={fetchVendors}
+      />
     </div>
   );
 }
