@@ -32,6 +32,30 @@ export default function AddAdminExpenseModal({ accounts, accountGroups, vendors,
   });
 
   useEffect(() => {
+    generateVoucherNumber();
+  }, []);
+
+  const generateVoucherNumber = async () => {
+    const yy = String(new Date().getFullYear()).slice(-2);
+    const prefix = `VR/${yy}/`;
+    const { data } = await supabase
+      .from('admin_expenses_transaction')
+      .select('voucher_number')
+      .like('voucher_number', `${prefix}%`)
+      .order('voucher_number', { ascending: false })
+      .limit(1);
+
+    let nextSeq = 1;
+    if (data && data.length > 0 && data[0].voucher_number) {
+      const parts = data[0].voucher_number.split('/');
+      const last = parseInt(parts[2], 10);
+      if (!isNaN(last)) nextSeq = last + 1;
+    }
+    const padded = String(nextSeq).padStart(5, '0');
+    setForm(prev => ({ ...prev, voucher_number: `${prefix}${padded}` }));
+  };
+
+  useEffect(() => {
     if (form.account_id) {
       const acc = accounts.find(a => a.id === form.account_id);
       if (acc) {
@@ -97,9 +121,8 @@ export default function AddAdminExpenseModal({ accounts, accountGroups, vendors,
               <input
                 type="text"
                 value={form.voucher_number}
-                onChange={e => handleChange('voucher_number', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                placeholder="Auto / Manual"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700 cursor-not-allowed font-medium"
               />
             </div>
             <div>
