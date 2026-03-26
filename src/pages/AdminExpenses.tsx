@@ -83,7 +83,7 @@ export default function AdminExpenses() {
     const [accRes, agRes, venRes, brRes] = await Promise.all([
       supabase.from('accounts_master').select('id, accounting_head, sub_group, main_group').eq('active', true).order('accounting_head'),
       supabase.from('account_group_master').select('id, sub_group, main_group').eq('active', true).order('sub_group'),
-      supabase.from('vendor_master').select('id, vendor_name, account_no, bank_name, ifsc_code').eq('is_active', true).order('vendor_name'),
+      supabase.from('vendor_master').select('id, vendor_name, account_no, bank_name, ifsc_code').eq('is_active', true).eq('vendor_type', 'Admin').order('vendor_name'),
       supabase.from('branch_master').select('id, branch_name').eq('is_active', true).order('branch_name'),
     ]);
     if (accRes.data) setAccounts(accRes.data);
