@@ -141,8 +141,13 @@ export function AddVendorModal({ isOpen, onClose, onSuccess }: AddVendorModalPro
         tds_declaration_url = await uploadFile(files.tds_declaration, 'tds');
       }
 
+      const tdsRateMap: Record<string, number> = {
+        'Individual': 1,
+        'Corporate': 2,
+        'Individual 10%': 10,
+      };
       const tds_rate = formData.tds_applicable === 'Y'
-        ? (formData.tds_category === 'Individual' ? 1 : 2)
+        ? (tdsRateMap[formData.tds_category] ?? 2)
         : null;
 
       const { error } = await supabase.from('vendor_master').insert({
@@ -366,6 +371,7 @@ export function AddVendorModal({ isOpen, onClose, onSuccess }: AddVendorModalPro
                   <option value="">Select Category</option>
                   <option value="Individual">Individual (Rate: 1%)</option>
                   <option value="Corporate">Corporate (Rate: 2%)</option>
+                  <option value="Individual 10%">Individual 10% (Rate: 10%)</option>
                 </select>
               </div>
             )}
