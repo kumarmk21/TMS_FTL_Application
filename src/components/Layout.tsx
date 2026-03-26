@@ -59,6 +59,8 @@ import AccountsMaster from '../pages/AccountsMaster';
 import ConsolidateBillGeneration from '../pages/ConsolidateBillGeneration';
 import ConsolBillPrint from '../pages/ConsolBillPrint';
 import BTHPaidReport from '../pages/BTHPaidReport';
+import AdminExpenses from '../pages/AdminExpenses';
+import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
 
 export interface MenuItem {
   id: string;
@@ -123,6 +125,7 @@ const menuItems: MenuItem[] = [
       { id: 'generate-advance-bank-file', label: 'Generate Advance Bank File' },
       { id: 'regenerate-advance-bank-file', label: 'Advance Bank Payment File Regenerate' },
       { id: 'generate-balance-bank-file', label: 'BTH Payment' },
+      { id: 'admin-payment-bank-file', label: 'Admin Payment Bank File' },
       { id: 'generate-debit-note', label: 'Generate Debit Note' },
       { id: 'generate-credit-note', label: 'Generate Credit Note' },
     ],
@@ -272,6 +275,10 @@ export function Layout() {
         return <RegenerateAdvanceBankFile />;
       case 'generate-balance-bank-file':
         return <GenerateBalanceBankFile />;
+      case 'admin-expenses':
+        return <AdminExpenses />;
+      case 'admin-payment-bank-file':
+        return <AdminPaymentBankFile />;
       case 'income-expense-report':
         return <IncomeExpenseReport />;
       case 'sales-report':
