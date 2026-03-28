@@ -59,6 +59,7 @@ import AccountsMaster from '../pages/AccountsMaster';
 import ConsolidateBillGeneration from '../pages/ConsolidateBillGeneration';
 import ConsolBillPrint from '../pages/ConsolBillPrint';
 import BTHPaidReport from '../pages/BTHPaidReport';
+import APReport from '../pages/APReport';
 import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
 
@@ -291,6 +292,8 @@ export function Layout() {
         return <ConsolBillPrint />;
       case 'bth-paid-report':
         return <BTHPaidReport />;
+      case 'ap-report':
+        return <APReport />;
       default:
         return <Dashboard />;
     }
