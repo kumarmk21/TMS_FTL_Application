@@ -24,6 +24,7 @@ interface PendingTHC {
   vehicle_number: string | null;
   origin: string | null;
   destination: string | null;
+  thc_amount: number | null;
   thc_gross_amount: number | null;
   thc_tds_amount: number | null;
   thc_net_payable_amount: number | null;
@@ -78,7 +79,7 @@ export default function APReport() {
       const { data, error } = await supabase
         .from('thc_details')
         .select(
-          'thc_id, thc_id_number, thc_date, lr_number, vehicle_number, origin, destination, thc_gross_amount, thc_tds_amount, thc_net_payable_amount, thc_advance_amount, thc_balance_amount, bth_due_date, thc_vendor, ven_act_name'
+          'thc_id, thc_id_number, thc_date, lr_number, vehicle_number, origin, destination, thc_amount, thc_gross_amount, thc_tds_amount, thc_net_payable_amount, thc_advance_amount, thc_balance_amount, bth_due_date, thc_vendor, ven_act_name'
         )
         .is('thc_balance_payment_date', null)
         .gt('thc_balance_amount', 0)
@@ -171,9 +172,9 @@ export default function APReport() {
       }).reduce((a, r) => a + (r.thc_balance_amount ?? 0), 0);
     }, 0);
     const totalTHCs = vendorSummaries.reduce((s, v) => s + v.thcCount, 0);
-    const totalNetPayable = vendorSummaries.reduce((s, v) => s + v.totalNetPayable, 0);
+    const totalTHCAmount = vendorSummaries.reduce((s, v) => s + v.records.reduce((a, r) => a + (r.thc_amount ?? 0), 0), 0);
     const totalAdvance = vendorSummaries.reduce((s, v) => s + v.totalAdvance, 0);
-    return { totalVendors, totalBalance, overdueBalance, dueSoonBalance, totalTHCs, totalNetPayable, totalAdvance };
+    return { totalVendors, totalBalance, overdueBalance, dueSoonBalance, totalTHCs, totalTHCAmount, totalAdvance };
   }, [vendorSummaries]);
 
   const toggleVendor = (vendorId: string) => {
@@ -304,10 +305,10 @@ export default function APReport() {
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
               <div className="flex items-center gap-2 mb-2">
                 <TrendingDown className="w-4 h-4 text-gray-400" />
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Net Payable</span>
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total THC Amt</span>
               </div>
-              <p className="text-xl font-bold text-gray-900">₹{fmt(overallStats.totalNetPayable)}</p>
-              <p className="text-xs text-gray-400 mt-0.5">Gross total</p>
+              <p className="text-xl font-bold text-gray-900">₹{fmt(overallStats.totalTHCAmount)}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Sum of THC amounts</p>
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
