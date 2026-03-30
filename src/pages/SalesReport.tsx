@@ -39,6 +39,7 @@ interface BookingLR {
   bill_date: string;
   bill_to_state?: string;
   bill_to_gstin?: string;
+  state_alpha_code?: string;
   created_at: string;
 }
 
@@ -98,9 +99,17 @@ export default function SalesReport() {
         query = query.eq('booking_branch', profile.branch_code);
       }
 
-      const { data: bookingLRData, error } = await query;
+      const [{ data: bookingLRData, error }, { data: stateData }] = await Promise.all([
+        query,
+        supabase.from('state_master').select('state_name, alpha_code'),
+      ]);
 
       if (error) throw error;
+
+      const stateAlphaMap: Record<string, string> = {};
+      (stateData || []).forEach((s) => {
+        if (s.state_name) stateAlphaMap[s.state_name.toLowerCase()] = s.alpha_code || '';
+      });
 
       const enrichedData = await Promise.all(
         (bookingLRData || []).map(async (lr) => {
@@ -111,10 +120,12 @@ export default function SalesReport() {
               .eq('lr_bill_number', lr.bill_no)
               .maybeSingle();
 
+            const stateName = billData?.bill_to_state || '';
             return {
               ...lr,
-              bill_to_state: billData?.bill_to_state || '',
+              bill_to_state: stateName,
               bill_to_gstin: billData?.bill_to_gstin || '',
+              state_alpha_code: stateAlphaMap[stateName.toLowerCase()] || '',
             };
           }
           return lr;
@@ -210,6 +221,7 @@ export default function SalesReport() {
           : '',
         'Freight Bill Number': item.bill_no || '',
         'Bill To State': item.bill_to_state || '',
+        'State Alpha Code': item.state_alpha_code || '',
         'Bill To GSTIN': item.bill_to_gstin || '',
         'Bill Date': item.bill_date
           ? new Date(item.bill_date).toLocaleDateString('en-IN')
@@ -250,6 +262,7 @@ export default function SalesReport() {
         'LR Date': '',
         'Freight Bill Number': '',
         'Bill To State': '',
+        'State Alpha Code': '',
         'Bill To GSTIN': '',
         'Bill Date': '',
         'Branch': '',
@@ -289,6 +302,7 @@ export default function SalesReport() {
         { wch: 12 },
         { wch: 20 },
         { wch: 15 },
+        { wch: 16 },
         { wch: 18 },
         { wch: 12 },
         { wch: 12 },
