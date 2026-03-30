@@ -105,22 +105,16 @@ export default function GenerateCustomerBill() {
     }
   };
 
-  const handleSelectAll = () => {
-    if (selectedLRs.size === unbilledLRs.length) {
+  const handleSelectLR = (tranId: string) => {
+    if (selectedLRs.has(tranId)) {
       setSelectedLRs(new Set());
     } else {
-      setSelectedLRs(new Set(unbilledLRs.map(lr => lr.tran_id)));
+      if (selectedLRs.size >= 1) {
+        alert('Only one LR can be selected at a time. Please deselect the current LR before selecting another.');
+        return;
+      }
+      setSelectedLRs(new Set([tranId]));
     }
-  };
-
-  const handleSelectLR = (tranId: string) => {
-    const newSelected = new Set(selectedLRs);
-    if (newSelected.has(tranId)) {
-      newSelected.delete(tranId);
-    } else {
-      newSelected.add(tranId);
-    }
-    setSelectedLRs(newSelected);
   };
 
   const calculateTotalAmount = () => {
@@ -257,15 +251,15 @@ export default function GenerateCustomerBill() {
             </h2>
             {unbilledLRs.length > 0 && (
               <div className="flex items-center gap-4">
-                <button
-                  onClick={handleSelectAll}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  <CheckSquare className="w-4 h-4" />
-                  {selectedLRs.size === unbilledLRs.length ? 'Deselect All' : 'Select All'}
-                </button>
                 {selectedLRs.size > 0 && (
                   <>
+                    <button
+                      onClick={() => setSelectedLRs(new Set())}
+                      className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      <CheckSquare className="w-4 h-4" />
+                      Deselect All
+                    </button>
                     <div className="text-lg font-semibold text-gray-700">
                       Total: ₹{calculateTotalAmount().toFixed(2)}
                     </div>
@@ -293,12 +287,7 @@ export default function GenerateCustomerBill() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <input
-                        type="checkbox"
-                        checked={selectedLRs.size === unbilledLRs.length}
-                        onChange={handleSelectAll}
-                        className="w-4 h-4 rounded"
-                      />
+                      Select
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       LR No
@@ -330,10 +319,11 @@ export default function GenerateCustomerBill() {
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
                         <input
-                          type="checkbox"
+                          type="radio"
+                          name="selected_lr"
                           checked={selectedLRs.has(lr.tran_id)}
                           onChange={() => handleSelectLR(lr.tran_id)}
-                          className="w-4 h-4 rounded"
+                          className="w-4 h-4 accent-blue-600"
                         />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
