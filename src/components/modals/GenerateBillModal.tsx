@@ -140,7 +140,7 @@ export default function GenerateBillModal({
       const { data: gstData, error: gstError } = await supabase
         .from('customer_gst_master')
         .select('id, customer_code, gstin, bill_to_address, state_id, state_master(state_name)')
-        .eq('customer_name', billingPartyName);
+        .eq('customer_code', billingPartyCode);
 
       if (gstError) throw gstError;
 
