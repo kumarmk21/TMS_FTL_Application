@@ -272,9 +272,9 @@ export function BillCancelRegenerate() {
   };
 
   const filteredBills = bills.filter(bill =>
-    bill.lr_bill_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.billing_party_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.billing_party_code.toLowerCase().includes(searchTerm.toLowerCase())
+    (bill.lr_bill_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (bill.billing_party_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (bill.billing_party_code || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const formatCurrency = (amount: number) => {
@@ -454,7 +454,7 @@ export function BillCancelRegenerate() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {lrRecords.map((lr) => (
-                        <tr key={lr.lr_id} className="hover:bg-gray-50">
+                        <tr key={lr.tran_id} className="hover:bg-gray-50">
                           <td className="px-4 py-2 text-sm font-medium text-gray-900">{lr.manual_lr_no}</td>
                           <td className="px-4 py-2 text-sm text-gray-600">{formatDate(lr.lr_date)}</td>
                           <td className="px-4 py-2 text-sm text-gray-600">
