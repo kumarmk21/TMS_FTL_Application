@@ -74,14 +74,14 @@ export function LRTracking() {
       if (searchType === 'lrNumber' && statusType === 'lr_ops_status') {
         const { data: lrData, error: lrError } = await supabase
           .from('booking_lr')
-          .select('id, manual_lr_no, lr_date, billing_party_name, from_city, to_city, vehicle_type, vehicle_number, lr_ops_status')
+          .select('tran_id, manual_lr_no, lr_date, billing_party_name, from_city, to_city, vehicle_type, vehicle_number, lr_ops_status')
           .ilike('manual_lr_no', `%${formData.lrNumber.trim()}%`)
           .order('manual_lr_no', { ascending: false });
 
         if (lrError) throw lrError;
 
         if (lrData && lrData.length > 0) {
-          const lrIds = lrData.map((lr) => lr.id);
+          const lrIds = lrData.map((lr) => lr.tran_id);
           const { data: thcData, error: thcError } = await supabase
             .from('thc_details')
             .select('tran_id, thc_amount, thc_advance_amount, thc_balance_amount, ven_act_name')
@@ -100,7 +100,7 @@ export function LRTracking() {
           });
 
           const combined: LROpsDetailData[] = lrData.map((lr) => ({
-            id: lr.id,
+            id: lr.tran_id,
             manual_lr_no: lr.manual_lr_no,
             lr_date: lr.lr_date,
             billing_party_name: lr.billing_party_name,
@@ -109,7 +109,7 @@ export function LRTracking() {
             vehicle_type: lr.vehicle_type,
             vehicle_number: lr.vehicle_number,
             lr_ops_status: lr.lr_ops_status,
-            ...(thcMap[lr.id] || { thc_amount: null, thc_advance_amount: null, thc_balance_amount: null, ven_act_name: null }),
+            ...(thcMap[lr.tran_id] || { thc_amount: null, thc_advance_amount: null, thc_balance_amount: null, ven_act_name: null }),
           }));
 
           setOpsDetailResults(combined);
