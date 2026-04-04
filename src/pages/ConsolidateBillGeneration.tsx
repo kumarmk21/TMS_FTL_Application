@@ -412,6 +412,7 @@ export default function ConsolidateBillGeneration() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LR No</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LR Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Number</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From City</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To City</th>
@@ -425,7 +426,7 @@ export default function ConsolidateBillGeneration() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {bills.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={12} className="px-6 py-8 text-center text-gray-500">
                         No bills found for the selected billing party
                       </td>
                     </tr>
@@ -448,6 +449,7 @@ export default function ConsolidateBillGeneration() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {bill.lr_date ? new Date(bill.lr_date).toLocaleDateString('en-GB') : '-'}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{bill.bill_no || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                           {bill.bill_date ? new Date(bill.bill_date).toLocaleDateString('en-GB') : '-'}
                         </td>
