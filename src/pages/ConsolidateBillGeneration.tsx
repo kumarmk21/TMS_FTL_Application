@@ -117,7 +117,7 @@ export default function ConsolidateBillGeneration() {
         .from('booking_lr')
         .select('billing_party_code, billing_party_name')
         .not('bill_no', 'is', null)
-        .eq('lr_financial_status', 'Bill Generated')
+        .is('consol_bill_number', null)
         .not('billing_party_code', 'is', null)
         .order('billing_party_name');
 
@@ -156,8 +156,8 @@ export default function ConsolidateBillGeneration() {
         .from('booking_lr')
         .select('tran_id, bill_no, manual_lr_no, bill_date, lr_date, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, billing_party_code, billing_party_name, bill_amount, lr_total_amount, loading_charges, unloading_charges, detention_charges')
         .eq('billing_party_code', selectedParty)
-        .eq('lr_financial_status', 'Bill Generated')
         .not('bill_no', 'is', null)
+        .is('consol_bill_number', null)
         .order('bill_date', { ascending: true });
 
       if (error) throw error;
