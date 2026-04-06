@@ -371,9 +371,14 @@ export function LREntry() {
       }
 
       if (editingLR) {
+        const updateData = { ...lrData };
+        delete updateData.lr_status;
+        delete updateData.lr_financial_status;
+        delete updateData.created_by;
+
         const { error } = await supabase
           .from('booking_lr')
-          .update(lrData)
+          .update(updateData)
           .eq('tran_id', editingLR.tran_id);
 
         if (error) throw error;
