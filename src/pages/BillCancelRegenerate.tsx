@@ -150,6 +150,8 @@ export function BillCancelRegenerate() {
           bill_no: null,
           bill_date: null,
           bill_due_date: null,
+          bill_amount: null,
+          lr_financial_status: 'Booked',
         })
         .eq('bill_no', selectedBill.lr_bill_number);
 
