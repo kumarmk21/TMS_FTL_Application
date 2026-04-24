@@ -52,7 +52,7 @@ interface DashboardStats {
 interface BillRecord {
   billing_party_name: string | null;
   bill_amount: number | null;
-  bill_date: string | null;
+  lr_bill_date: string | null;
   lr_bill_status: string | null;
   lr_bill_mr_net_amount: number | null;
 }
@@ -71,6 +71,8 @@ interface PartyBillSummary {
   totalReceived: number;
   outstanding: number;
   billCount: number;
+  transportCount: number;
+  warehouseCount: number;
 }
 
 interface MonthBillSummary {
@@ -79,6 +81,8 @@ interface MonthBillSummary {
   totalBilled: number;
   totalReceived: number;
   billCount: number;
+  transportBilled: number;
+  warehouseBilled: number;
 }
 
 type BillTab = 'party' | 'month';
@@ -197,10 +201,12 @@ export function Dashboard() {
       const [lrBillResult, whBillResult, overdueResult] = await Promise.all([
         supabase
           .from('lr_bill')
-          .select('billing_party_name, bill_amount, bill_date, lr_bill_status, lr_bill_mr_net_amount'),
+          .select('billing_party_name, bill_amount, lr_bill_date, lr_bill_status, lr_bill_mr_net_amount')
+          .not('bill_status', 'eq', 'Cancelled'),
         supabase
           .from('warehouse_bill')
-          .select('billing_party_name, total_amount, bill_date, bill_status, net_amount'),
+          .select('billing_party_name, total_amount, bill_date, bill_status, net_amount')
+          .not('bill_status', 'eq', 'Cancelled'),
         supabase
           .from('lr_bill')
           .select('bill_id', { count: 'exact', head: true })
@@ -211,24 +217,33 @@ export function Dashboard() {
       const lrBills: BillRecord[] = lrBillResult.data || [];
       const whBills: WarehouseBillRecord[] = whBillResult.data || [];
 
-      // --- party-wise aggregation (LR bills only — they have billing_party_name) ---
+      // --- party-wise aggregation ---
       const partyMap = new Map<string, PartyBillSummary>();
 
-      const processBill = (party: string | null, amount: number | null, received: number | null, status: string | null) => {
+      const processBill = (
+        party: string | null,
+        amount: number | null,
+        received: number | null,
+        status: string | null,
+        type: 'transport' | 'warehouse'
+      ) => {
         const key = party || 'Unknown';
-        const paid = status?.toLowerCase() === 'paid' ? (received || amount || 0) : 0;
+        const isPaid = status?.toLowerCase() === 'paid';
+        const paidAmt = isPaid ? (received && received > 0 ? received : amount || 0) : 0;
         if (!partyMap.has(key)) {
-          partyMap.set(key, { party: key, totalBilled: 0, totalReceived: 0, outstanding: 0, billCount: 0 });
+          partyMap.set(key, { party: key, totalBilled: 0, totalReceived: 0, outstanding: 0, billCount: 0, transportCount: 0, warehouseCount: 0 });
         }
         const entry = partyMap.get(key)!;
         entry.totalBilled += amount || 0;
-        entry.totalReceived += paid;
+        entry.totalReceived += paidAmt;
         entry.outstanding = entry.totalBilled - entry.totalReceived;
         entry.billCount += 1;
+        if (type === 'transport') entry.transportCount += 1;
+        else entry.warehouseCount += 1;
       };
 
-      lrBills.forEach(b => processBill(b.billing_party_name, b.bill_amount, b.lr_bill_mr_net_amount, b.lr_bill_status));
-      whBills.forEach(b => processBill(b.billing_party_name, b.total_amount, b.net_amount, b.bill_status));
+      lrBills.forEach(b => processBill(b.billing_party_name, b.bill_amount, b.lr_bill_mr_net_amount, b.lr_bill_status, 'transport'));
+      whBills.forEach(b => processBill(b.billing_party_name, b.total_amount, b.net_amount, b.bill_status, 'warehouse'));
 
       const partyList = Array.from(partyMap.values()).sort((a, b) => b.totalBilled - a.totalBilled);
       setPartyBills(partyList);
@@ -236,23 +251,32 @@ export function Dashboard() {
       // --- month-wise aggregation ---
       const monthMap = new Map<string, MonthBillSummary>();
 
-      const processMonthBill = (date: string | null, amount: number | null, received: number | null, status: string | null) => {
+      const processMonthBill = (
+        date: string | null,
+        amount: number | null,
+        received: number | null,
+        status: string | null,
+        type: 'transport' | 'warehouse'
+      ) => {
         if (!date) return;
         const d = new Date(date);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         const label = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-        const paid = status?.toLowerCase() === 'paid' ? (received || amount || 0) : 0;
+        const isPaid = status?.toLowerCase() === 'paid';
+        const paidAmt = isPaid ? (received && received > 0 ? received : amount || 0) : 0;
         if (!monthMap.has(key)) {
-          monthMap.set(key, { month: label, monthKey: key, totalBilled: 0, totalReceived: 0, billCount: 0 });
+          monthMap.set(key, { month: label, monthKey: key, totalBilled: 0, totalReceived: 0, billCount: 0, transportBilled: 0, warehouseBilled: 0 });
         }
         const entry = monthMap.get(key)!;
         entry.totalBilled += amount || 0;
-        entry.totalReceived += paid;
+        entry.totalReceived += paidAmt;
         entry.billCount += 1;
+        if (type === 'transport') entry.transportBilled += amount || 0;
+        else entry.warehouseBilled += amount || 0;
       };
 
-      lrBills.forEach(b => processMonthBill(b.bill_date, b.bill_amount, b.lr_bill_mr_net_amount, b.lr_bill_status));
-      whBills.forEach(b => processMonthBill(b.bill_date, b.total_amount, b.net_amount, b.bill_status));
+      lrBills.forEach(b => processMonthBill(b.lr_bill_date, b.bill_amount, b.lr_bill_mr_net_amount, b.lr_bill_status, 'transport'));
+      whBills.forEach(b => processMonthBill(b.bill_date, b.total_amount, b.net_amount, b.bill_status, 'warehouse'));
 
       const monthList = Array.from(monthMap.values()).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
       setMonthBills(monthList);
@@ -472,7 +496,8 @@ export function Dashboard() {
                       <tr className="bg-gray-50 border-b border-gray-100">
                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Billing Party</th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Bills</th>
+                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Transport</th>
+                        <th className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Warehouse</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Billed</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Received</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Outstanding</th>
@@ -494,8 +519,15 @@ export function Dashboard() {
                                 <span className="text-sm font-medium text-gray-900">{p.party}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-3.5 text-sm text-gray-600 text-right">
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-xs font-semibold">{p.billCount}</span>
+                            <td className="px-6 py-3.5 text-center">
+                              {p.transportCount > 0 ? (
+                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">{p.transportCount}</span>
+                              ) : <span className="text-gray-300 text-xs">—</span>}
+                            </td>
+                            <td className="px-6 py-3.5 text-center">
+                              {p.warehouseCount > 0 ? (
+                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-700">{p.warehouseCount}</span>
+                              ) : <span className="text-gray-300 text-xs">—</span>}
                             </td>
                             <td className="px-6 py-3.5 text-sm font-semibold text-gray-900 text-right">
                               {formatCurrency(p.totalBilled)}
@@ -597,6 +629,8 @@ export function Dashboard() {
                       <tr className="bg-gray-50 border-b border-gray-100">
                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Month</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Bills</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-blue-500 uppercase tracking-wider">Transport</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-teal-500 uppercase tracking-wider">Warehouse</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Billed</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Received</th>
                         <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Outstanding</th>
@@ -604,7 +638,7 @@ export function Dashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {filteredMonths.map((m, i) => {
+                      {filteredMonths.map((m) => {
                         const outstanding = m.totalBilled - m.totalReceived;
                         const pct = m.totalBilled > 0 ? (m.totalReceived / m.totalBilled) * 100 : 0;
                         const isCurrentMonth = m.monthKey === `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
@@ -620,6 +654,12 @@ export function Dashboard() {
                             </td>
                             <td className="px-6 py-3.5 text-sm text-gray-600 text-right">
                               <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-xs font-semibold">{m.billCount}</span>
+                            </td>
+                            <td className="px-6 py-3.5 text-sm font-medium text-blue-700 text-right">
+                              {m.transportBilled > 0 ? formatCurrency(m.transportBilled) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-6 py-3.5 text-sm font-medium text-teal-700 text-right">
+                              {m.warehouseBilled > 0 ? formatCurrency(m.warehouseBilled) : <span className="text-gray-300">—</span>}
                             </td>
                             <td className="px-6 py-3.5 text-sm font-semibold text-gray-900 text-right">
                               {formatCurrency(m.totalBilled)}
