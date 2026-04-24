@@ -121,10 +121,14 @@ export function Dashboard() {
     statusBreakdown: [],
   });
 
+  const now = new Date();
   const [partyBills, setPartyBills] = useState<PartyBillSummary[]>([]);
+  const [partyBillsLoading, setPartyBillsLoading] = useState(false);
   const [monthBills, setMonthBills] = useState<MonthBillSummary[]>([]);
   const [billTab, setBillTab] = useState<BillTab>('party');
   const [partyExpanded, setPartyExpanded] = useState(false);
+  const [partyFilterMonth, setPartyFilterMonth] = useState<number>(now.getMonth() + 1);
+  const [partyFilterYear, setPartyFilterYear] = useState<number>(now.getFullYear());
   const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('all');
   const [totalBilled, setTotalBilled] = useState(0);
   const [totalOutstanding, setTotalOutstanding] = useState(0);
@@ -134,6 +138,11 @@ export function Dashboard() {
   useEffect(() => {
     fetchAll();
   }, []);
+
+  useEffect(() => {
+    fetchPartyBills(partyFilterMonth, partyFilterYear);
+    setPartyExpanded(false);
+  }, [partyFilterMonth, partyFilterYear]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -194,6 +203,68 @@ export function Dashboard() {
     }
   };
 
+  const buildPartyMap = (
+    lrBills: BillRecord[],
+    whBills: WarehouseBillRecord[]
+  ): PartyBillSummary[] => {
+    const partyMap = new Map<string, PartyBillSummary>();
+    const processBill = (
+      party: string | null,
+      amount: number | null,
+      received: number | null,
+      status: string | null,
+      type: 'transport' | 'warehouse'
+    ) => {
+      const key = party || 'Unknown';
+      const isPaid = status?.toLowerCase() === 'paid';
+      const paidAmt = isPaid ? (received && received > 0 ? received : amount || 0) : 0;
+      if (!partyMap.has(key)) {
+        partyMap.set(key, { party: key, totalBilled: 0, totalReceived: 0, outstanding: 0, billCount: 0, transportCount: 0, warehouseCount: 0 });
+      }
+      const entry = partyMap.get(key)!;
+      entry.totalBilled += amount || 0;
+      entry.totalReceived += paidAmt;
+      entry.outstanding = entry.totalBilled - entry.totalReceived;
+      entry.billCount += 1;
+      if (type === 'transport') entry.transportCount += 1;
+      else entry.warehouseCount += 1;
+    };
+    lrBills.forEach(b => processBill(b.billing_party_name, b.bill_amount, b.lr_bill_mr_net_amount, b.lr_bill_status, 'transport'));
+    whBills.forEach(b => processBill(b.billing_party_name, b.total_amount, b.net_amount, b.bill_status, 'warehouse'));
+    return Array.from(partyMap.values()).sort((a, b) => b.totalBilled - a.totalBilled);
+  };
+
+  const fetchPartyBills = async (month: number, year: number) => {
+    setPartyBillsLoading(true);
+    try {
+      const monthStr = String(month).padStart(2, '0');
+      const dateFrom = `${year}-${monthStr}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const dateTo = `${year}-${monthStr}-${lastDay}`;
+
+      const [lrRes, whRes] = await Promise.all([
+        supabase
+          .from('lr_bill')
+          .select('billing_party_name, bill_amount, lr_bill_date, lr_bill_status, lr_bill_mr_net_amount')
+          .not('bill_status', 'eq', 'Cancelled')
+          .gte('lr_bill_date', dateFrom)
+          .lte('lr_bill_date', dateTo),
+        supabase
+          .from('warehouse_bill')
+          .select('billing_party_name, total_amount, bill_date, bill_status, net_amount')
+          .not('bill_status', 'eq', 'Cancelled')
+          .gte('bill_date', dateFrom)
+          .lte('bill_date', dateTo),
+      ]);
+
+      setPartyBills(buildPartyMap(lrRes.data || [], whRes.data || []));
+    } catch (e) {
+      console.error('Error fetching party bills:', e);
+    } finally {
+      setPartyBillsLoading(false);
+    }
+  };
+
   const fetchBillsData = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -217,40 +288,14 @@ export function Dashboard() {
       const lrBills: BillRecord[] = lrBillResult.data || [];
       const whBills: WarehouseBillRecord[] = whBillResult.data || [];
 
-      // --- party-wise aggregation ---
-      const partyMap = new Map<string, PartyBillSummary>();
+      // All-time totals for banner KPIs
+      const allPartyList = buildPartyMap(lrBills, whBills);
+      setTotalBilled(allPartyList.reduce((s, p) => s + p.totalBilled, 0));
+      setTotalOutstanding(allPartyList.reduce((s, p) => s + p.outstanding, 0));
+      setOverdueCount(overdueResult.count || 0);
 
-      const processBill = (
-        party: string | null,
-        amount: number | null,
-        received: number | null,
-        status: string | null,
-        type: 'transport' | 'warehouse'
-      ) => {
-        const key = party || 'Unknown';
-        const isPaid = status?.toLowerCase() === 'paid';
-        const paidAmt = isPaid ? (received && received > 0 ? received : amount || 0) : 0;
-        if (!partyMap.has(key)) {
-          partyMap.set(key, { party: key, totalBilled: 0, totalReceived: 0, outstanding: 0, billCount: 0, transportCount: 0, warehouseCount: 0 });
-        }
-        const entry = partyMap.get(key)!;
-        entry.totalBilled += amount || 0;
-        entry.totalReceived += paidAmt;
-        entry.outstanding = entry.totalBilled - entry.totalReceived;
-        entry.billCount += 1;
-        if (type === 'transport') entry.transportCount += 1;
-        else entry.warehouseCount += 1;
-      };
-
-      lrBills.forEach(b => processBill(b.billing_party_name, b.bill_amount, b.lr_bill_mr_net_amount, b.lr_bill_status, 'transport'));
-      whBills.forEach(b => processBill(b.billing_party_name, b.total_amount, b.net_amount, b.bill_status, 'warehouse'));
-
-      const partyList = Array.from(partyMap.values()).sort((a, b) => b.totalBilled - a.totalBilled);
-      setPartyBills(partyList);
-
-      // --- month-wise aggregation ---
+      // Month-wise aggregation (all-time, for Month-wise tab)
       const monthMap = new Map<string, MonthBillSummary>();
-
       const processMonthBill = (
         date: string | null,
         amount: number | null,
@@ -274,19 +319,12 @@ export function Dashboard() {
         if (type === 'transport') entry.transportBilled += amount || 0;
         else entry.warehouseBilled += amount || 0;
       };
-
       lrBills.forEach(b => processMonthBill(b.lr_bill_date, b.bill_amount, b.lr_bill_mr_net_amount, b.lr_bill_status, 'transport'));
       whBills.forEach(b => processMonthBill(b.bill_date, b.total_amount, b.net_amount, b.bill_status, 'warehouse'));
+      setMonthBills(Array.from(monthMap.values()).sort((a, b) => b.monthKey.localeCompare(a.monthKey)));
 
-      const monthList = Array.from(monthMap.values()).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-      setMonthBills(monthList);
-
-      // totals
-      const allBilled = partyList.reduce((s, p) => s + p.totalBilled, 0);
-      const allOutstanding = partyList.reduce((s, p) => s + p.outstanding, 0);
-      setTotalBilled(allBilled);
-      setTotalOutstanding(allOutstanding);
-      setOverdueCount(overdueResult.count || 0);
+      // Party bills default to current month (initial load)
+      await fetchPartyBills(partyFilterMonth, partyFilterYear);
     } catch (e) {
       console.error('Error fetching bills data:', e);
     }
@@ -438,7 +476,7 @@ export function Dashboard() {
       {/* Party-wise / Month-wise Bills Panel */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         {/* Tab header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-gray-100">
+        <div className="flex items-center justify-between px-6 pt-5 pb-0 border-b border-gray-100 flex-wrap gap-y-2">
           <div className="flex items-center gap-1">
             <button
               onClick={() => setBillTab('party')}
@@ -463,6 +501,34 @@ export function Dashboard() {
               Month-wise Bills
             </button>
           </div>
+
+          {/* Party-wise: month-year filter */}
+          {billTab === 'party' && (
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-xs text-gray-500 font-medium">Filter:</span>
+              <select
+                value={partyFilterMonth}
+                onChange={e => setPartyFilterMonth(Number(e.target.value))}
+                className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+              >
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={i + 1}>{m}</option>
+                ))}
+              </select>
+              <select
+                value={partyFilterYear}
+                onChange={e => setPartyFilterYear(Number(e.target.value))}
+                className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+              >
+                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Month-wise: year filter */}
           {billTab === 'month' && availableYears.length > 0 && (
             <div className="flex items-center gap-2 mb-1">
               <label className="text-xs text-gray-500">Year:</label>
@@ -483,10 +549,16 @@ export function Dashboard() {
         {/* Party-wise tab */}
         {billTab === 'party' && (
           <div>
-            {partyBills.length === 0 ? (
+            {partyBillsLoading ? (
+              <div className="py-16 flex items-center justify-center gap-3 text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin text-red-500" />
+                <span className="text-sm">Loading {MONTHS[partyFilterMonth - 1]} {partyFilterYear}…</span>
+              </div>
+            ) : partyBills.length === 0 ? (
               <div className="py-16 text-center text-gray-400">
                 <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No billing data available</p>
+                <p className="text-sm font-medium text-gray-500">No bills for {MONTHS[partyFilterMonth - 1]} {partyFilterYear}</p>
+                <p className="text-xs text-gray-400 mt-1">Try selecting a different month or year</p>
               </div>
             ) : (
               <>
@@ -560,15 +632,18 @@ export function Dashboard() {
 
                 {/* Footer totals + show more */}
                 <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-6 text-sm">
-                    <span className="text-gray-500">
-                      Total Billed: <span className="font-bold text-gray-900">{formatCurrency(totalBilled)}</span>
+                  <div className="flex items-center gap-6 text-sm flex-wrap">
+                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                      {MONTHS[partyFilterMonth - 1]} {partyFilterYear}
                     </span>
                     <span className="text-gray-500">
-                      Outstanding: <span className="font-bold text-amber-600">{formatCurrency(totalOutstanding)}</span>
+                      Billed: <span className="font-bold text-gray-900">{formatCurrency(partyBills.reduce((s, p) => s + p.totalBilled, 0))}</span>
                     </span>
                     <span className="text-gray-500">
-                      Collected: <span className="font-bold text-emerald-600">{formatCurrency(totalBilled - totalOutstanding)}</span>
+                      Outstanding: <span className="font-bold text-amber-600">{formatCurrency(partyBills.reduce((s, p) => s + p.outstanding, 0))}</span>
+                    </span>
+                    <span className="text-gray-500">
+                      Collected: <span className="font-bold text-emerald-600">{formatCurrency(partyBills.reduce((s, p) => s + p.totalReceived, 0))}</span>
                     </span>
                   </div>
                   {partyBills.length > 8 && (
