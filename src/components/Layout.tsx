@@ -62,6 +62,7 @@ import BTHPaidReport from '../pages/BTHPaidReport';
 import APReport from '../pages/APReport';
 import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
+import DownloadBTHBankFile from '../pages/DownloadBTHBankFile';
 
 export interface MenuItem {
   id: string;
@@ -126,6 +127,7 @@ const menuItems: MenuItem[] = [
       { id: 'generate-advance-bank-file', label: 'Generate Advance Bank File' },
       { id: 'regenerate-advance-bank-file', label: 'Advance Bank Payment File Regenerate' },
       { id: 'generate-balance-bank-file', label: 'BTH Payment' },
+      { id: 'download-bth-bank-file', label: 'Download BTH Bank File' },
       { id: 'admin-payment-bank-file', label: 'Admin Payment Bank File' },
       { id: 'generate-debit-note', label: 'Generate Debit Note' },
       { id: 'generate-credit-note', label: 'Generate Credit Note' },
@@ -278,6 +280,8 @@ export function Layout() {
         return <GenerateBalanceBankFile />;
       case 'admin-expenses':
         return <AdminExpenses />;
+      case 'download-bth-bank-file':
+        return <DownloadBTHBankFile />;
       case 'admin-payment-bank-file':
         return <AdminPaymentBankFile />;
       case 'income-expense-report':
