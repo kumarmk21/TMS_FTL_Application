@@ -18,7 +18,11 @@ import {
   BarChart2,
   Users,
   RefreshCw,
+  Download,
+  ClipboardList,
+  Inbox,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 
 interface DashboardStats {
@@ -85,7 +89,47 @@ interface MonthBillSummary {
   warehouseBilled: number;
 }
 
-type BillTab = 'party' | 'month';
+interface UnbilledLRRow {
+  tran_id: string;
+  manual_lr_no: string;
+  lr_date: string | null;
+  billing_party_code: string | null;
+  billing_party_name: string | null;
+  from_city: string | null;
+  to_city: string | null;
+  vehicle_type: string | null;
+  chrg_wt: number | null;
+  lr_total_amount: number | null;
+  freight_amount: number | null;
+  lr_status: string | null;
+  booking_branch: string | null;
+}
+
+interface UnbilledPartySummary {
+  party: string;
+  partyCode: string;
+  lrCount: number;
+  totalAmount: number;
+  lrs: UnbilledLRRow[];
+  expanded: boolean;
+}
+
+interface FreightPendingRow {
+  tran_id: string;
+  manual_lr_no: string;
+  lr_date: string | null;
+  billing_party_code: string | null;
+  billing_party_name: string | null;
+  from_city: string | null;
+  to_city: string | null;
+  vehicle_type: string | null;
+  chrg_wt: number | null;
+  lr_total_amount: number | null;
+  lr_status: string | null;
+  booking_branch: string | null;
+}
+
+type BillTab = 'party' | 'month' | 'unbilled' | 'freight';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -135,6 +179,16 @@ export function Dashboard() {
   const [overdueCount, setOverdueCount] = useState(0);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
+  // Tab 3: Party-Wise Unbilled
+  const [unbilledParties, setUnbilledParties] = useState<UnbilledPartySummary[]>([]);
+  const [unbilledLoading, setUnbilledLoading] = useState(false);
+  const [unbilledSearch, setUnbilledSearch] = useState('');
+
+  // Tab 4: Freight Entry Pending
+  const [freightPending, setFreightPending] = useState<FreightPendingRow[]>([]);
+  const [freightLoading, setFreightLoading] = useState(false);
+  const [freightSearch, setFreightSearch] = useState('');
+
   useEffect(() => {
     fetchAll();
   }, []);
@@ -143,6 +197,14 @@ export function Dashboard() {
     fetchPartyBills(partyFilterMonth, partyFilterYear);
     setPartyExpanded(false);
   }, [partyFilterMonth, partyFilterYear]);
+
+  useEffect(() => {
+    if (billTab === 'unbilled' && unbilledParties.length === 0) fetchUnbilledParties();
+  }, [billTab]);
+
+  useEffect(() => {
+    if (billTab === 'freight' && freightPending.length === 0) fetchFreightPending();
+  }, [billTab]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -330,6 +392,116 @@ export function Dashboard() {
     }
   };
 
+  const fetchUnbilledParties = async () => {
+    setUnbilledLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('booking_lr')
+        .select('tran_id, manual_lr_no, lr_date, billing_party_code, billing_party_name, from_city, to_city, vehicle_type, chrg_wt, lr_total_amount, freight_amount, lr_status, booking_branch')
+        .eq('pay_basis', 'TBB')
+        .gt('lr_total_amount', 0)
+        .is('bill_no', null)
+        .order('lr_date', { ascending: false });
+
+      if (error) throw error;
+
+      const rows: UnbilledLRRow[] = data || [];
+      const partyMap = new Map<string, UnbilledPartySummary>();
+      rows.forEach(lr => {
+        const key = lr.billing_party_code || 'UNKNOWN';
+        if (!partyMap.has(key)) {
+          partyMap.set(key, {
+            party: lr.billing_party_name || lr.billing_party_code || 'Unknown',
+            partyCode: key,
+            lrCount: 0,
+            totalAmount: 0,
+            lrs: [],
+            expanded: false,
+          });
+        }
+        const entry = partyMap.get(key)!;
+        entry.lrCount += 1;
+        entry.totalAmount += lr.lr_total_amount || 0;
+        entry.lrs.push(lr);
+      });
+      setUnbilledParties(Array.from(partyMap.values()).sort((a, b) => b.totalAmount - a.totalAmount));
+    } catch (e) {
+      console.error('Error fetching unbilled parties:', e);
+    } finally {
+      setUnbilledLoading(false);
+    }
+  };
+
+  const fetchFreightPending = async () => {
+    setFreightLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('booking_lr')
+        .select('tran_id, manual_lr_no, lr_date, billing_party_code, billing_party_name, from_city, to_city, vehicle_type, chrg_wt, lr_total_amount, lr_status, booking_branch')
+        .eq('pay_basis', 'TBB')
+        .or('lr_total_amount.is.null,lr_total_amount.eq.0')
+        .order('lr_date', { ascending: false });
+
+      if (error) throw error;
+      setFreightPending(data || []);
+    } catch (e) {
+      console.error('Error fetching freight pending:', e);
+    } finally {
+      setFreightLoading(false);
+    }
+  };
+
+  const exportUnbilledToExcel = () => {
+    const rows = unbilledParties
+      .filter(p => !unbilledSearch || p.party.toLowerCase().includes(unbilledSearch.toLowerCase()))
+      .flatMap(p =>
+        p.lrs.map(lr => ({
+          'Billing Party': p.party,
+          'Party Code': p.partyCode,
+          'LR No': lr.manual_lr_no,
+          'LR Date': lr.lr_date || '',
+          'From': lr.from_city || '',
+          'To': lr.to_city || '',
+          'Vehicle Type': lr.vehicle_type || '',
+          'Chrg Wt': lr.chrg_wt || 0,
+          'Freight Amount': lr.freight_amount || 0,
+          'Total Amount': lr.lr_total_amount || 0,
+          'Status': lr.lr_status || '',
+          'Branch': lr.booking_branch || '',
+        }))
+      );
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Unbilled');
+    XLSX.writeFile(wb, `party_wise_unbilled_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const exportFreightPendingToExcel = () => {
+    const rows = filteredFreight.map(lr => ({
+      'LR No': lr.manual_lr_no,
+      'LR Date': lr.lr_date || '',
+      'Billing Party': lr.billing_party_name || '',
+      'Party Code': lr.billing_party_code || '',
+      'From': lr.from_city || '',
+      'To': lr.to_city || '',
+      'Vehicle Type': lr.vehicle_type || '',
+      'Chrg Wt': lr.chrg_wt || 0,
+      'Total Amount': lr.lr_total_amount || 0,
+      'Status': lr.lr_status || '',
+      'Branch': lr.booking_branch || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Freight Pending');
+    XLSX.writeFile(wb, `freight_entry_pending_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const toggleUnbilledParty = (partyCode: string) => {
+    setUnbilledParties(prev =>
+      prev.map(p => p.partyCode === partyCode ? { ...p, expanded: !p.expanded } : p)
+    );
+  };
+
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
 
@@ -349,6 +521,19 @@ export function Dashboard() {
 
   // bar chart max for visual bars
   const maxMonthBilled = Math.max(...monthBills.map(m => m.totalBilled), 1);
+
+  const filteredUnbilledParties = unbilledSearch
+    ? unbilledParties.filter(p => p.party.toLowerCase().includes(unbilledSearch.toLowerCase()) || p.partyCode.toLowerCase().includes(unbilledSearch.toLowerCase()))
+    : unbilledParties;
+
+  const filteredFreight = freightSearch
+    ? freightPending.filter(lr =>
+        lr.manual_lr_no?.toLowerCase().includes(freightSearch.toLowerCase()) ||
+        lr.billing_party_name?.toLowerCase().includes(freightSearch.toLowerCase()) ||
+        lr.from_city?.toLowerCase().includes(freightSearch.toLowerCase()) ||
+        lr.to_city?.toLowerCase().includes(freightSearch.toLowerCase())
+      )
+    : freightPending;
 
   if (loading) {
     return (
@@ -499,6 +684,38 @@ export function Dashboard() {
             >
               <BarChart2 className="w-4 h-4" />
               Month-wise Bills
+            </button>
+            <button
+              onClick={() => setBillTab('unbilled')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+                billTab === 'unbilled'
+                  ? 'border-amber-500 text-amber-700 bg-amber-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              Party-Wise Unbilled
+              {unbilledParties.length > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                  {unbilledParties.reduce((s, p) => s + p.lrCount, 0)}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setBillTab('freight')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+                billTab === 'freight'
+                  ? 'border-rose-600 text-rose-700 bg-rose-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Inbox className="w-4 h-4" />
+              Freight Entry Pending
+              {freightPending.length > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
+                  {freightPending.length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -775,6 +992,265 @@ export function Dashboard() {
                   </span>
                   <span className="text-gray-500">
                     Outstanding: <span className="font-bold text-amber-600">{formatCurrency(filteredMonths.reduce((s, m) => s + (m.totalBilled - m.totalReceived), 0))}</span>
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        {/* Party-Wise Unbilled tab */}
+        {billTab === 'unbilled' && (
+          <div>
+            {/* Toolbar */}
+            <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Search party..."
+                  value={unbilledSearch}
+                  onChange={e => setUnbilledSearch(e.target.value)}
+                  className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400 w-52"
+                />
+                {unbilledSearch && (
+                  <button onClick={() => setUnbilledSearch('')} className="text-xs text-gray-400 hover:text-gray-600">Clear</button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {!unbilledLoading && (
+                  <span className="text-xs text-gray-500">
+                    {filteredUnbilledParties.length} parties · {filteredUnbilledParties.reduce((s, p) => s + p.lrCount, 0)} LRs ·
+                    <span className="font-semibold text-amber-700 ml-1">{formatCurrency(filteredUnbilledParties.reduce((s, p) => s + p.totalAmount, 0))}</span>
+                  </span>
+                )}
+                <button
+                  onClick={() => { setUnbilledParties([]); fetchUnbilledParties(); }}
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-amber-600 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-amber-300 transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                </button>
+                <button
+                  onClick={exportUnbilledToExcel}
+                  disabled={filteredUnbilledParties.length === 0}
+                  className="flex items-center gap-1.5 text-xs text-white bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 rounded-lg px-3 py-1.5 transition-colors font-medium"
+                >
+                  <Download className="w-3.5 h-3.5" /> Export
+                </button>
+              </div>
+            </div>
+
+            {unbilledLoading ? (
+              <div className="py-16 flex items-center justify-center gap-3 text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                <span className="text-sm">Loading unbilled LRs…</span>
+              </div>
+            ) : filteredUnbilledParties.length === 0 ? (
+              <div className="py-16 text-center text-gray-400">
+                <ClipboardList className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm font-medium text-gray-500">{unbilledSearch ? 'No parties match your search' : 'No unbilled TBB LRs found'}</p>
+                <p className="text-xs text-gray-400 mt-1">All TBB LRs have been billed</p>
+              </div>
+            ) : (
+              <>
+                <div className="divide-y divide-gray-100">
+                  {filteredUnbilledParties.map((p, i) => (
+                    <div key={p.partyCode}>
+                      {/* Party summary row */}
+                      <button
+                        onClick={() => toggleUnbilledParty(p.partyCode)}
+                        className="w-full flex items-center gap-4 px-6 py-3.5 hover:bg-amber-50/50 transition-colors text-left group"
+                      >
+                        <span className="text-sm text-gray-400 w-6 flex-shrink-0">{i + 1}</span>
+                        <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-bold text-amber-700">{p.party[0]?.toUpperCase()}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">{p.party}</p>
+                          <p className="text-xs text-gray-400">{p.partyCode}</p>
+                        </div>
+                        <div className="flex items-center gap-8 flex-shrink-0">
+                          <div className="text-right">
+                            <p className="text-xs text-gray-400 uppercase tracking-wide">LRs</p>
+                            <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">{p.lrCount}</span>
+                          </div>
+                          <div className="text-right min-w-[110px]">
+                            <p className="text-xs text-gray-400 uppercase tracking-wide">Total Amount</p>
+                            <p className="text-sm font-bold text-amber-700">{formatCurrency(p.totalAmount)}</p>
+                          </div>
+                          <div className="w-4">
+                            {p.expanded
+                              ? <ChevronUp className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />
+                              : <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-amber-500 transition-colors" />}
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Expanded LR detail rows */}
+                      {p.expanded && (
+                        <div className="bg-amber-50/30 border-t border-amber-100">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="bg-amber-50 border-b border-amber-100">
+                                <th className="pl-16 pr-4 py-2 text-left text-xs font-semibold text-amber-700 uppercase tracking-wider">LR No.</th>
+                                <th className="px-4 py-2 text-left text-xs font-semibold text-amber-700 uppercase tracking-wider">Date</th>
+                                <th className="px-4 py-2 text-left text-xs font-semibold text-amber-700 uppercase tracking-wider">Route</th>
+                                <th className="px-4 py-2 text-left text-xs font-semibold text-amber-700 uppercase tracking-wider">Vehicle</th>
+                                <th className="px-4 py-2 text-right text-xs font-semibold text-amber-700 uppercase tracking-wider">Chrg Wt</th>
+                                <th className="px-4 py-2 text-right text-xs font-semibold text-amber-700 uppercase tracking-wider">Amount</th>
+                                <th className="px-4 py-2 text-left text-xs font-semibold text-amber-700 uppercase tracking-wider">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-amber-50">
+                              {p.lrs.map(lr => {
+                                const style = getStatusStyle(lr.lr_status || '');
+                                return (
+                                  <tr key={lr.tran_id} className="hover:bg-amber-50/60">
+                                    <td className="pl-16 pr-4 py-2.5 text-sm font-semibold text-gray-900">{lr.manual_lr_no}</td>
+                                    <td className="px-4 py-2.5 text-sm text-gray-600">{lr.lr_date ? new Date(lr.lr_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}</td>
+                                    <td className="px-4 py-2.5 text-sm text-gray-600">{lr.from_city} → {lr.to_city}</td>
+                                    <td className="px-4 py-2.5 text-sm text-gray-500">{lr.vehicle_type || '—'}</td>
+                                    <td className="px-4 py-2.5 text-sm text-right text-gray-600">{lr.chrg_wt ?? '—'}</td>
+                                    <td className="px-4 py-2.5 text-sm text-right font-semibold text-gray-900">{formatCurrency(lr.lr_total_amount || 0)}</td>
+                                    <td className="px-4 py-2.5">
+                                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                                        {lr.lr_status || '—'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-3 bg-amber-50/50 border-t border-amber-100 flex items-center gap-6 text-sm flex-wrap">
+                  <span className="text-gray-500">
+                    Parties: <span className="font-bold text-gray-900">{filteredUnbilledParties.length}</span>
+                  </span>
+                  <span className="text-gray-500">
+                    Total LRs: <span className="font-bold text-gray-900">{filteredUnbilledParties.reduce((s, p) => s + p.lrCount, 0)}</span>
+                  </span>
+                  <span className="text-gray-500">
+                    Total Unbilled: <span className="font-bold text-amber-700">{formatCurrency(filteredUnbilledParties.reduce((s, p) => s + p.totalAmount, 0))}</span>
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Freight Entry Pending tab */}
+        {billTab === 'freight' && (
+          <div>
+            {/* Toolbar */}
+            <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Search LR, party, city..."
+                  value={freightSearch}
+                  onChange={e => setFreightSearch(e.target.value)}
+                  className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-rose-400 w-56"
+                />
+                {freightSearch && (
+                  <button onClick={() => setFreightSearch('')} className="text-xs text-gray-400 hover:text-gray-600">Clear</button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {!freightLoading && (
+                  <span className="text-xs text-gray-500">
+                    <span className="font-semibold text-rose-700">{filteredFreight.length}</span> LRs pending freight entry
+                  </span>
+                )}
+                <button
+                  onClick={() => { setFreightPending([]); fetchFreightPending(); }}
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-rose-600 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:border-rose-300 transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                </button>
+                <button
+                  onClick={exportFreightPendingToExcel}
+                  disabled={filteredFreight.length === 0}
+                  className="flex items-center gap-1.5 text-xs text-white bg-rose-600 hover:bg-rose-700 disabled:bg-gray-300 rounded-lg px-3 py-1.5 transition-colors font-medium"
+                >
+                  <Download className="w-3.5 h-3.5" /> Export
+                </button>
+              </div>
+            </div>
+
+            {freightLoading ? (
+              <div className="py-16 flex items-center justify-center gap-3 text-gray-400">
+                <Loader2 className="w-5 h-5 animate-spin text-rose-500" />
+                <span className="text-sm">Loading freight pending entries…</span>
+              </div>
+            ) : filteredFreight.length === 0 ? (
+              <div className="py-16 text-center text-gray-400">
+                <Inbox className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="text-sm font-medium text-gray-500">{freightSearch ? 'No entries match your search' : 'No pending freight entries'}</p>
+                <p className="text-xs text-gray-400 mt-1">All TBB LRs have freight amounts filled in</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">LR No.</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">LR Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Billing Party</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Route</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Vehicle</th>
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Chrg Wt</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Branch</th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {filteredFreight.map((lr, i) => {
+                        const style = getStatusStyle(lr.lr_status || '');
+                        return (
+                          <tr key={lr.tran_id} className="hover:bg-rose-50/30 transition-colors">
+                            <td className="px-6 py-3.5 text-sm text-gray-400">{i + 1}</td>
+                            <td className="px-6 py-3.5 text-sm font-semibold text-gray-900">{lr.manual_lr_no}</td>
+                            <td className="px-6 py-3.5 text-sm text-gray-600">
+                              {lr.lr_date ? new Date(lr.lr_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                            </td>
+                            <td className="px-6 py-3.5">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900 truncate max-w-[180px]">{lr.billing_party_name || '—'}</p>
+                                {lr.billing_party_code && <p className="text-xs text-gray-400">{lr.billing_party_code}</p>}
+                              </div>
+                            </td>
+                            <td className="px-6 py-3.5 text-sm text-gray-600 whitespace-nowrap">{lr.from_city} → {lr.to_city}</td>
+                            <td className="px-6 py-3.5 text-sm text-gray-500">{lr.vehicle_type || '—'}</td>
+                            <td className="px-6 py-3.5 text-sm text-right text-gray-600">{lr.chrg_wt ?? '—'}</td>
+                            <td className="px-6 py-3.5 text-sm text-gray-500">{lr.booking_branch || '—'}</td>
+                            <td className="px-6 py-3.5">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${style.bg} ${style.text}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                                {lr.lr_status || '—'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-3 bg-rose-50/40 border-t border-rose-100 flex items-center gap-6 text-sm flex-wrap">
+                  <span className="text-gray-500">
+                    Total Pending: <span className="font-bold text-rose-700">{filteredFreight.length} LRs</span>
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    These LRs have <code className="bg-gray-100 px-1 rounded">pay_basis = TBB</code> but no freight amount entered.
                   </span>
                 </div>
               </>
