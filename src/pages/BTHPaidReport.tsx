@@ -23,6 +23,8 @@ interface THCRecord {
   ven_act_name: string | null;
   thc_vendor: string | null;
   vendor_name?: string;
+  pod_recd_date: string | null;
+  pod_recd_type: string | null;
 }
 
 interface Vendor {
@@ -94,7 +96,31 @@ export default function BTHPaidReport() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setRecords(data || []);
+
+      const thcData = data || [];
+
+      // Fetch POD received date/type from booking_lr for all lr_numbers
+      const lrNumbers = [...new Set(thcData.map(r => r.lr_number).filter(Boolean))] as string[];
+      const podMap: Record<string, { pod_recd_date: string | null; pod_recd_type: string | null }> = {};
+
+      if (lrNumbers.length > 0) {
+        const { data: lrData } = await supabase
+          .from('booking_lr')
+          .select('manual_lr_no, pod_recd_date, pod_recd_type')
+          .in('manual_lr_no', lrNumbers);
+
+        (lrData || []).forEach(lr => {
+          podMap[lr.manual_lr_no] = { pod_recd_date: lr.pod_recd_date, pod_recd_type: lr.pod_recd_type };
+        });
+      }
+
+      const merged: THCRecord[] = thcData.map(r => ({
+        ...r,
+        pod_recd_date: r.lr_number ? (podMap[r.lr_number]?.pod_recd_date ?? null) : null,
+        pod_recd_type: r.lr_number ? (podMap[r.lr_number]?.pod_recd_type ?? null) : null,
+      }));
+
+      setRecords(merged);
     } catch (err) {
       console.error('Error fetching records:', err);
     } finally {
@@ -122,6 +148,8 @@ export default function BTHPaidReport() {
       'Balance Amount': r.thc_balance_amount ?? '',
       'Balance Payment Date': r.thc_balance_payment_date || '',
       'UTR Details': r.thc_balance_pmt_utr_details || '',
+      'POD Received Date': r.pod_recd_date || '',
+      'POD Received Type': r.pod_recd_type || '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -276,6 +304,7 @@ export default function BTHPaidReport() {
                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide">Balance Paid</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">Pmt Date</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">UTR Details</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">POD Recd Date</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -302,6 +331,20 @@ export default function BTHPaidReport() {
                       <td className="px-4 py-3 text-gray-600 text-xs max-w-[140px] truncate" title={r.thc_balance_pmt_utr_details || ''}>
                         {r.thc_balance_pmt_utr_details || '-'}
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {r.pod_recd_date ? (
+                          <div>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                              {new Date(r.pod_recd_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                            {r.pod_recd_type && (
+                              <p className="text-[10px] text-gray-400 mt-0.5 pl-0.5">{r.pod_recd_type}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -317,7 +360,7 @@ export default function BTHPaidReport() {
                     <td className="px-4 py-3 text-right text-green-700">
                       ₹{totalBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
-                    <td colSpan={2} />
+                    <td colSpan={3} />
                   </tr>
                 </tfoot>
               </table>
