@@ -127,6 +127,7 @@ const menuItems: MenuItem[] = [
       { id: 'generate-advance-bank-file', label: 'Generate Advance Bank File' },
       { id: 'regenerate-advance-bank-file', label: 'Advance Bank Payment File Regenerate' },
       { id: 'generate-balance-bank-file', label: 'BTH Payment' },
+      { id: 'download-bth-bank-file', label: 'Download BTH Bank File' },
       { id: 'admin-payment-bank-file', label: 'Admin Payment Bank File' },
       { id: 'generate-debit-note', label: 'Generate Debit Note' },
       { id: 'generate-credit-note', label: 'Generate Credit Note' },
@@ -300,6 +301,7 @@ export function Layout() {
       case 'lr-life-cycle':
         return <VehicleTracking />;
       case 'truck-balance-payment':
+      case 'download-bth-bank-file':
         return <GenerateBalanceBankFile />;
       case 'pending-pod':
         return <PODUpload />;
