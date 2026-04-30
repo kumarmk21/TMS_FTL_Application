@@ -62,6 +62,7 @@ import BTHPaidReport from '../pages/BTHPaidReport';
 import APReport from '../pages/APReport';
 import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
+import { VehicleTracking } from '../pages/VehicleTracking';
 
 export interface MenuItem {
   id: string;
@@ -294,6 +295,17 @@ export function Layout() {
         return <BTHPaidReport />;
       case 'ap-report':
         return <APReport />;
+      case 'ar-report':
+        return <APReport />;
+      case 'lr-life-cycle':
+        return <VehicleTracking />;
+      case 'truck-balance-payment':
+        return <GenerateBalanceBankFile />;
+      case 'pending-pod':
+        return <PODUpload />;
+      case 'generate-debit-note':
+      case 'generate-credit-note':
+        return <Dashboard />;
       default:
         return <Dashboard />;
     }
