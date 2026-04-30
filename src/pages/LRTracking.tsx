@@ -86,6 +86,13 @@ export function LRTracking() {
   const [finDetailResults, setFinDetailResults] = useState<LRFinDetailData[]>([]);
   const [searched, setSearched] = useState(false);
 
+  const clearResults = () => {
+    setResults([]);
+    setOpsDetailResults([]);
+    setFinDetailResults([]);
+    setSearched(false);
+  };
+
   const [formData, setFormData] = useState({
     fromDate: '',
     toDate: '',
@@ -844,17 +851,14 @@ export function LRTracking() {
   const isOpsDetailMode = searchType === 'lrNumber' && statusType === 'lr_ops_status';
   const isFinDetailMode = searchType === 'lrNumber' && statusType === 'lr_financial_status';
 
-  const hasResults = isOpsDetailMode
-    ? opsDetailResults.length > 0
-    : isFinDetailMode
-    ? finDetailResults.length > 0
-    : results.length > 0;
-
-  const resultCount = isOpsDetailMode
+  const activeResults = isOpsDetailMode
     ? opsDetailResults.length
     : isFinDetailMode
     ? finDetailResults.length
     : results.length;
+
+  const hasResults = activeResults > 0;
+  const resultCount = activeResults;
 
   return (
     <div className="space-y-6">
@@ -875,7 +879,7 @@ export function LRTracking() {
                   type="radio"
                   value="dateRange"
                   checked={searchType === 'dateRange'}
-                  onChange={(e) => setSearchType(e.target.value as 'dateRange' | 'lrNumber')}
+                  onChange={(e) => { setSearchType(e.target.value as 'dateRange' | 'lrNumber'); clearResults(); }}
                   className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
                 />
                 <span className="text-sm font-medium text-gray-700">Date Range</span>
@@ -885,7 +889,7 @@ export function LRTracking() {
                   type="radio"
                   value="lrNumber"
                   checked={searchType === 'lrNumber'}
-                  onChange={(e) => setSearchType(e.target.value as 'dateRange' | 'lrNumber')}
+                  onChange={(e) => { setSearchType(e.target.value as 'dateRange' | 'lrNumber'); clearResults(); }}
                   className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
                 />
                 <span className="text-sm font-medium text-gray-700">LR Number</span>
@@ -944,7 +948,7 @@ export function LRTracking() {
                   type="radio"
                   value="lr_status"
                   checked={statusType === 'lr_status'}
-                  onChange={(e) => setStatusType(e.target.value as any)}
+                  onChange={(e) => { setStatusType(e.target.value as any); clearResults(); }}
                   className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
                 />
                 <span className="text-sm font-medium text-gray-700">LR Status</span>
@@ -954,7 +958,7 @@ export function LRTracking() {
                   type="radio"
                   value="lr_ops_status"
                   checked={statusType === 'lr_ops_status'}
-                  onChange={(e) => setStatusType(e.target.value as any)}
+                  onChange={(e) => { setStatusType(e.target.value as any); clearResults(); }}
                   className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
                 />
                 <span className="text-sm font-medium text-gray-700">LR Ops Status</span>
@@ -964,7 +968,7 @@ export function LRTracking() {
                   type="radio"
                   value="lr_financial_status"
                   checked={statusType === 'lr_financial_status'}
-                  onChange={(e) => setStatusType(e.target.value as any)}
+                  onChange={(e) => { setStatusType(e.target.value as any); clearResults(); }}
                   className="w-4 h-4 text-red-600 border-gray-300 focus:ring-red-500"
                 />
                 <span className="text-sm font-medium text-gray-700">LR Fin Status</span>
