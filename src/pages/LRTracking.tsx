@@ -52,6 +52,8 @@ interface LRFinDetailData {
   vehicle_number: string;
   lr_financial_status: string;
   pod_upload: string | null;
+  pod_recd_date: string | null;
+  pod_recd_type: string | null;
   bill_amount: number | null;
   bill_date: string | null;
   bill_due_date: string | null;
@@ -77,6 +79,56 @@ interface LRFinDetailData {
   lr_bill_sub_type: string | null;
 }
 
+const SUPABASE_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/pod-documents/`;
+
+function resolvePodUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  if (raw.startsWith('http')) return raw;
+  return `${SUPABASE_STORAGE_URL}${raw}`;
+}
+
+function PodCard({ podRaw, onView }: { podRaw: string; onView: (url: string) => void }) {
+  const url = resolvePodUrl(podRaw)!;
+  return (
+    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <CheckCircle className="w-5 h-5 text-emerald-600" />
+        <p className="text-sm font-bold text-emerald-800">POD Uploaded</p>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onView(url)}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-white border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
+        >
+          <Eye className="w-3.5 h-3.5" /> View
+        </button>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-emerald-600 rounded-lg text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+        >
+          <Download className="w-3.5 h-3.5" /> Download
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function PodTableCell({ podRaw, onView }: { podRaw: string; onView: (url: string) => void }) {
+  const url = resolvePodUrl(podRaw)!;
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={() => onView(url)} className="text-blue-600 hover:text-blue-700" title="View POD">
+        <Eye className="w-5 h-5" />
+      </button>
+      <a href={url} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-700" title="Download POD">
+        <Download className="w-5 h-5" />
+      </a>
+    </div>
+  );
+}
+
 export function LRTracking() {
   const [searchType, setSearchType] = useState<'dateRange' | 'lrNumber'>('dateRange');
   const [statusType, setStatusType] = useState<'lr_status' | 'lr_ops_status' | 'lr_financial_status'>('lr_status');
@@ -92,6 +144,7 @@ export function LRTracking() {
     setFinDetailResults([]);
     setSearched(false);
   };
+
 
   const [formData, setFormData] = useState({
     fromDate: '',
@@ -168,7 +221,7 @@ export function LRTracking() {
       if (searchType === 'lrNumber' && statusType === 'lr_financial_status') {
         const { data: lrData, error: lrError } = await supabase
           .from('booking_lr')
-          .select('tran_id, manual_lr_no, lr_date, billing_party_name, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, pod_upload, bill_amount, bill_date, bill_due_date')
+          .select('tran_id, manual_lr_no, lr_date, billing_party_name, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, pod_upload, pod_recd_date, pod_recd_type, bill_amount, bill_date, bill_due_date')
           .ilike('manual_lr_no', `%${formData.lrNumber.trim()}%`)
           .order('manual_lr_no', { ascending: false });
 
@@ -226,6 +279,8 @@ export function LRTracking() {
               vehicle_number: lr.vehicle_number,
               lr_financial_status: lr.lr_financial_status,
               pod_upload: lr.pod_upload,
+              pod_recd_date: lr.pod_recd_date ?? null,
+              pod_recd_type: lr.pod_recd_type ?? null,
               bill_amount: lr.bill_amount,
               bill_date: lr.bill_date,
               bill_due_date: lr.bill_due_date,
@@ -487,6 +542,18 @@ export function LRTracking() {
                 <span className="text-xs text-teal-200">Vehicle:</span>
                 <span className="text-xs font-semibold text-white uppercase">{lr.vehicle_number || lr.vehicle_type || '-'}</span>
               </div>
+              {lr.pod_recd_date && (
+                <div className="flex items-center gap-2 bg-white/15 border border-white/20 rounded-full px-3 py-1">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-300" />
+                  <span className="text-xs text-teal-200">POD Received:</span>
+                  <span className="text-xs font-semibold text-white">
+                    {new Date(lr.pod_recd_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                  {lr.pod_recd_type && (
+                    <span className="text-xs text-teal-300">· {lr.pod_recd_type}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -639,28 +706,7 @@ export function LRTracking() {
                   <Image className="w-3.5 h-3.5" /> POD Status
                 </h3>
                 {lr.pod_upload ? (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-600" />
-                      <p className="text-sm font-bold text-emerald-800">POD Uploaded</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setSelectedPOD(lr.pod_upload!)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-white border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> View
-                      </button>
-                      <a
-                        href={lr.pod_upload}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-emerald-600 rounded-lg text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Download
-                      </a>
-                    </div>
-                  </div>
+                  <PodCard podRaw={lr.pod_upload} onView={setSelectedPOD} />
                 ) : (
                   <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-4 text-center">
                     <AlertCircle className="w-8 h-8 text-gray-300 mx-auto mb-2" />
@@ -763,14 +809,7 @@ export function LRTracking() {
               </td>
               <td className="px-4 py-3 text-sm">
                 {lr.pod_upload ? (
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => setSelectedPOD(lr.pod_upload)} className="text-blue-600 hover:text-blue-700" title="View POD">
-                      <Eye className="w-5 h-5" />
-                    </button>
-                    <a href={lr.pod_upload} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-700" title="Download POD">
-                      <Download className="w-5 h-5" />
-                    </a>
-                  </div>
+                  <PodTableCell podRaw={lr.pod_upload} onView={setSelectedPOD} />
                 ) : (
                   <span className="text-gray-400 text-xs">No POD</span>
                 )}
