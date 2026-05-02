@@ -243,8 +243,11 @@ export default function ConsolidateBillGeneration() {
 
     let nextNum = 1;
     if (data?.consol_bill_no) {
-      const match = data.consol_bill_no.match(/(\d+)$/);
-      if (match) nextNum = parseInt(match[1]) + 1;
+      const billNo = data.consol_bill_no;
+      // Strip the prefix to get only the counter portion
+      const counter = billNo.startsWith(prefix) ? billNo.slice(prefix.length) : billNo;
+      const parsed = parseInt(counter, 10);
+      if (!isNaN(parsed)) nextNum = parsed + 1;
     }
 
     return `${prefix}${String(nextNum).padStart(5, '0')}`;
