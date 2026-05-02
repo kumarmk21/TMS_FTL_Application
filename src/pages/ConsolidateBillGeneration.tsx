@@ -232,25 +232,32 @@ export default function ConsolidateBillGeneration() {
       .limit(1)
       .maybeSingle();
 
-    const prefix = companyData?.gstin ? companyData.gstin.substring(0, 2) : 'CB';
+    const gstinPrefix = companyData?.gstin ? companyData.gstin.substring(0, 2) : 'CB';
+
+    // FY prefix: financial year ending 2 digits (e.g. Apr 2026–Mar 2027 → "27")
+    const now = new Date();
+    const fyYear = now.getMonth() >= 3 ? now.getFullYear() + 1 : now.getFullYear();
+    const fyPrefix = String(fyYear).slice(-2);
+
+    const fullPrefix = `${gstinPrefix}${fyPrefix}`; // e.g. "2727"
 
     const { data } = await supabase
       .from('consol_bill_data')
       .select('consol_bill_no')
-      .order('created_date', { ascending: false })
+      .like('consol_bill_no', `${fullPrefix}%`)
+      .order('consol_bill_no', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     let nextNum = 1;
     if (data?.consol_bill_no) {
-      const billNo = data.consol_bill_no;
-      // Strip the prefix to get only the counter portion
-      const counter = billNo.startsWith(prefix) ? billNo.slice(prefix.length) : billNo;
+      // Counter is always the last 5 chars
+      const counter = data.consol_bill_no.slice(-5);
       const parsed = parseInt(counter, 10);
       if (!isNaN(parsed)) nextNum = parsed + 1;
     }
 
-    return `${prefix}${String(nextNum).padStart(5, '0')}`;
+    return `${fullPrefix}${String(nextNum).padStart(5, '0')}`;
   };
 
   const handleAckFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
