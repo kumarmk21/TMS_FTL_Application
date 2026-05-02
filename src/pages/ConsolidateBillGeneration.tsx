@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Search, FileText, Loader2, CheckCircle, Upload, X } from 'lucide-react';
+import { Search, FileText, Loader2, CheckCircle, Upload, X, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface BillingParty {
@@ -194,6 +194,33 @@ export default function ConsolidateBillGeneration() {
     return bills
       .filter(b => selectedBills.has(b.tran_id))
       .reduce((sum, b) => sum + (Number(b.lr_total_amount) || Number(b.bill_amount) || 0), 0);
+  };
+
+  const downloadCSV = () => {
+    const partyName = billingParties.find(p => p.billing_party_code === selectedParty)?.billing_party_name || selectedParty;
+    const headers = ['LR No', 'LR Date', 'Bill Number', 'Bill Date', 'Billing Party', 'From City', 'To City', 'Vehicle Type', 'Vehicle No', 'Loading+Unloading Amt', 'Detention Amt', 'Bill Amount'];
+    const rows = bills.map(b => [
+      b.manual_lr_no || b.bill_no,
+      b.lr_date ? new Date(b.lr_date).toLocaleDateString('en-GB') : '',
+      b.bill_no || '',
+      b.bill_date ? new Date(b.bill_date).toLocaleDateString('en-GB') : '',
+      b.billing_party_name || '',
+      b.from_city || '',
+      b.to_city || '',
+      b.vehicle_type || '',
+      b.vehicle_number || '',
+      (Number(b.loading_charges || 0) + Number(b.unloading_charges || 0)).toFixed(2),
+      Number(b.detention_charges || 0).toFixed(2),
+      (Number(b.lr_total_amount) || Number(b.bill_amount) || 0).toFixed(2),
+    ]);
+    const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `consol-bills-${partyName.replace(/\s+/g, '_')}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const generateConsolBillNo = async (): Promise<string> => {
@@ -392,11 +419,22 @@ export default function ConsolidateBillGeneration() {
               <h2 className="text-base font-semibold text-gray-800">
                 Bills ({bills.length} found)
               </h2>
-              {selectedBills.size > 0 && (
-                <span className="text-sm text-gray-600">
-                  {selectedBills.size} selected &mdash; Total: <span className="font-semibold text-gray-900">&#8377;{selectedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </span>
-              )}
+              <div className="flex items-center gap-4">
+                {selectedBills.size > 0 && (
+                  <span className="text-sm text-gray-600">
+                    {selectedBills.size} selected &mdash; Total: <span className="font-semibold text-gray-900">&#8377;{selectedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </span>
+                )}
+                {bills.length > 0 && (
+                  <button
+                    onClick={downloadCSV}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-md hover:bg-emerald-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download CSV
+                  </button>
+                )}
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
