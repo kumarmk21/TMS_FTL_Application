@@ -40,6 +40,7 @@ interface GeneratedBill {
   loading_charges: number;
   unloading_charges: number;
   detention_charges: number;
+  consol_bill_number: string | null;
 }
 
 const CONSOL_BILL_STATUS_OPTIONS = ['Cons.Generated', 'Submitted', 'Partially Paid', 'Fully Paid', 'Disputed'];
@@ -116,8 +117,6 @@ export default function ConsolidateBillGeneration() {
       const { data, error } = await supabase
         .from('booking_lr')
         .select('billing_party_code, billing_party_name')
-        .not('bill_no', 'is', null)
-        .is('consol_bill_number', null)
         .not('billing_party_code', 'is', null)
         .order('billing_party_name');
 
@@ -154,11 +153,9 @@ export default function ConsolidateBillGeneration() {
     try {
       const { data, error } = await supabase
         .from('booking_lr')
-        .select('tran_id, bill_no, manual_lr_no, bill_date, lr_date, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, billing_party_code, billing_party_name, bill_amount, lr_total_amount, loading_charges, unloading_charges, detention_charges')
+        .select('tran_id, bill_no, manual_lr_no, bill_date, lr_date, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, billing_party_code, billing_party_name, bill_amount, lr_total_amount, loading_charges, unloading_charges, detention_charges, consol_bill_number')
         .eq('billing_party_code', selectedParty)
-        .not('bill_no', 'is', null)
-        .is('consol_bill_number', null)
-        .order('bill_date', { ascending: true });
+        .order('lr_date', { ascending: true });
 
       if (error) throw error;
 
@@ -198,7 +195,7 @@ export default function ConsolidateBillGeneration() {
 
   const downloadCSV = () => {
     const partyName = billingParties.find(p => p.billing_party_code === selectedParty)?.billing_party_name || selectedParty;
-    const headers = ['LR No', 'LR Date', 'Bill Number', 'Bill Date', 'Billing Party', 'From City', 'To City', 'Vehicle Type', 'Vehicle No', 'Loading+Unloading Amt', 'Detention Amt', 'LR Total Amt', 'Bill Amount'];
+    const headers = ['LR No', 'LR Date', 'Bill Number', 'Bill Date', 'Billing Party', 'From City', 'To City', 'Vehicle Type', 'Vehicle No', 'Loading+Unloading Amt', 'Detention Amt', 'LR Total Amt', 'Bill Amount', 'Bill Status', 'Consol Bill No'];
     const rows = bills.map(b => [
       b.manual_lr_no || b.bill_no,
       b.lr_date ? new Date(b.lr_date).toLocaleDateString('en-GB') : '',
@@ -213,6 +210,8 @@ export default function ConsolidateBillGeneration() {
       Number(b.detention_charges || 0).toFixed(2),
       Number(b.lr_total_amount || 0).toFixed(2),
       (Number(b.lr_total_amount) || Number(b.bill_amount) || 0).toFixed(2),
+      b.bill_no ? (b.consol_bill_number ? 'Consol Billed' : 'Billed') : 'Unbilled',
+      b.consol_bill_number || '',
     ]);
     const csv = [headers, ...rows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -471,12 +470,14 @@ export default function ConsolidateBillGeneration() {
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Detention Amt</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">LR Total Amt</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Consol Bill No</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {bills.length === 0 ? (
                     <tr>
-                      <td colSpan={13} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={15} className="px-6 py-8 text-center text-gray-500">
                         No bills found for the selected billing party
                       </td>
                     </tr>
@@ -519,6 +520,16 @@ export default function ConsolidateBillGeneration() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
                           &#8377;{(Number(bill.lr_total_amount) || Number(bill.bill_amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {!bill.bill_no ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Unbilled</span>
+                          ) : bill.consol_bill_number ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Consol Billed</span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">Billed</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{bill.consol_bill_number || '-'}</td>
                       </tr>
                     ))
                   )}
