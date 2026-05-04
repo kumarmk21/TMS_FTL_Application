@@ -208,7 +208,7 @@ export default function GenerateBillModal({
   };
 
   const calculateSubTotal = () => {
-    return selectedLRs.reduce((sum, lr) => sum + (lr.freight_amount || 0), 0);
+    return selectedLRs.reduce((sum, lr) => sum + (lr.lr_total_amount || lr.freight_amount || 0), 0);
   };
 
   const handleGSTChange = (gstId: string) => {
