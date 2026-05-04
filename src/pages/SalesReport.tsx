@@ -217,14 +217,14 @@ export default function SalesReport() {
         'Sr. No.': index + 1,
         'LR Number': item.manual_lr_no || '',
         'LR Date': item.lr_date
-          ? new Date(item.lr_date).toLocaleDateString('en-IN')
+          ? (() => { const d = new Date(item.lr_date); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; })()
           : '',
         'Freight Bill Number': item.bill_no || '',
         'Bill To State': item.bill_to_state || '',
         'State Alpha Code': item.state_alpha_code || '',
         'Bill To GSTIN': item.bill_to_gstin || '',
         'Bill Date': item.bill_date
-          ? new Date(item.bill_date).toLocaleDateString('en-IN')
+          ? (() => { const d = new Date(item.bill_date); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; })()
           : '',
         'Branch': item.booking_branch || '',
         'Consignor': item.consignor || '',
