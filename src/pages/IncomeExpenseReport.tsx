@@ -10,7 +10,7 @@ interface IncomeExpenseRecord {
   origin: string | null;
   destination: string | null;
   billing_party_name: string | null;
-  freight_amount: number | null;
+  sub_total: number | null;
   bill_no: string | null;
   thc_number: string | null;
   vehicle_number: string | null;
@@ -57,7 +57,7 @@ export default function IncomeExpenseReport() {
           from_city,
           to_city,
           billing_party_name,
-          freight_amount,
+          sub_total,
           bill_no,
           vehicle_type,
           lr_status,
@@ -95,9 +95,9 @@ export default function IncomeExpenseReport() {
       const formattedData: IncomeExpenseRecord[] = (data || []).map((record: any) => {
         const thc = record.thc_details?.[0];
         const vendor = thc?.vendor_master;
-        const freightAmount = record.freight_amount || 0;
+        const subTotal = record.sub_total || 0;
         const grossAmount = thc?.thc_gross_amount || 0;
-        const profit = freightAmount - grossAmount;
+        const profit = subTotal - grossAmount;
 
         return {
           tran_id: record.tran_id,
@@ -106,7 +106,7 @@ export default function IncomeExpenseReport() {
           origin: thc?.origin || record.from_city,
           destination: thc?.destination || record.to_city,
           billing_party_name: record.billing_party_name,
-          freight_amount: freightAmount,
+          sub_total: subTotal,
           bill_no: record.bill_no,
           thc_number: thc?.thc_number,
           vehicle_number: thc?.vehicle_number,
@@ -174,13 +174,13 @@ export default function IncomeExpenseReport() {
   };
 
   const calculateTotals = () => {
-    const totalFreight = filteredRecords.reduce((sum, record) => sum + (record.freight_amount || 0), 0);
+    const totalSubTotal = filteredRecords.reduce((sum, record) => sum + (record.sub_total || 0), 0);
     const totalGross = filteredRecords.reduce((sum, record) => sum + (record.thc_gross_amount || 0), 0);
     const totalAdvance = filteredRecords.reduce((sum, record) => sum + (record.thc_advance_amount || 0), 0);
     const totalBalance = filteredRecords.reduce((sum, record) => sum + (record.thc_balance_amount || 0), 0);
-    const totalProfit = totalFreight - totalGross;
+    const totalProfit = totalSubTotal - totalGross;
 
-    return { totalFreight, totalGross, totalAdvance, totalBalance, totalProfit };
+    return { totalSubTotal, totalGross, totalAdvance, totalBalance, totalProfit };
   };
 
   const exportToExcel = () => {
@@ -190,7 +190,7 @@ export default function IncomeExpenseReport() {
       'Origin': record.origin || '',
       'Destination': record.destination || '',
       'Billing Party': record.billing_party_name || '',
-      'Freight Amount': record.freight_amount || 0,
+      'Sub Total': record.sub_total || 0,
       'Bill Number': record.bill_no || '',
       'THC Number': record.thc_number || '',
       'Vehicle Number': record.vehicle_number || '',
@@ -254,8 +254,8 @@ export default function IncomeExpenseReport() {
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
         <div className="bg-white p-4 rounded-lg shadow-sm">
-          <div className="text-sm text-gray-600 mb-1">Total Freight</div>
-          <div className="text-2xl font-bold text-green-600">₹{formatCurrency(totals.totalFreight)}</div>
+          <div className="text-sm text-gray-600 mb-1">Total Sub Total</div>
+          <div className="text-2xl font-bold text-green-600">₹{formatCurrency(totals.totalSubTotal)}</div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <div className="text-sm text-gray-600 mb-1">Total Expense</div>
@@ -346,7 +346,7 @@ export default function IncomeExpenseReport() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Origin</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destination</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billing Party</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Freight</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sub Total</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bill No</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">THC No</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle</th>
@@ -375,7 +375,7 @@ export default function IncomeExpenseReport() {
                     <td className="px-4 py-3 text-sm text-gray-900">{record.destination || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">{record.billing_party_name || '-'}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-green-600">
-                      ₹{formatCurrency(record.freight_amount)}
+                      ₹{formatCurrency(record.sub_total)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">{record.bill_no || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">{record.thc_number || '-'}</td>
