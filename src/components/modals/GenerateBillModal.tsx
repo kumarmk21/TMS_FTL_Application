@@ -247,6 +247,11 @@ export default function GenerateBillModal({
       return;
     }
 
+    if (!formData.sac_code) {
+      alert('Please select SAC Code');
+      return;
+    }
+
     setLoading(true);
     try {
       const subTotal = calculateSubTotal();
@@ -426,7 +431,7 @@ export default function GenerateBillModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                SAC Code
+                SAC Code <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <FileText className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
