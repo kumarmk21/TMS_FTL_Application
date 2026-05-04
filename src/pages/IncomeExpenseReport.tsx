@@ -10,7 +10,7 @@ interface IncomeExpenseRecord {
   origin: string | null;
   destination: string | null;
   billing_party_name: string | null;
-  sub_total: number | null;
+  lr_total_amount: number | null;
   bill_no: string | null;
   thc_number: string | null;
   vehicle_number: string | null;
@@ -57,7 +57,7 @@ export default function IncomeExpenseReport() {
           from_city,
           to_city,
           billing_party_name,
-          sub_total,
+          lr_total_amount,
           bill_no,
           vehicle_type,
           lr_status,
@@ -95,7 +95,7 @@ export default function IncomeExpenseReport() {
       const formattedData: IncomeExpenseRecord[] = (data || []).map((record: any) => {
         const thc = record.thc_details?.[0];
         const vendor = thc?.vendor_master;
-        const subTotal = record.sub_total || 0;
+        const subTotal = record.lr_total_amount || 0;
         const grossAmount = thc?.thc_gross_amount || 0;
         const profit = subTotal - grossAmount;
 
@@ -106,7 +106,7 @@ export default function IncomeExpenseReport() {
           origin: thc?.origin || record.from_city,
           destination: thc?.destination || record.to_city,
           billing_party_name: record.billing_party_name,
-          sub_total: subTotal,
+          lr_total_amount: subTotal,
           bill_no: record.bill_no,
           thc_number: thc?.thc_number,
           vehicle_number: thc?.vehicle_number,
@@ -174,7 +174,7 @@ export default function IncomeExpenseReport() {
   };
 
   const calculateTotals = () => {
-    const totalSubTotal = filteredRecords.reduce((sum, record) => sum + (record.sub_total || 0), 0);
+    const totalSubTotal = filteredRecords.reduce((sum, record) => sum + (record.lr_total_amount || 0), 0);
     const totalGross = filteredRecords.reduce((sum, record) => sum + (record.thc_gross_amount || 0), 0);
     const totalAdvance = filteredRecords.reduce((sum, record) => sum + (record.thc_advance_amount || 0), 0);
     const totalBalance = filteredRecords.reduce((sum, record) => sum + (record.thc_balance_amount || 0), 0);
@@ -190,7 +190,7 @@ export default function IncomeExpenseReport() {
       'Origin': record.origin || '',
       'Destination': record.destination || '',
       'Billing Party': record.billing_party_name || '',
-      'Sub Total': record.sub_total || 0,
+      'Sub Total': record.lr_total_amount || 0,
       'Bill Number': record.bill_no || '',
       'THC Number': record.thc_number || '',
       'Vehicle Number': record.vehicle_number || '',
@@ -375,7 +375,7 @@ export default function IncomeExpenseReport() {
                     <td className="px-4 py-3 text-sm text-gray-900">{record.destination || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">{record.billing_party_name || '-'}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium text-green-600">
-                      ₹{formatCurrency(record.sub_total)}
+                      ₹{formatCurrency(record.lr_total_amount)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">{record.bill_no || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-900">{record.thc_number || '-'}</td>
