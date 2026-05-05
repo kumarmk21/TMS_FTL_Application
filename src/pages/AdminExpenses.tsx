@@ -72,27 +72,36 @@ export default function AdminExpenses() {
   const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
-    fetchMasterData();
+    loadAll();
   }, []);
 
   useEffect(() => {
-    fetchExpenses();
+    fetchExpenses(accounts, vendors, branches);
   }, [fromDate, toDate, filterStatus]);
 
-  const fetchMasterData = async () => {
+  const loadAll = async () => {
     const [accRes, agRes, venRes, brRes] = await Promise.all([
       supabase.from('accounts_master').select('id, accounting_head, sub_group, main_group').eq('active', true).order('accounting_head'),
       supabase.from('account_group_master').select('id, sub_group, main_group').eq('active', true).order('sub_group'),
       supabase.from('vendor_master').select('id, vendor_name, account_no, bank_name, ifsc_code').eq('is_active', true).eq('vendor_type', 'Admin').order('vendor_name'),
       supabase.from('branch_master').select('id, branch_name').eq('is_active', true).order('branch_name'),
     ]);
-    if (accRes.data) setAccounts(accRes.data);
-    if (agRes.data) setAccountGroups(agRes.data);
-    if (venRes.data) setVendors(venRes.data);
-    if (brRes.data) setBranches(brRes.data);
+    const freshAccounts = accRes.data || [];
+    const freshAccountGroups = agRes.data || [];
+    const freshVendors = venRes.data || [];
+    const freshBranches = brRes.data || [];
+    setAccounts(freshAccounts);
+    setAccountGroups(freshAccountGroups);
+    setVendors(freshVendors);
+    setBranches(freshBranches);
+    await fetchExpenses(freshAccounts, freshVendors, freshBranches);
   };
 
-  const fetchExpenses = async () => {
+  const fetchExpenses = async (
+    accList = accounts,
+    venList = vendors,
+    brList = branches
+  ) => {
     setLoading(true);
     try {
       let query = supabase
@@ -114,9 +123,9 @@ export default function AdminExpenses() {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const accMap = new Map(accounts.map(a => [a.id, a]));
-        const venMap = new Map(vendors.map(v => [v.id, v.vendor_name]));
-        const brMap = new Map(branches.map(b => [b.id, b.branch_name]));
+        const accMap = new Map(accList.map(a => [a.id, a]));
+        const venMap = new Map(venList.map(v => [v.id, v.vendor_name]));
+        const brMap = new Map(brList.map(b => [b.id, b.branch_name]));
 
         const enriched = data.map(e => ({
           ...e,
