@@ -62,6 +62,7 @@ import BTHPaidReport from '../pages/BTHPaidReport';
 import APReport from '../pages/APReport';
 import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
+import DownloadBTHBankFile from '../pages/DownloadBTHBankFile';
 import { VehicleTracking } from '../pages/VehicleTracking';
 
 export interface MenuItem {
@@ -171,7 +172,7 @@ const menuItems: MenuItem[] = [
       { id: 'pending-pod', label: 'Pending POD' },
       { id: 'ar-report', label: 'AR Report' },
       { id: 'ap-report', label: 'AP Report' },
-      { id: 'bth-paid-report', label: 'BTH Payment' },
+      { id: 'bth-paid-report', label: 'BTH Paid Report' },
     ],
   },
 ];
@@ -300,8 +301,9 @@ export function Layout() {
         return <APReport />;
       case 'lr-life-cycle':
         return <VehicleTracking />;
-      case 'truck-balance-payment':
       case 'download-bth-bank-file':
+        return <DownloadBTHBankFile />;
+      case 'truck-balance-payment':
         return <GenerateBalanceBankFile />;
       case 'pending-pod':
         return <PODUpload />;
