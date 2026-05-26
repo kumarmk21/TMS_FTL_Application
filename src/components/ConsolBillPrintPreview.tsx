@@ -37,6 +37,7 @@ interface ConsolBillDetails {
   consol_bill_pending_amount: number | null;
   consol_bill_status: string;
   bill_from_company: string | null;
+  division: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
   cancellation_reason: string | null;
@@ -385,6 +386,11 @@ export function ConsolBillPrintPreview({ consolBillId, onClose }: ConsolBillPrin
             <div className="border border-gray-300 rounded p-3 text-xs space-y-1">
               <p className="font-bold text-gray-800 text-sm mb-1">Bill To</p>
               <p className="font-bold text-gray-900 text-sm">{bill.consol_billing_party}</p>
+              {bill.division && (
+                <p className="text-gray-700">
+                  <span className="font-semibold">Division:</span> {bill.division}
+                </p>
+              )}
               {customerGST?.bill_to_address && (
                 <p className="text-gray-700">{customerGST.bill_to_address}</p>
               )}
@@ -480,6 +486,7 @@ export function ConsolBillPrintPreview({ consolBillId, onClose }: ConsolBillPrin
               </h2>
               <p className="text-xs text-gray-500">
                 Page {pageIdx + 2} &nbsp;|&nbsp; Billing Party: {bill.consol_billing_party}
+                {bill.division && <> &nbsp;|&nbsp; Division: {bill.division}</>}
               </p>
             </div>
 

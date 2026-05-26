@@ -65,6 +65,7 @@ export default function ConsolidateBillGeneration() {
   const [consolBillStatus, setConsolBillStatus] = useState('Cons.Generated');
   const [consolBillSubDate, setConsolBillSubDate] = useState('');
   const [consolBillSubmittedTo, setConsolBillSubmittedTo] = useState('');
+  const [division, setDivision] = useState('');
   const [ackFile, setAckFile] = useState<File | null>(null);
   const [ackFileName, setAckFileName] = useState('');
 
@@ -322,6 +323,7 @@ export default function ConsolidateBillGeneration() {
           consol_bill_ack_filename: ackFilenameStored,
           consol_bill_status: consolBillStatus,
           bill_from_company: billFromCompany || null,
+          division: division.trim() || null,
           created_by: user?.id,
           updated_by: user?.id,
         });
@@ -350,6 +352,7 @@ export default function ConsolidateBillGeneration() {
       setConsolBillSubmittedTo('');
       setConsolBillStatus('Cons.Generated');
       setBillFromCompany('');
+      setDivision('');
 
       await handleSearch();
     } catch (error) {
@@ -587,7 +590,7 @@ export default function ConsolidateBillGeneration() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Consol Bill Date <span className="text-red-500">*</span>
@@ -596,6 +599,16 @@ export default function ConsolidateBillGeneration() {
                     type="date"
                     value={consolBillDate}
                     onChange={e => setConsolBillDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Division</label>
+                  <input
+                    type="text"
+                    value={division}
+                    onChange={e => setDivision(e.target.value)}
+                    placeholder="e.g. North Region"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
                   />
                 </div>
