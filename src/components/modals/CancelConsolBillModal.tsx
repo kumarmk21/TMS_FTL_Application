@@ -29,7 +29,8 @@ export function CancelConsolBillModal({
     setStatus('processing');
     setErrorMsg('');
     try {
-      const { error } = await supabase
+      // Step 1: mark the consol bill as cancelled
+      const { error: billError } = await supabase
         .from('consol_bill_data')
         .update({
           consol_bill_status: 'Cancelled',
@@ -39,7 +40,22 @@ export function CancelConsolBillModal({
         })
         .eq('tran_id', billId);
 
-      if (error) throw error;
+      if (billError) throw billError;
+
+      // Step 2: release all LRs tied to this consol bill number
+      // so they become available for a new consolidated bill
+      const { error: lrError } = await supabase
+        .from('booking_lr')
+        .update({
+          consol_bill_number: null,
+          consol_bill_date: null,
+          consol_bill_amount: null,
+          consol_bill_pending_amount: null,
+          lr_financial_status: 'LR Finalised',
+        })
+        .eq('consol_bill_number', billNo);
+
+      if (lrError) throw lrError;
 
       setStatus('success');
       setTimeout(() => {
@@ -90,8 +106,9 @@ export function CancelConsolBillModal({
           <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
             <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-amber-800">
-              This will mark the bill as <strong>Cancelled</strong>. The original bill data will be
-              preserved for audit purposes. This action cannot be undone.
+              This will mark the bill as <strong>Cancelled</strong> and release all linked LR numbers
+              back to <strong>LR Finalised</strong> status, making them available for a new consolidated
+              bill. The original bill data will be preserved for audit purposes.
             </p>
           </div>
 
