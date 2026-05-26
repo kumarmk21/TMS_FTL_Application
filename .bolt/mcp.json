@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "sentry": {
+    "github": {
       "enabled": true
     }
   }
