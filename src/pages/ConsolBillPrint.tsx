@@ -174,6 +174,8 @@ export default function ConsolBillPrint() {
                           ? 'bg-yellow-100 text-yellow-700'
                           : bill.consol_bill_status === 'Submitted'
                           ? 'bg-blue-100 text-blue-700'
+                          : bill.consol_bill_status === 'Cancelled'
+                          ? 'bg-red-100 text-red-700'
                           : 'bg-gray-100 text-gray-700'
                       }`}>
                         {bill.consol_bill_status}

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { X, Printer, Download } from 'lucide-react';
+import { X, Printer, Download, Ban } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
+import { useAuth } from '../contexts/AuthContext';
+import { CancelConsolBillModal } from './modals/CancelConsolBillModal';
 
 interface CompanyDetails {
   company_name: string;
@@ -35,6 +37,9 @@ interface ConsolBillDetails {
   consol_bill_pending_amount: number | null;
   consol_bill_status: string;
   bill_from_company: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancellation_reason: string | null;
 }
 
 interface CustomerGST {
@@ -64,11 +69,15 @@ interface ConsolBillPrintPreviewProps {
 const ROWS_PER_ANNEXURE_PAGE = 10;
 
 export function ConsolBillPrintPreview({ consolBillId, onClose }: ConsolBillPrintPreviewProps) {
+  const { profile } = useAuth();
   const [company, setCompany] = useState<CompanyDetails | null>(null);
   const [bill, setBill] = useState<ConsolBillDetails | null>(null);
   const [customerGST, setCustomerGST] = useState<CustomerGST | null>(null);
   const [lrRecords, setLrRecords] = useState<LRRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+
+  const canCancel = profile?.role === 'admin' || profile?.role === 'manager';
 
   useEffect(() => {
     fetchData();
@@ -291,10 +300,27 @@ export function ConsolBillPrintPreview({ consolBillId, onClose }: ConsolBillPrin
   return (
     <div className="fixed inset-0 bg-gray-100 z-50 overflow-auto">
       <div className="print:hidden sticky top-0 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between z-10 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-800">
-          Consol Bill Print — {bill.consol_bill_no}
-        </h2>
         <div className="flex items-center gap-3">
+          <h2 className="text-lg font-semibold text-gray-800">
+            Consol Bill Print — {bill.consol_bill_no}
+          </h2>
+          {bill.consol_bill_status === 'Cancelled' && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full border border-red-200">
+              <Ban className="w-3 h-3" />
+              Cancelled
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {canCancel && bill.consol_bill_status !== 'Cancelled' && (
+            <button
+              onClick={() => setShowCancelModal(true)}
+              className="flex items-center gap-2 border border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Ban className="w-4 h-4" />
+              Cancel Bill
+            </button>
+          )}
           <button
             onClick={handleDownloadPDF}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -318,6 +344,16 @@ export function ConsolBillPrintPreview({ consolBillId, onClose }: ConsolBillPrin
           </button>
         </div>
       </div>
+
+      {showCancelModal && (
+        <CancelConsolBillModal
+          billId={bill.tran_id}
+          billNo={bill.consol_bill_no}
+          isOpen={showCancelModal}
+          onClose={() => setShowCancelModal(false)}
+          onSuccess={fetchData}
+        />
+      )}
 
       <div className="consol-bill-print-content max-w-4xl mx-auto my-6 print:my-0 print:max-w-none space-y-0">
         {/* ── PAGE 1: MAIN BILL ── */}
