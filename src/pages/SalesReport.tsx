@@ -220,12 +220,12 @@ export default function SalesReport() {
           ? (() => { const d = new Date(item.lr_date); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; })()
           : '',
         'Freight Bill Number': item.bill_no || '',
-        'Bill To State': item.bill_to_state || '',
-        'State Alpha Code': item.state_alpha_code || '',
-        'Bill To GSTIN': item.bill_to_gstin || '',
         'Bill Date': item.bill_date
           ? (() => { const d = new Date(item.bill_date); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; })()
           : '',
+        'Bill To State': item.bill_to_state || '',
+        'State Alpha Code': item.state_alpha_code || '',
+        'Bill To GSTIN': item.bill_to_gstin || '',
         'Branch': item.booking_branch || '',
         'Consignor': item.consignor || '',
         'Consignee': item.consignee || '',
@@ -261,10 +261,10 @@ export default function SalesReport() {
         'LR Number': '',
         'LR Date': '',
         'Freight Bill Number': '',
+        'Bill Date': '',
         'Bill To State': '',
         'State Alpha Code': '',
         'Bill To GSTIN': '',
-        'Bill Date': '',
         'Branch': '',
         'Consignor': '',
         'Consignee': '',
