@@ -59,6 +59,7 @@ import AccountsMaster from '../pages/AccountsMaster';
 import ConsolidateBillGeneration from '../pages/ConsolidateBillGeneration';
 import ConsolBillPrint from '../pages/ConsolBillPrint';
 import BTHPaidReport from '../pages/BTHPaidReport';
+import ATHPaidReport from '../pages/ATHPaidReport';
 import APReport from '../pages/APReport';
 import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
@@ -173,6 +174,7 @@ const menuItems: MenuItem[] = [
       { id: 'ar-report', label: 'AR Report' },
       { id: 'ap-report', label: 'AP Report' },
       { id: 'bth-paid-report', label: 'BTH Paid Report' },
+      { id: 'ath-paid-report', label: 'ATH Paid Report' },
     ],
   },
 ];
@@ -295,6 +297,8 @@ export function Layout() {
         return <ConsolBillPrint />;
       case 'bth-paid-report':
         return <BTHPaidReport />;
+      case 'ath-paid-report':
+        return <ATHPaidReport />;
       case 'ap-report':
         return <APReport />;
       case 'ar-report':
