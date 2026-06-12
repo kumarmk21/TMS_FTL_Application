@@ -3,33 +3,32 @@ import { supabase } from '../lib/supabase';
 import { Search, FileDown, Loader2, BarChart3 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-interface LRRow {
-  tran_id: string;
-  manual_lr_no: string | null;
-  lr_date: string | null;
-  bill_no: string | null;
+// Unified row shape for both transport LRs and warehouse bills
+interface SalesRow {
+  id: string;
+  source: 'Transport' | 'Warehouse';
+  ref_number: string | null;       // LR no or WB number
+  ref_date: string | null;         // lr_date or bill_date
+  bill_no: string | null;          // bill_no (transport) or bill_number (WB)
   bill_date: string | null;
   billing_party_code: string | null;
   billing_party_name: string | null;
-  from_city: string | null;
-  to_city: string | null;
-  vehicle_number: string | null;
-  vehicle_type: string | null;
+  from_city: string | null;        // from_city or service_type
+  to_city: string | null;          // to_city or '-'
   consignor: string | null;
   consignee: string | null;
+  vehicle_number: string | null;
   no_of_pkgs: number | null;
   chrg_wt: number | null;
-  freight_amount: number | null;
-  loading_charges: number | null;
-  unloading_charges: number | null;
-  detention_charges: number | null;
-  docket_charges: number | null;
-  penalties_oth_charges: number | null;
-  subtotal: number | null;
-  gst_amount: number | null;
-  lr_total_amount: number | null;
+  freight_amount: number;          // warehouse_charges for WB
+  loading_unloading: number;
+  detention: number;
+  other_charges: number;
+  subtotal: number;
+  gst_amount: number;
+  total_amount: number;
   pay_basis: string | null;
-  lr_financial_status: string | null;
+  fin_status: string | null;       // lr_financial_status or bill_status
 }
 
 interface BillingParty {
@@ -40,10 +39,9 @@ interface BillingParty {
 interface PartyGroup {
   party_code: string;
   party_name: string;
-  rows: LRRow[];
+  rows: SalesRow[];
   total_freight: number;
-  total_loading: number;
-  total_unloading: number;
+  total_lu: number;
   total_detention: number;
   total_other: number;
   total_subtotal: number;
@@ -74,17 +72,22 @@ export default function PartyWiseSalesReport() {
   const fetchBillingParties = async () => {
     setPartiesLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('booking_lr')
-        .select('billing_party_code, billing_party_name')
-        .not('billing_party_code', 'is', null)
-        .not('billing_party_name', 'is', null);
-
-      if (error) throw error;
+      const [{ data: lrParties }, { data: wbParties }] = await Promise.all([
+        supabase
+          .from('booking_lr')
+          .select('billing_party_code, billing_party_name')
+          .not('billing_party_code', 'is', null)
+          .not('billing_party_name', 'is', null),
+        supabase
+          .from('warehouse_bill')
+          .select('billing_party_code, billing_party_name')
+          .not('billing_party_code', 'is', null)
+          .not('billing_party_name', 'is', null),
+      ]);
 
       const seen = new Set<string>();
       const unique: BillingParty[] = [];
-      for (const row of data || []) {
+      for (const row of [...(lrParties || []), ...(wbParties || [])]) {
         if (row.billing_party_code && !seen.has(row.billing_party_code)) {
           seen.add(row.billing_party_code);
           unique.push({
@@ -108,28 +111,108 @@ export default function PartyWiseSalesReport() {
     setLoading(true);
     setSearched(true);
     try {
-      let query = supabase
+      // Build both queries in parallel
+      let lrQuery = supabase
         .from('booking_lr')
         .select(
-          'tran_id, manual_lr_no, lr_date, bill_no, bill_date, billing_party_code, billing_party_name, from_city, to_city, vehicle_number, vehicle_type, consignor, consignee, no_of_pkgs, chrg_wt, freight_amount, loading_charges, unloading_charges, detention_charges, docket_charges, penalties_oth_charges, subtotal, gst_amount, lr_total_amount, pay_basis, lr_financial_status'
+          'tran_id, manual_lr_no, lr_date, bill_no, bill_date, billing_party_code, billing_party_name, from_city, to_city, vehicle_number, consignor, consignee, no_of_pkgs, chrg_wt, freight_amount, loading_charges, unloading_charges, detention_charges, docket_charges, penalties_oth_charges, subtotal, gst_amount, lr_total_amount, pay_basis, lr_financial_status'
         )
         .gte('lr_date', fromDate)
-        .lte('lr_date', toDate)
-        .order('billing_party_name', { ascending: true })
-        .order('lr_date', { ascending: true });
+        .lte('lr_date', toDate);
+
+      let wbQuery = supabase
+        .from('warehouse_bill')
+        .select(
+          'bill_id, bill_number, bill_date, billing_party_code, billing_party_name, service_type, warehouse_charges, other_charges, sub_total, igst_amount, cgst_amount, sgst_amount, total_amount, gst_charge_type, bill_status'
+        )
+        .gte('bill_date', fromDate)
+        .lte('bill_date', toDate)
+        .neq('bill_status', 'Cancelled');
 
       if (selectedParty) {
-        query = query.eq('billing_party_code', selectedParty);
+        lrQuery = lrQuery.eq('billing_party_code', selectedParty);
+        wbQuery = wbQuery.eq('billing_party_code', selectedParty);
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
+      const [{ data: lrData, error: lrErr }, { data: wbData, error: wbErr }] = await Promise.all([
+        lrQuery.order('billing_party_name').order('lr_date'),
+        wbQuery.order('billing_party_name').order('bill_date'),
+      ]);
 
-      const rows: LRRow[] = data || [];
+      if (lrErr) throw lrErr;
+      if (wbErr) throw wbErr;
 
-      // Group by billing party
+      // Normalise transport LR rows
+      const transportRows: SalesRow[] = (lrData || []).map((r) => ({
+        id: r.tran_id,
+        source: 'Transport',
+        ref_number: r.manual_lr_no || null,
+        ref_date: r.lr_date,
+        bill_no: r.bill_no || null,
+        bill_date: r.bill_date || null,
+        billing_party_code: r.billing_party_code,
+        billing_party_name: r.billing_party_name,
+        from_city: r.from_city,
+        to_city: r.to_city,
+        consignor: r.consignor,
+        consignee: r.consignee,
+        vehicle_number: r.vehicle_number,
+        no_of_pkgs: r.no_of_pkgs,
+        chrg_wt: r.chrg_wt,
+        freight_amount: Number(r.freight_amount || 0),
+        loading_unloading: Number(r.loading_charges || 0) + Number(r.unloading_charges || 0),
+        detention: Number(r.detention_charges || 0),
+        other_charges: Number(r.docket_charges || 0) + Number(r.penalties_oth_charges || 0),
+        subtotal: Number(r.subtotal || 0),
+        gst_amount: Number(r.gst_amount || 0),
+        total_amount: Number(r.lr_total_amount || 0),
+        pay_basis: r.pay_basis,
+        fin_status: r.lr_financial_status,
+      }));
+
+      // Normalise warehouse bill rows
+      const warehouseRows: SalesRow[] = (wbData || []).map((r) => {
+        const gst = Number(r.igst_amount || 0) + Number(r.cgst_amount || 0) + Number(r.sgst_amount || 0);
+        return {
+          id: r.bill_id,
+          source: 'Warehouse',
+          ref_number: r.bill_number || null,
+          ref_date: r.bill_date,
+          bill_no: r.bill_number || null,
+          bill_date: r.bill_date,
+          billing_party_code: r.billing_party_code,
+          billing_party_name: r.billing_party_name,
+          from_city: r.service_type || 'Warehouse',
+          to_city: null,
+          consignor: null,
+          consignee: null,
+          vehicle_number: null,
+          no_of_pkgs: null,
+          chrg_wt: null,
+          freight_amount: Number(r.warehouse_charges || 0),
+          loading_unloading: 0,
+          detention: 0,
+          other_charges: Number(r.other_charges || 0),
+          subtotal: Number(r.sub_total || 0),
+          gst_amount: gst,
+          total_amount: Number(r.total_amount || 0),
+          pay_basis: null,
+          fin_status: r.bill_status,
+        };
+      });
+
+      const allRows = [...transportRows, ...warehouseRows];
+
+      // Group by billing party (preserve alphabetical order)
       const groupMap = new Map<string, PartyGroup>();
-      for (const r of rows) {
+      // Sort all rows by party name then date
+      allRows.sort((a, b) => {
+        const pCmp = (a.billing_party_name || '').localeCompare(b.billing_party_name || '');
+        if (pCmp !== 0) return pCmp;
+        return (a.ref_date || '').localeCompare(b.ref_date || '');
+      });
+
+      for (const r of allRows) {
         const key = r.billing_party_code || '__none__';
         const name = r.billing_party_name || 'Unknown';
         if (!groupMap.has(key)) {
@@ -138,8 +221,7 @@ export default function PartyWiseSalesReport() {
             party_name: name,
             rows: [],
             total_freight: 0,
-            total_loading: 0,
-            total_unloading: 0,
+            total_lu: 0,
             total_detention: 0,
             total_other: 0,
             total_subtotal: 0,
@@ -149,14 +231,13 @@ export default function PartyWiseSalesReport() {
         }
         const g = groupMap.get(key)!;
         g.rows.push(r);
-        g.total_freight += Number(r.freight_amount || 0);
-        g.total_loading += Number(r.loading_charges || 0);
-        g.total_unloading += Number(r.unloading_charges || 0);
-        g.total_detention += Number(r.detention_charges || 0);
-        g.total_other += Number(r.docket_charges || 0) + Number(r.penalties_oth_charges || 0);
-        g.total_subtotal += Number(r.subtotal || 0);
-        g.total_gst += Number(r.gst_amount || 0);
-        g.total_amount += Number(r.lr_total_amount || 0);
+        g.total_freight += r.freight_amount;
+        g.total_lu += r.loading_unloading;
+        g.total_detention += r.detention;
+        g.total_other += r.other_charges;
+        g.total_subtotal += r.subtotal;
+        g.total_gst += r.gst_amount;
+        g.total_amount += r.total_amount;
       }
 
       setPartyGroups(Array.from(groupMap.values()));
@@ -170,8 +251,7 @@ export default function PartyWiseSalesReport() {
   const grandTotals = partyGroups.reduce(
     (acc, g) => ({
       freight: acc.freight + g.total_freight,
-      loading: acc.loading + g.total_loading,
-      unloading: acc.unloading + g.total_unloading,
+      lu: acc.lu + g.total_lu,
       detention: acc.detention + g.total_detention,
       other: acc.other + g.total_other,
       subtotal: acc.subtotal + g.total_subtotal,
@@ -179,7 +259,7 @@ export default function PartyWiseSalesReport() {
       amount: acc.amount + g.total_amount,
       lrs: acc.lrs + g.rows.length,
     }),
-    { freight: 0, loading: 0, unloading: 0, detention: 0, other: 0, subtotal: 0, gst: 0, amount: 0, lrs: 0 }
+    { freight: 0, lu: 0, detention: 0, other: 0, subtotal: 0, gst: 0, amount: 0, lrs: 0 }
   );
 
   const handleExport = () => {
@@ -192,47 +272,45 @@ export default function PartyWiseSalesReport() {
       for (const r of g.rows) {
         exportRows.push({
           'Sr.No': srNo++,
+          'Source': r.source,
           'Billing Party': g.party_name,
-          'LR Number': r.manual_lr_no || '',
-          'LR Date': r.lr_date || '',
+          'Ref. Number': r.ref_number || '',
+          'Ref. Date': r.ref_date || '',
           'Bill No': r.bill_no || '',
           'Bill Date': r.bill_date || '',
-          'From City': r.from_city || '',
+          'From / Service Type': r.from_city || '',
           'To City': r.to_city || '',
           'Consignor': r.consignor || '',
           'Consignee': r.consignee || '',
           'Vehicle No': r.vehicle_number || '',
-          'Vehicle Type': r.vehicle_type || '',
           'Pkgs': r.no_of_pkgs ?? '',
           'Chrg Wt (KG)': r.chrg_wt ?? '',
-          'Freight Amt': r.freight_amount ?? 0,
-          'Loading': r.loading_charges ?? 0,
-          'Unloading': r.unloading_charges ?? 0,
-          'Detention': r.detention_charges ?? 0,
-          'Other Charges': (Number(r.docket_charges || 0) + Number(r.penalties_oth_charges || 0)),
-          'Subtotal': r.subtotal ?? 0,
-          'GST Amt': r.gst_amount ?? 0,
-          'Total Amount': r.lr_total_amount ?? 0,
+          'Freight / WH Charges': r.freight_amount,
+          'Loading + Unloading': r.loading_unloading,
+          'Detention': r.detention,
+          'Other Charges': r.other_charges,
+          'Subtotal': r.subtotal,
+          'GST Amount': r.gst_amount,
+          'Total Amount': r.total_amount,
           'Pay Basis': r.pay_basis || '',
-          'Financial Status': r.lr_financial_status || '',
+          'Status': r.fin_status || '',
         });
       }
-      // Party subtotal row
       exportRows.push({
         'Sr.No': '',
-        'Billing Party': `SUBTOTAL — ${g.party_name} (${g.rows.length} LRs)`,
-        'LR Number': '', 'LR Date': '', 'Bill No': '', 'Bill Date': '',
-        'From City': '', 'To City': '', 'Consignor': '', 'Consignee': '',
-        'Vehicle No': '', 'Vehicle Type': '', 'Pkgs': '', 'Chrg Wt (KG)': '',
-        'Freight Amt': g.total_freight,
-        'Loading': g.total_loading,
-        'Unloading': g.total_unloading,
+        'Source': '',
+        'Billing Party': `SUBTOTAL — ${g.party_name} (${g.rows.length} records)`,
+        'Ref. Number': '', 'Ref. Date': '', 'Bill No': '', 'Bill Date': '',
+        'From / Service Type': '', 'To City': '', 'Consignor': '', 'Consignee': '',
+        'Vehicle No': '', 'Pkgs': '', 'Chrg Wt (KG)': '',
+        'Freight / WH Charges': g.total_freight,
+        'Loading + Unloading': g.total_lu,
         'Detention': g.total_detention,
         'Other Charges': g.total_other,
         'Subtotal': g.total_subtotal,
-        'GST Amt': g.total_gst,
+        'GST Amount': g.total_gst,
         'Total Amount': g.total_amount,
-        'Pay Basis': '', 'Financial Status': '',
+        'Pay Basis': '', 'Status': '',
       });
     }
 
@@ -241,15 +319,6 @@ export default function PartyWiseSalesReport() {
     XLSX.utils.book_append_sheet(wb, ws, 'Party Wise Sales');
     XLSX.writeFile(wb, `Party_Wise_Sales_${fromDate}_to_${toDate}.xlsx`);
   };
-
-  const cols = [
-    'Sr.', 'LR Number', 'LR Date', 'Bill No', 'Bill Date',
-    'From City', 'To City', 'Consignor', 'Consignee',
-    'Vehicle No', 'Pkgs', 'Chrg Wt',
-    'Freight Amt', 'Lod+Unlod', 'Detention', 'Other',
-    'Subtotal', 'GST Amt', 'Total Amt',
-    'Pay Basis', 'Fin. Status',
-  ];
 
   return (
     <div className="space-y-6">
@@ -260,7 +329,7 @@ export default function PartyWiseSalesReport() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Party Wise Sales</h1>
-          <p className="text-sm text-gray-500">Sales summary grouped by billing party</p>
+          <p className="text-sm text-gray-500">Transport & warehouse sales grouped by billing party</p>
         </div>
       </div>
 
@@ -329,11 +398,10 @@ export default function PartyWiseSalesReport() {
       {/* Results */}
       {searched && !loading && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          {/* Results header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-wrap gap-3">
             <div className="flex items-center gap-4 flex-wrap text-sm">
               <span className="font-semibold text-gray-700">
-                {grandTotals.lrs} LR{grandTotals.lrs !== 1 ? 's' : ''} across {partyGroups.length} part{partyGroups.length !== 1 ? 'ies' : 'y'}
+                {grandTotals.lrs} record{grandTotals.lrs !== 1 ? 's' : ''} across {partyGroups.length} part{partyGroups.length !== 1 ? 'ies' : 'y'}
               </span>
               {partyGroups.length > 0 && (
                 <span className="text-gray-500">
@@ -363,74 +431,71 @@ export default function PartyWiseSalesReport() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Sr.</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">LR No.</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">LR Date</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Source</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Ref. No.</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Ref. Date</th>
                     <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Bill No.</th>
                     <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Bill Date</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">From</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">From / Service</th>
                     <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">To</th>
                     <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Consignor</th>
                     <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Consignee</th>
                     <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Vehicle No.</th>
                     <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Pkgs</th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Chrg Wt</th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Freight</th>
+                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Freight/WH</th>
                     <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">L+U</th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Detention</th>
                     <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Other</th>
                     <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Subtotal</th>
                     <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">GST</th>
                     <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Total</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Pay Basis</th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Fin. Status</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide whitespace-nowrap">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {partyGroups.map((g) => {
-                    let partySeq = 0;
+                    let seq = 0;
                     return (
                       <>
-                        {/* Party header row */}
+                        {/* Party header */}
                         <tr key={`hdr-${g.party_code}`} className="bg-slate-800">
-                          <td colSpan={21} className="px-4 py-2.5">
-                            <span className="text-xs font-bold text-white uppercase tracking-wider">
-                              {g.party_name}
-                            </span>
-                            <span className="ml-3 text-xs text-slate-300">{g.rows.length} LR{g.rows.length !== 1 ? 's' : ''}</span>
+                          <td colSpan={19} className="px-4 py-2.5">
+                            <span className="text-xs font-bold text-white uppercase tracking-wider">{g.party_name}</span>
+                            <span className="ml-3 text-xs text-slate-300">{g.rows.length} record{g.rows.length !== 1 ? 's' : ''}</span>
                           </td>
                         </tr>
 
-                        {/* LR rows */}
+                        {/* Data rows */}
                         {g.rows.map((r) => {
-                          partySeq++;
-                          const luAmt = Number(r.loading_charges || 0) + Number(r.unloading_charges || 0);
-                          const otherAmt = Number(r.docket_charges || 0) + Number(r.penalties_oth_charges || 0);
+                          seq++;
+                          const isWH = r.source === 'Warehouse';
                           return (
-                            <tr key={r.tran_id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                              <td className="px-3 py-2.5 text-gray-400 text-xs">{partySeq}</td>
-                              <td className="px-3 py-2.5 font-medium text-gray-900 whitespace-nowrap">{r.manual_lr_no || '-'}</td>
-                              <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{fmt(r.lr_date)}</td>
+                            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                              <td className="px-3 py-2.5 text-gray-400 text-xs">{seq}</td>
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${isWH ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                  {r.source}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 font-medium text-gray-900 whitespace-nowrap">{r.ref_number || '-'}</td>
+                              <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{fmt(r.ref_date)}</td>
                               <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{r.bill_no || '-'}</td>
                               <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{fmt(r.bill_date)}</td>
                               <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{r.from_city || '-'}</td>
                               <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{r.to_city || '-'}</td>
-                              <td className="px-3 py-2.5 text-gray-700 max-w-[120px] truncate" title={r.consignor || ''}>{r.consignor || '-'}</td>
-                              <td className="px-3 py-2.5 text-gray-700 max-w-[120px] truncate" title={r.consignee || ''}>{r.consignee || '-'}</td>
+                              <td className="px-3 py-2.5 text-gray-700 max-w-[110px] truncate" title={r.consignor || ''}>{r.consignor || '-'}</td>
+                              <td className="px-3 py-2.5 text-gray-700 max-w-[110px] truncate" title={r.consignee || ''}>{r.consignee || '-'}</td>
                               <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{r.vehicle_number || '-'}</td>
                               <td className="px-3 py-2.5 text-right text-gray-600">{r.no_of_pkgs ?? '-'}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-600">{r.chrg_wt ?? '-'}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-800 whitespace-nowrap">₹{inr(Number(r.freight_amount || 0))}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">{luAmt > 0 ? `₹${inr(luAmt)}` : '-'}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">{Number(r.detention_charges || 0) > 0 ? `₹${inr(Number(r.detention_charges))}` : '-'}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">{otherAmt > 0 ? `₹${inr(otherAmt)}` : '-'}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-800 whitespace-nowrap">₹{inr(Number(r.subtotal || 0))}</td>
-                              <td className="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">{Number(r.gst_amount || 0) > 0 ? `₹${inr(Number(r.gst_amount))}` : '-'}</td>
-                              <td className="px-3 py-2.5 text-right font-semibold text-gray-900 whitespace-nowrap">₹{inr(Number(r.lr_total_amount || 0))}</td>
-                              <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">{r.pay_basis || '-'}</td>
+                              <td className="px-3 py-2.5 text-right text-gray-800 whitespace-nowrap">₹{inr(r.freight_amount)}</td>
+                              <td className="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">{r.loading_unloading > 0 ? `₹${inr(r.loading_unloading)}` : '-'}</td>
+                              <td className="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">{r.other_charges > 0 ? `₹${inr(r.other_charges)}` : '-'}</td>
+                              <td className="px-3 py-2.5 text-right text-gray-800 whitespace-nowrap">₹{inr(r.subtotal)}</td>
+                              <td className="px-3 py-2.5 text-right text-gray-700 whitespace-nowrap">{r.gst_amount > 0 ? `₹${inr(r.gst_amount)}` : '-'}</td>
+                              <td className="px-3 py-2.5 text-right font-semibold text-gray-900 whitespace-nowrap">₹{inr(r.total_amount)}</td>
                               <td className="px-3 py-2.5 whitespace-nowrap">
-                                {r.lr_financial_status ? (
+                                {r.fin_status ? (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">
-                                    {r.lr_financial_status}
+                                    {r.fin_status}
                                   </span>
                                 ) : '-'}
                               </td>
@@ -438,19 +503,18 @@ export default function PartyWiseSalesReport() {
                           );
                         })}
 
-                        {/* Party subtotal row */}
+                        {/* Party subtotal */}
                         <tr key={`sub-${g.party_code}`} className="bg-red-50 border-y-2 border-red-100">
                           <td colSpan={12} className="px-4 py-2.5 text-right text-xs font-bold text-red-800 uppercase tracking-wide">
                             Subtotal — {g.party_name}
                           </td>
                           <td className="px-3 py-2.5 text-right font-bold text-red-900 whitespace-nowrap">₹{inr(g.total_freight)}</td>
-                          <td className="px-3 py-2.5 text-right font-bold text-red-900 whitespace-nowrap">₹{inr(g.total_loading + g.total_unloading)}</td>
-                          <td className="px-3 py-2.5 text-right font-bold text-red-900 whitespace-nowrap">₹{inr(g.total_detention)}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-red-900 whitespace-nowrap">₹{inr(g.total_lu)}</td>
                           <td className="px-3 py-2.5 text-right font-bold text-red-900 whitespace-nowrap">₹{inr(g.total_other)}</td>
                           <td className="px-3 py-2.5 text-right font-bold text-red-900 whitespace-nowrap">₹{inr(g.total_subtotal)}</td>
                           <td className="px-3 py-2.5 text-right font-bold text-red-900 whitespace-nowrap">₹{inr(g.total_gst)}</td>
                           <td className="px-3 py-2.5 text-right font-bold text-red-900 whitespace-nowrap">₹{inr(g.total_amount)}</td>
-                          <td colSpan={2} />
+                          <td />
                         </tr>
                       </>
                     );
@@ -461,16 +525,15 @@ export default function PartyWiseSalesReport() {
                 <tfoot>
                   <tr className="bg-slate-900 border-t-2 border-slate-700">
                     <td colSpan={12} className="px-4 py-3 text-right text-xs font-bold text-white uppercase tracking-wide">
-                      Grand Total — {grandTotals.lrs} LRs / {partyGroups.length} Parties
+                      Grand Total — {grandTotals.lrs} records / {partyGroups.length} parties
                     </td>
                     <td className="px-3 py-3 text-right font-bold text-white whitespace-nowrap">₹{inr(grandTotals.freight)}</td>
-                    <td className="px-3 py-3 text-right font-bold text-white whitespace-nowrap">₹{inr(grandTotals.loading + grandTotals.unloading)}</td>
-                    <td className="px-3 py-3 text-right font-bold text-white whitespace-nowrap">₹{inr(grandTotals.detention)}</td>
+                    <td className="px-3 py-3 text-right font-bold text-white whitespace-nowrap">₹{inr(grandTotals.lu)}</td>
                     <td className="px-3 py-3 text-right font-bold text-white whitespace-nowrap">₹{inr(grandTotals.other)}</td>
                     <td className="px-3 py-3 text-right font-bold text-white whitespace-nowrap">₹{inr(grandTotals.subtotal)}</td>
                     <td className="px-3 py-3 text-right font-bold text-white whitespace-nowrap">₹{inr(grandTotals.gst)}</td>
                     <td className="px-3 py-3 text-right font-bold text-yellow-300 whitespace-nowrap text-base">₹{inr(grandTotals.amount)}</td>
-                    <td colSpan={2} />
+                    <td />
                   </tr>
                 </tfoot>
               </table>
