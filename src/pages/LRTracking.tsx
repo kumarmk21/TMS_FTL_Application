@@ -5,8 +5,9 @@ import {
   MapPin, Truck, User, IndianRupee, ArrowRight, Package,
   Receipt, CheckCircle, Clock, AlertCircle, XCircle,
   CreditCard, Banknote, ClipboardCheck, Image, FileMinus,
-  Building2
+  Building2, ExternalLink
 } from 'lucide-react';
+import { BillPrintPreview } from '../components/BillPrintPreview';
 
 interface LRTrackingData {
   manual_lr_no: string;
@@ -77,6 +78,8 @@ interface LRFinDetailData {
   credit_days: number | null;
   lr_bill_sub_date: string | null;
   lr_bill_sub_type: string | null;
+  bill_id: string | null;
+  bill_no: string | null;
 }
 
 const SUPABASE_STORAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/pod-documents/`;
@@ -153,6 +156,7 @@ export function LRTracking() {
   });
 
   const [selectedPOD, setSelectedPOD] = useState<string | null>(null);
+  const [previewBillId, setPreviewBillId] = useState<string | null>(null);
 
   const handleSearch = async () => {
     if (searchType === 'dateRange' && (!formData.fromDate || !formData.toDate)) {
@@ -221,7 +225,7 @@ export function LRTracking() {
       if (searchType === 'lrNumber' && statusType === 'lr_financial_status') {
         const { data: lrData, error: lrError } = await supabase
           .from('booking_lr')
-          .select('tran_id, manual_lr_no, lr_date, billing_party_name, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, pod_upload, pod_recd_date, pod_recd_type, bill_amount, bill_date, bill_due_date')
+          .select('tran_id, manual_lr_no, lr_date, billing_party_name, from_city, to_city, vehicle_type, vehicle_number, lr_financial_status, pod_upload, pod_recd_date, pod_recd_type, bill_amount, bill_date, bill_due_date, bill_no')
           .ilike('manual_lr_no', `%${formData.lrNumber.trim()}%`)
           .order('manual_lr_no', { ascending: false });
 
@@ -237,17 +241,52 @@ export function LRTracking() {
               lr_bill_mr_date, lr_bill_mr_number, lr_bill_tds_applicable, lr_bill_tds_amount,
               lr_bill_deduction_amount, lr_bill_mr_net_amount, sub_total, bill_amount,
               consol_bill_number, consol_bill_date, consol_bill_sub_date, consol_bill_sub_to,
-              bill_generation_branch, credit_days, lr_bill_sub_date, lr_bill_sub_type, bill_status
+              bill_generation_branch, credit_days, lr_bill_sub_date, lr_bill_sub_type, bill_status,
+              bill_id
             `)
             .in('tran_id', lrIds)
             .is('cancelled_at', null);
 
           if (billError) throw billError;
 
+          // Build map by tran_id (primary lookup)
           const billMap: Record<string, typeof billData[0]> = {};
           (billData || []).forEach((b) => {
             if (!billMap[b.tran_id]) billMap[b.tran_id] = b;
           });
+
+          // For any LR not found by tran_id, fall back to lookup via booking_lr.bill_no
+          const missingTranIds = lrData
+            .filter((lr) => lr.bill_no && !billMap[lr.tran_id])
+            .map((lr) => lr.bill_no as string);
+
+          if (missingTranIds.length > 0) {
+            const { data: fallbackData } = await supabase
+              .from('lr_bill')
+              .select(`
+                tran_id, lr_bill_number, lr_bill_date, lr_bill_due_date, lr_bill_status,
+                lr_bill_mr_date, lr_bill_mr_number, lr_bill_tds_applicable, lr_bill_tds_amount,
+                lr_bill_deduction_amount, lr_bill_mr_net_amount, sub_total, bill_amount,
+                consol_bill_number, consol_bill_date, consol_bill_sub_date, consol_bill_sub_to,
+                bill_generation_branch, credit_days, lr_bill_sub_date, lr_bill_sub_type, bill_status,
+                bill_id
+              `)
+              .in('lr_bill_number', missingTranIds)
+              .is('cancelled_at', null);
+
+            // Map fallback results by lr_bill_number so we can match back to LR rows
+            const fallbackByBillNo: Record<string, typeof fallbackData[0]> = {};
+            (fallbackData || []).forEach((b) => {
+              if (b.lr_bill_number) fallbackByBillNo[b.lr_bill_number] = b;
+            });
+
+            // Attach fallback to correct tran_id slot
+            lrData.forEach((lr) => {
+              if (lr.bill_no && !billMap[lr.tran_id] && fallbackByBillNo[lr.bill_no]) {
+                billMap[lr.tran_id] = fallbackByBillNo[lr.bill_no];
+              }
+            });
+          }
 
           const branchIds = [...new Set(
             (billData || [])
@@ -304,6 +343,8 @@ export function LRTracking() {
               credit_days: bill?.credit_days ?? null,
               lr_bill_sub_date: bill?.lr_bill_sub_date ?? null,
               lr_bill_sub_type: bill?.lr_bill_sub_type ?? null,
+              bill_id: bill?.bill_id ?? null,
+              bill_no: lr.bill_no ?? null,
             };
           });
 
@@ -601,12 +642,22 @@ export function LRTracking() {
                   <CreditCard className="w-3.5 h-3.5" /> Bill Details
                 </h3>
 
-                {lr.lr_bill_number ? (
+                {(lr.lr_bill_number || lr.bill_no) ? (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
                         <p className="text-xs text-gray-400 font-medium mb-0.5">Bill Number</p>
-                        <p className="text-sm font-bold text-gray-800">{lr.lr_bill_number}</p>
+                        {lr.bill_id ? (
+                          <button
+                            onClick={() => setPreviewBillId(lr.bill_id!)}
+                            className="flex items-center gap-1.5 text-sm font-bold text-teal-700 hover:text-teal-900 hover:underline transition-colors group"
+                          >
+                            {lr.lr_bill_number || lr.bill_no}
+                            <ExternalLink className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100" />
+                          </button>
+                        ) : (
+                          <p className="text-sm font-bold text-gray-800">{lr.lr_bill_number || lr.bill_no}</p>
+                        )}
                       </div>
                       <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
                         <p className="text-xs text-gray-400 font-medium mb-0.5">Bill Date</p>
@@ -1068,8 +1119,11 @@ export function LRTracking() {
         </div>
       )}
 
-      {selectedPOD && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      {previewBillId && (
+        <BillPrintPreview billId={previewBillId} onClose={() => setPreviewBillId(null)} />
+      )}
+
+      {selectedPOD && (        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">POD Document</h3>
