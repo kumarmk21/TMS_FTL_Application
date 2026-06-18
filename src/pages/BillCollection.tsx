@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import html2pdf from 'html2pdf.js';
-import { Search, Calendar, X, Receipt, CreditCard as Edit2, XCircle, CheckCircle, Clock, Loader2, IndianRupee, FileText, Download, Mail, Eye, RefreshCw, Truck, Building2, AlertCircle, CreditCard, Filter } from 'lucide-react';
+import { Search, Calendar, X, Receipt, CreditCard as Edit2, XCircle, CheckCircle, Clock, Loader2, IndianRupee, FileText, Download, Mail, Eye, RefreshCw, Truck, Building2, AlertCircle, CreditCard, Filter, Layers } from 'lucide-react';
+import { CombinedPaymentModal } from '../components/modals/CombinedPaymentModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ interface PaymentReceipt {
   remarks: string | null;
   is_cancelled: boolean;
   created_at: string;
+  combined_payment_id?: string | null;
 }
 
 interface PRFormData {
@@ -633,6 +635,7 @@ export function BillCollection() {
   const [viewPrData, setViewPrData] = useState<PaymentReceipt | null>(null);
   const [viewBillData, setViewBillData] = useState<BillRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [combineModalOpen, setCombineModalOpen] = useState(false);
 
   const handleReset = () => {
     setFromDate(firstOfMonthStr);
@@ -942,9 +945,17 @@ export function BillCollection() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Bill Collection</h1>
-        <p className="mt-1 text-sm text-gray-500">Track and manage payment collection for Transportation and Warehouse bills</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Bill Collection</h1>
+          <p className="mt-1 text-sm text-gray-500">Track and manage payment collection for Transportation and Warehouse bills</p>
+        </div>
+        <button
+          onClick={() => setCombineModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex-shrink-0"
+        >
+          <Layers className="w-4 h-4" /> Combined Payment
+        </button>
       </div>
 
       {/* Search Panel */}
@@ -1175,12 +1186,19 @@ export function BillCollection() {
                         {/* PR Number */}
                         <td className="px-4 py-3">
                           {pr ? (
-                            <button
-                              onClick={() => setViewPrData(pr)}
-                              className="text-sm font-bold text-blue-700 hover:text-blue-900 hover:underline transition-colors"
-                            >
-                              {pr.pr_number}
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => setViewPrData(pr)}
+                                className="text-sm font-bold text-blue-700 hover:text-blue-900 hover:underline transition-colors"
+                              >
+                                {pr.pr_number}
+                              </button>
+                              {pr.combined_payment_id && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-bold">
+                                  <Layers className="w-2.5 h-2.5" />COMB
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-gray-400 text-sm">-</span>
                           )}
@@ -1292,6 +1310,14 @@ export function BillCollection() {
           bill={viewBillData}
           pr={prMap[viewBillData.bill_id]}
           onClose={() => setViewBillData(null)}
+        />
+      )}
+
+      {combineModalOpen && (
+        <CombinedPaymentModal
+          customers={customers}
+          onClose={() => setCombineModalOpen(false)}
+          onSuccess={() => { if (searched) handleSearch(); }}
         />
       )}
     </div>
