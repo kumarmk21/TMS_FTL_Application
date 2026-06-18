@@ -610,11 +610,12 @@ export function BillCollection() {
   useEffect(() => {
     supabase
       .from('customer_master')
-      .select('customer_code, customer_name')
+      .select('customer_id, customer_name')
+      .eq('is_active', true)
       .order('customer_name')
       .then(({ data }) => {
         if (data) {
-          setCustomers(data.map((c: any) => ({ code: c.customer_code, name: c.customer_name })));
+          setCustomers(data.map((c: any) => ({ code: c.customer_id, name: c.customer_name })));
         }
       });
   }, []);
