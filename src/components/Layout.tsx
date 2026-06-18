@@ -66,6 +66,7 @@ import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
 import DownloadBTHBankFile from '../pages/DownloadBTHBankFile';
 import { VehicleTracking } from '../pages/VehicleTracking';
+import { BillCollection } from '../pages/BillCollection';
 
 export interface MenuItem {
   id: string;
@@ -132,6 +133,7 @@ const menuItems: MenuItem[] = [
       { id: 'generate-balance-bank-file', label: 'BTH Payment' },
       { id: 'download-bth-bank-file', label: 'Download BTH Bank File' },
       { id: 'admin-payment-bank-file', label: 'Admin Payment Bank File' },
+      { id: 'bill-collection', label: 'Bill Collection' },
       { id: 'generate-debit-note', label: 'Generate Debit Note' },
       { id: 'generate-credit-note', label: 'Generate Credit Note' },
     ],
@@ -287,6 +289,8 @@ export function Layout() {
         return <AdminExpenses />;
       case 'admin-payment-bank-file':
         return <AdminPaymentBankFile />;
+      case 'bill-collection':
+        return <BillCollection />;
       case 'income-expense-report':
         return <IncomeExpenseReport />;
       case 'sales-report':
