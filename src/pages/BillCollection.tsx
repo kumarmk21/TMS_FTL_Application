@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import html2pdf from 'html2pdf.js';
@@ -602,6 +602,22 @@ export function BillCollection() {
   const [billTypeFilter, setBillTypeFilter] = useState<'all' | 'lr' | 'warehouse'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'collected'>('all');
   const [billNumberInput, setBillNumberInput] = useState('');
+  const [billingPartyFilter, setBillingPartyFilter] = useState('');
+
+  // Customers for dropdown
+  const [customers, setCustomers] = useState<{ code: string; name: string }[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from('customer_master')
+      .select('customer_code, customer_name')
+      .order('customer_name')
+      .then(({ data }) => {
+        if (data) {
+          setCustomers(data.map((c: any) => ({ code: c.customer_code, name: c.customer_name })));
+        }
+      });
+  }, []);
 
   // Results state
   const [bills, setBills] = useState<BillRow[]>([]);
@@ -623,6 +639,7 @@ export function BillCollection() {
     setBillTypeFilter('all');
     setStatusFilter('all');
     setBillNumberInput('');
+    setBillingPartyFilter('');
     setBills([]);
     setPrMap({});
     setSearched(false);
@@ -646,23 +663,29 @@ export function BillCollection() {
       // Fetch LR bills and WH bills in parallel
       const [lrResult, whResult] = await Promise.all([
         (billTypeFilter === 'all' || billTypeFilter === 'lr')
-          ? supabase
-              .from('lr_bill')
-              .select('bill_id, lr_bill_number, lr_bill_date, lr_bill_due_date, billing_party_name, billing_party_code, bill_amount, lr_bill_status, bill_status')
-              .gte('lr_bill_date', fromDate)
-              .lte('lr_bill_date', toDate)
-              .neq('bill_status', 'Cancelled')
-              .neq('bill_status', 'Regenerated')
-              .order('lr_bill_date', { ascending: false })
+          ? (() => {
+              let q = supabase
+                .from('lr_bill')
+                .select('bill_id, lr_bill_number, lr_bill_date, lr_bill_due_date, billing_party_name, billing_party_code, bill_amount, lr_bill_status, bill_status')
+                .gte('lr_bill_date', fromDate)
+                .lte('lr_bill_date', toDate)
+                .neq('bill_status', 'Cancelled')
+                .neq('bill_status', 'Regenerated');
+              if (billingPartyFilter) q = q.eq('billing_party_code', billingPartyFilter);
+              return q.order('lr_bill_date', { ascending: false });
+            })()
           : Promise.resolve({ data: [], error: null }),
         (billTypeFilter === 'all' || billTypeFilter === 'warehouse')
-          ? supabase
-              .from('warehouse_bill')
-              .select('bill_id, bill_number, bill_date, bill_due_date, billing_party_name, billing_party_code, total_amount, bill_status')
-              .gte('bill_date', fromDate)
-              .lte('bill_date', toDate)
-              .neq('bill_status', 'Cancelled')
-              .order('bill_date', { ascending: false })
+          ? (() => {
+              let q = supabase
+                .from('warehouse_bill')
+                .select('bill_id, bill_number, bill_date, bill_due_date, billing_party_name, billing_party_code, total_amount, bill_status')
+                .gte('bill_date', fromDate)
+                .lte('bill_date', toDate)
+                .neq('bill_status', 'Cancelled');
+              if (billingPartyFilter) q = q.eq('billing_party_code', billingPartyFilter);
+              return q.order('bill_date', { ascending: false });
+            })()
           : Promise.resolve({ data: [], error: null }),
       ]);
 
@@ -930,7 +953,7 @@ export function BillCollection() {
           <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Search Criteria</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
           {/* From Date */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1.5">From Date <span className="text-red-500">*</span></label>
@@ -970,6 +993,21 @@ export function BillCollection() {
               <option value="all">All</option>
               <option value="pending">Pending for Collection</option>
               <option value="collected">Collected Bills</option>
+            </select>
+          </div>
+
+          {/* Billing Party */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Billing Party</label>
+            <select
+              value={billingPartyFilter}
+              onChange={e => setBillingPartyFilter(e.target.value)}
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            >
+              <option value="">All Parties</option>
+              {customers.map(c => (
+                <option key={c.code} value={c.code}>{c.name}</option>
+              ))}
             </select>
           </div>
 
