@@ -770,8 +770,16 @@ export function CombinedPaymentModal({
                                 {a.bill_type === 'lr' ? 'Transport' : 'Warehouse'}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-sm font-semibold text-gray-700 text-right whitespace-nowrap">
-                              {fmt(a.bill_amount)}
+                            <td className="px-4 py-2.5 whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-2">
+                                <span className="text-sm font-semibold text-gray-700">{fmt(a.bill_amount)}</span>
+                                <button
+                                  onClick={() => updateAllocation(a.bill_id, a.bill_amount.toFixed(2))}
+                                  className="px-1.5 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors whitespace-nowrap"
+                                >
+                                  Recd in Full
+                                </button>
+                              </div>
                             </td>
                             <td className="px-4 py-2.5">
                               <div className="relative max-w-[140px]">
