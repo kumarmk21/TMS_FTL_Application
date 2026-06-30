@@ -60,6 +60,7 @@ import ConsolidateBillGeneration from '../pages/ConsolidateBillGeneration';
 import ConsolBillPrint from '../pages/ConsolBillPrint';
 import BTHPaidReport from '../pages/BTHPaidReport';
 import ATHPaidReport from '../pages/ATHPaidReport';
+import BillPaymentReport from '../pages/BillPaymentReport';
 import PartyWiseSalesReport from '../pages/PartyWiseSalesReport';
 import APReport from '../pages/APReport';
 import AdminExpenses from '../pages/AdminExpenses';
@@ -179,6 +180,7 @@ const menuItems: MenuItem[] = [
       { id: 'bth-paid-report', label: 'BTH Paid Report' },
       { id: 'ath-paid-report', label: 'ATH Paid Report' },
       { id: 'party-wise-sales', label: 'Party Wise Sales' },
+      { id: 'bill-payment-report', label: 'Bill Payment Report' },
     ],
   },
 ];
@@ -305,6 +307,8 @@ export function Layout() {
         return <BTHPaidReport />;
       case 'ath-paid-report':
         return <ATHPaidReport />;
+      case 'bill-payment-report':
+        return <BillPaymentReport />;
       case 'party-wise-sales':
         return <PartyWiseSalesReport />;
       case 'ap-report':
