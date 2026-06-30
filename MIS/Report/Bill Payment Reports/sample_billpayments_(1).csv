@@ -1,0 +1,4 @@
+Payment Number,Date,Vendor Name,Mode,Description,Exchange Rate,Amount,Paid Through,Tax Account,Reference Number,Bill Number,Bill Amount,Reverse Charge Tax Rate,Reverse Charge Tax Type,Reverse Charge Tax Name,Payment Type,GST Treatment,GST Identification Number (GSTIN),Destination of Supply,Description of Supply,TDS Name,TDS Percentage,TDS Section Code,TDS Amount,Bill Date
+1,2017-07-05,David,Cash,,1.00,128.000,Petty Cash,,,BILL-1,128.000,,,,Bill Payment,business_none,,TN
+2,2017-07-05,David,Cash,,1.00,100.000,Petty Cash,,,BILL-2,100.000,,,,Bill Payment,business_none,,TN
+3,2017-07-05,John,Cash,,1.00,128.000,Petty Cash,,,,,5,Tax Group,GST5,Vendor Advance,business_gst,33aaaaa1111a1z1,TN,GOODS,Dividend,10.00,194,50,2017-07-05
