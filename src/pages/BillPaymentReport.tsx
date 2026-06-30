@@ -13,6 +13,7 @@ interface PaymentRecord {
   thc_date: string | null;
   lr_number: string | null;
   vehicle_number: string | null;
+  vehicle_type: string | null;
   origin: string | null;
   destination: string | null;
   ven_act_name: string | null;
@@ -118,7 +119,7 @@ export default function BillPaymentReport() {
     setRecords([]);
 
     const SELECT =
-      'thc_id, thc_id_number, thc_date, lr_number, vehicle_number, origin, destination, ' +
+      'thc_id, thc_id_number, thc_date, lr_number, vehicle_number, vehicle_type, origin, destination, ' +
       'ven_act_name, thc_vendor, thc_amount, thc_advance_amount, thc_balance_amount, ' +
       'thc_tds_amount, thc_net_payable_amount, ath_date, ath_voucher_no, ' +
       'thc_balance_payment_date, thc_balance_pmt_utr_details';
@@ -229,6 +230,7 @@ export default function BillPaymentReport() {
       'Transaction Type': r.tx_type,
       'LR Number': r.lr_number || '',
       'Vehicle Number': r.vehicle_number || '',
+      'Vehicle Type': r.vehicle_type || '',
       'Origin': r.origin || '',
       'Destination': r.destination || '',
     }));
@@ -485,7 +487,7 @@ export default function BillPaymentReport() {
                   <tr>
                     {[
                       '#', 'Date', 'Type', 'THC No.', 'LR Number', 'Vendor Name',
-                      'Vehicle No.', 'Route', 'THC Amount', 'Amount Paid', 'TDS', 'Reference No.', 'Bill Date',
+                      'Vehicle No.', 'Vehicle Type', 'Route', 'THC Amount', 'Amount Paid', 'TDS', 'Reference No.', 'Bill Date',
                     ].map(col => (
                       <th key={col} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">
                         {col}
@@ -518,6 +520,7 @@ export default function BillPaymentReport() {
                         {r.ven_act_name || '-'}
                       </td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.vehicle_number || '-'}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{r.vehicle_type || '-'}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {r.origin || r.destination ? (
                           <span className="flex items-center gap-1 text-xs text-gray-600">
