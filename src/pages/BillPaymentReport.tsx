@@ -183,11 +183,9 @@ export default function BillPaymentReport() {
 
   // ── Export ─────────────────────────────────────────────────────────────────
 
-  const handleExport = () => {
-    if (!records.length) return;
-
-    const rows = records.map((r, i) => ({
-      'Payment Number': i + 1,
+  const buildRows = () =>
+    records.map((r, i) => ({
+      'Payment Number': `BTH${50001 + i}`,
       'Date': r.payment_date || '',
       'Vendor Name': r.ven_act_name || '',
       'Mode': exportMode,
@@ -197,7 +195,7 @@ export default function BillPaymentReport() {
       'Paid Through': exportPaidThrough,
       'Tax Account': '',
       'Reference Number': r.reference_no,
-      'Bill Number': r.thc_id_number || r.lr_number || '',
+      'Bill Number': r.lr_number || '',
       'Bill Amount': r.thc_amount ?? '',
       'Reverse Charge Tax Rate': '',
       'Reverse Charge Tax Type': '',
@@ -219,17 +217,33 @@ export default function BillPaymentReport() {
       'Destination': r.destination || '',
     }));
 
+  const handleExportXlsx = () => {
+    if (!records.length) return;
+    const rows = buildRows();
     const ws = XLSX.utils.json_to_sheet(rows);
-
-    // Auto column widths
-    const colWidths = Object.keys(rows[0] || {}).map(k => ({
-      wch: Math.max(k.length, 12),
-    }));
+    const colWidths = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 12) }));
     ws['!cols'] = colWidths;
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Bill Payment Report');
     XLSX.writeFile(wb, `Bill_Payment_Report_${fromDate}_to_${toDate}.xlsx`);
+  };
+
+  const handleExportCsv = () => {
+    if (!records.length) return;
+    const rows = buildRows();
+    const headers = Object.keys(rows[0]);
+    const escape = (v: unknown) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers.map(escape).join(','), ...rows.map(r => headers.map(h => escape((r as Record<string, unknown>)[h])).join(','))].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Bill_Payment_Report_${fromDate}_to_${toDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -423,13 +437,22 @@ export default function BillPaymentReport() {
               )}
             </div>
             {records.length > 0 && (
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors"
-              >
-                <FileDown className="w-4 h-4" />
-                Export Excel
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportCsv}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Export CSV
+                </button>
+                <button
+                  onClick={handleExportXlsx}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Export Excel
+                </button>
+              </div>
             )}
           </div>
 
