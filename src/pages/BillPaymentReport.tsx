@@ -31,6 +31,7 @@ interface PaymentRecord {
   payment_date: string;
   amount_paid: number;
   reference_no: string;
+  lr_date: string | null;
 }
 
 interface VendorOption {
@@ -171,7 +172,22 @@ export default function BillPaymentReport() {
 
       // Sort by payment date descending
       combined.sort((a, b) => (a.payment_date < b.payment_date ? 1 : -1));
-      setRecords(combined);
+
+      // ── Enrich with LR Date from booking_lr ──────────────────────────────
+      const lrNums = [...new Set(combined.map(r => r.lr_number).filter(Boolean))] as string[];
+      const lrDateMap = new Map<string, string>();
+      if (lrNums.length > 0) {
+        const { data: lrData } = await supabase
+          .from('booking_lr')
+          .select('manual_lr_no, lr_date')
+          .in('manual_lr_no', lrNums);
+        for (const row of lrData || []) {
+          if (row.manual_lr_no && row.lr_date) lrDateMap.set(row.manual_lr_no, row.lr_date);
+        }
+      }
+      const enriched = combined.map(r => ({ ...r, lr_date: lrDateMap.get(r.lr_number ?? '') ?? null }));
+
+      setRecords(enriched);
       setSearched(true);
     } catch (err: any) {
       console.error(err);
@@ -203,13 +219,13 @@ export default function BillPaymentReport() {
       'Payment Type': 'Bill Payment',
       'GST Treatment': 'business_none',
       'GST Identification Number (GSTIN)': '',
-      'Destination of Supply': r.destination || '',
+      'Destination of Supply': 'MH',
       'Description of Supply': '',
       'TDS Name': '',
       'TDS Percentage': '',
       'TDS Section Code': '',
       'TDS Amount': r.tx_type === 'BTH' ? (r.thc_tds_amount ?? '') : '',
-      'Bill Date': r.thc_date || '',
+      'Bill Date': r.lr_date || '',
       'Transaction Type': r.tx_type,
       'LR Number': r.lr_number || '',
       'Vehicle Number': r.vehicle_number || '',
