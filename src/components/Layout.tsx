@@ -66,6 +66,7 @@ import APReport from '../pages/APReport';
 import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
 import DownloadBTHBankFile from '../pages/DownloadBTHBankFile';
+import ConsolidatedBTHFile from '../pages/ConsolidatedBTHFile';
 import { VehicleTracking } from '../pages/VehicleTracking';
 import { BillCollection } from '../pages/BillCollection';
 
@@ -133,6 +134,7 @@ const menuItems: MenuItem[] = [
       { id: 'regenerate-advance-bank-file', label: 'Advance Bank Payment File Regenerate' },
       { id: 'generate-balance-bank-file', label: 'BTH Payment' },
       { id: 'download-bth-bank-file', label: 'Download BTH Bank File' },
+      { id: 'consolidated-bth-file', label: 'Consolidated BTH File' },
       { id: 'admin-payment-bank-file', label: 'Admin Payment Bank File' },
       { id: 'bill-collection', label: 'Bill Collection' },
       { id: 'generate-debit-note', label: 'Generate Debit Note' },
@@ -319,6 +321,8 @@ export function Layout() {
         return <VehicleTracking />;
       case 'download-bth-bank-file':
         return <DownloadBTHBankFile />;
+      case 'consolidated-bth-file':
+        return <ConsolidatedBTHFile />;
       case 'truck-balance-payment':
         return <GenerateBalanceBankFile />;
       case 'pending-pod':
