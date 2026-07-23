@@ -594,10 +594,6 @@ Deno.serve(async (req: Request) => {
           reference_number: billNumber,
           is_inclusive_tax: false,
           line_items: lineItems,
-          custom_fields: [
-            { label: 'Bill Number', value: billNumber || '' },
-            { label: 'Bill Type', value: type === 'lr' ? 'LR Bill' : 'Warehouse Bill' },
-          ],
         };
 
         // Add tax if applicable and not RCM
