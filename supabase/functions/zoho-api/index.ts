@@ -100,7 +100,11 @@ async function getOrganizationId(accessToken: string, apiDomain: string): Promis
     throw new Error('No Zoho Books organization found.');
   }
 
-  const orgId = orgData.organizations[0].organization_id;
+  // Prefer the active, non-trial-expired org; fall back to the first
+  const activeOrg = orgData.organizations.find((o: any) =>
+    o.is_org_active !== false && !o.is_trial_expired
+  );
+  const orgId = (activeOrg || orgData.organizations[0]).organization_id;
 
   await supabase
     .from('zoho_oauth_tokens')
