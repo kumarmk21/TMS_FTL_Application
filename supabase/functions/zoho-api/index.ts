@@ -591,6 +591,7 @@ Deno.serve(async (req: Request) => {
           customer_id: customerInfo.zohoId,
           date: billDate ? new Date(billDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           ...(dueDate ? { due_date: new Date(dueDate).toISOString().split('T')[0] } : {}),
+          invoice_number: billNumber,
           reference_number: billNumber,
           is_inclusive_tax: false,
           line_items: lineItems,
