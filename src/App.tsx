@@ -7,7 +7,13 @@ import ZohoCallback from './pages/ZohoCallback';
 function AppContent() {
   const { user } = useAuth();
 
-  if (window.location.pathname === '/auth/zoho/callback') {
+  // Zoho OAuth redirects back to root with ?code= param
+  const params = new URLSearchParams(window.location.search);
+  const isZohoCallback =
+    window.location.pathname === '/auth/zoho/callback' ||
+    params.has('code') && params.has('location');
+
+  if (isZohoCallback) {
     return <ZohoCallback />;
   }
 

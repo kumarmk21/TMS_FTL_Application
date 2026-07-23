@@ -6,12 +6,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const CLIENT_ID = Deno.env.get('ZOHO_CLIENT_ID')!;
-const CLIENT_SECRET = Deno.env.get('ZOHO_CLIENT_SECRET')!;
-const REDIRECT_URI = Deno.env.get('ZOHO_REDIRECT_URI') || 'https://tms.dlslogistics.in/auth/zoho/callback';
-
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+interface ZohoConfig {
+  client_id: string;
+  client_secret: string;
+  redirect_uri: string;
+}
+
+async function getConfig(): Promise<ZohoConfig> {
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  const { data } = await supabase
+    .from('zoho_oauth_tokens')
+    .select('client_id, client_secret, redirect_uri')
+    .eq('id', 1)
+    .maybeSingle();
+
+  return {
+    client_id: data?.client_id || Deno.env.get('ZOHO_CLIENT_ID') || '',
+    client_secret: data?.client_secret || Deno.env.get('ZOHO_CLIENT_SECRET') || '',
+    redirect_uri: data?.redirect_uri || Deno.env.get('ZOHO_REDIRECT_URI') || 'https://tms.dlslogistics.in',
+  };
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -22,13 +39,15 @@ Deno.serve(async (req: Request) => {
   const action = url.searchParams.get('action') || 'status';
 
   try {
+    const config = await getConfig();
+
     // GET ?action=authorize — return Zoho consent URL
     if (action === 'authorize') {
       const authUrl = new URL('https://accounts.zoho.in/oauth/v2/auth');
       authUrl.searchParams.set('scope', 'ZohoBooks.fullaccess.all');
-      authUrl.searchParams.set('client_id', CLIENT_ID);
+      authUrl.searchParams.set('client_id', config.client_id);
       authUrl.searchParams.set('response_type', 'code');
-      authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+      authUrl.searchParams.set('redirect_uri', config.redirect_uri);
       authUrl.searchParams.set('access_type', 'offline');
       authUrl.searchParams.set('prompt', 'consent');
       return new Response(JSON.stringify({ authUrl: authUrl.toString() }), {
@@ -48,9 +67,9 @@ Deno.serve(async (req: Request) => {
 
       const tokenUrl = new URL('https://accounts.zoho.in/oauth/v2/token');
       tokenUrl.searchParams.set('grant_type', 'authorization_code');
-      tokenUrl.searchParams.set('client_id', CLIENT_ID);
-      tokenUrl.searchParams.set('client_secret', CLIENT_SECRET);
-      tokenUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+      tokenUrl.searchParams.set('client_id', config.client_id);
+      tokenUrl.searchParams.set('client_secret', config.client_secret);
+      tokenUrl.searchParams.set('redirect_uri', config.redirect_uri);
       tokenUrl.searchParams.set('code', code);
 
       const tokenRes = await fetch(tokenUrl.toString(), { method: 'POST' });
@@ -78,6 +97,9 @@ Deno.serve(async (req: Request) => {
           location: tokenData.location || null,
           connected_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          client_id: config.client_id,
+          client_secret: config.client_secret,
+          redirect_uri: config.redirect_uri,
         }, { onConflict: 'id' });
 
       if (error) throw error;
@@ -92,13 +114,13 @@ Deno.serve(async (req: Request) => {
       const supabase = createClient(supabaseUrl, supabaseKey);
       const { data, error } = await supabase
         .from('zoho_oauth_tokens')
-        .select('connected_at, expires_at, api_domain, location')
+        .select('connected_at, expires_at, api_domain, location, access_token')
         .eq('id', 1)
         .maybeSingle();
 
       if (error) throw error;
 
-      if (!data) {
+      if (!data || !data.access_token) {
         return new Response(JSON.stringify({ connected: false }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -120,7 +142,15 @@ Deno.serve(async (req: Request) => {
       const supabase = createClient(supabaseUrl, supabaseKey);
       const { error } = await supabase
         .from('zoho_oauth_tokens')
-        .delete()
+        .update({
+          access_token: null,
+          refresh_token: null,
+          expires_at: null,
+          api_domain: null,
+          location: null,
+          connected_at: null,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', 1);
 
       if (error) throw error;
