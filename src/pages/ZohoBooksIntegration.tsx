@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, Download, ArrowRight } from 'lucide-react';
+import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, Download, ArrowRight, FileText, Eye, Send } from 'lucide-react';
 
 interface ConnectionStatus {
   connected: boolean;
@@ -30,6 +30,32 @@ interface SyncStats {
   unlinked: number;
 }
 
+interface InvoiceSyncStats {
+  lr: { total: number; synced: number; pending: number };
+  warehouse: { total: number; synced: number; pending: number };
+  total: number;
+  synced: number;
+  pending: number;
+}
+
+interface InvoicePushResult {
+  total: number;
+  pushed: number;
+  skipped: number;
+  errors: number;
+  dryRun: boolean;
+  details: Array<{
+    bill_id: string;
+    bill_number: string;
+    bill_type: string;
+    customer_name: string;
+    amount: number;
+    zoho_invoice_id?: string;
+    zoho_invoice_number?: string;
+    status: string;
+  }>;
+}
+
 export default function ZohoBooksIntegration() {
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +68,13 @@ export default function ZohoBooksIntegration() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
   const [syncFilter, setSyncFilter] = useState<'all' | 'linked' | 'pushed' | 'error'>('all');
+
+  const [invoiceStats, setInvoiceStats] = useState<InvoiceSyncStats | null>(null);
+  const [pushing, setPushing] = useState(false);
+  const [pushResult, setPushResult] = useState<InvoicePushResult | null>(null);
+  const [pushFilter, setPushFilter] = useState<'all' | 'pushed' | 'skipped' | 'error'>('all');
+  const [billTypeFilter, setBillTypeFilter] = useState<'lr' | 'warehouse' | 'both'>('both');
+  const [dryRunOnly, setDryRunOnly] = useState(false);
 
   const oauthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-oauth`;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api`;
@@ -60,6 +93,7 @@ export default function ZohoBooksIntegration() {
       setStatus(data);
       if (data.connected) {
         await fetchSyncStats();
+        await fetchInvoiceStats();
       }
     } catch (err: any) {
       setError(err.message || 'Failed to check connection status');
@@ -68,12 +102,22 @@ export default function ZohoBooksIntegration() {
     }
   }, [oauthUrl]);
 
+  const fetchInvoiceStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiUrl}?action=invoice-sync-stats`, {
+        headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setInvoiceStats(data);
+    } catch {
+      // non-critical
+    }
+  }, [apiUrl]);
+
   const fetchSyncStats = useCallback(async () => {
     try {
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-      const sb = createClient(supabaseUrl, supabaseAnonKey);
+      const { supabase: sb } = await import('../lib/supabase');
 
       const { count: total } = await sb
         .from('customer_master')
@@ -178,6 +222,38 @@ export default function ZohoBooksIntegration() {
     }
   };
 
+  const handlePushInvoices = async () => {
+    setPushing(true);
+    setError('');
+    setPushResult(null);
+    try {
+      const res = await fetch(`${apiUrl}?action=push-invoices`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          bill_type: billTypeFilter,
+          dry_run: dryRunOnly,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Push failed (${res.status})`);
+      }
+      setPushResult(data);
+      const mode = data.dryRun ? 'DRY RUN: ' : '';
+      setSuccess(`${mode}${data.pushed} invoices pushed, ${data.skipped} skipped, ${data.errors} errors out of ${data.total} processed.`);
+      setTimeout(() => setSuccess(''), 8000);
+      await fetchInvoiceStats();
+    } catch (err: any) {
+      setError(err.message || 'Failed to push invoices');
+    } finally {
+      setPushing(false);
+    }
+  };
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString('en-IN', {
@@ -198,6 +274,20 @@ export default function ZohoBooksIntegration() {
         return true;
       })
     : [];
+
+  const filteredInvoiceDetails = pushResult
+    ? pushResult.details.filter(d => {
+        if (pushFilter === 'all') return true;
+        if (pushFilter === 'pushed') return d.status === 'pushed';
+        if (pushFilter === 'skipped') return d.status.startsWith('skipped');
+        if (pushFilter === 'error') return d.status.includes('error') || d.status.includes('push error');
+        return true;
+      })
+    : [];
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+  };
 
   return (
     <div className="space-y-6">
@@ -476,6 +566,211 @@ export default function ZohoBooksIntegration() {
                             <span className={`text-xs ${
                               d.status === 'linked' ? 'text-green-700' :
                               d.status === 'pushed' ? 'text-blue-700' :
+                              d.status.includes('error') ? 'text-red-700' :
+                              'text-gray-500'
+                            }`}>
+                              {d.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Push Invoices Card */}
+      {status?.connected && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="p-2 bg-emerald-50 rounded-lg">
+              <FileText className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-bold text-gray-900">Push Invoices to Zoho Books</h2>
+              <p className="text-sm text-gray-500">Export your LR and Warehouse bills as invoices to Zoho Books</p>
+            </div>
+          </div>
+
+          {/* Invoice Stats */}
+          {invoiceStats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <p className="text-2xl font-bold text-gray-900">{invoiceStats.total}</p>
+                <p className="text-xs text-gray-500 mt-0.5">Total Bills</p>
+              </div>
+              <div className="p-3 bg-green-50 rounded-lg text-center">
+                <p className="text-2xl font-bold text-green-700">{invoiceStats.synced}</p>
+                <p className="text-xs text-green-600 mt-0.5">Pushed to Zoho</p>
+              </div>
+              <div className="p-3 bg-amber-50 rounded-lg text-center">
+                <p className="text-2xl font-bold text-amber-700">{invoiceStats.pending}</p>
+                <p className="text-xs text-amber-600 mt-0.5">Pending</p>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-lg text-center">
+                <p className="text-xl font-bold text-blue-700">
+                  {invoiceStats.lr.total > 0 ? `${invoiceStats.lr.synced}/${invoiceStats.lr.total}` : '0'}
+                  <span className="text-xs text-gray-400 mx-1">LR</span>
+                  {invoiceStats.warehouse.total > 0 ? `${invoiceStats.warehouse.synced}/${invoiceStats.warehouse.total}` : '0'}
+                  <span className="text-xs text-gray-400 ml-1">WH</span>
+                </p>
+                <p className="text-xs text-blue-600 mt-0.5">Breakdown</p>
+              </div>
+            </div>
+          )}
+
+          {/* Controls */}
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium text-gray-600">Bill Type:</label>
+              <select
+                value={billTypeFilter}
+                onChange={(e) => setBillTypeFilter(e.target.value as 'lr' | 'warehouse' | 'both')}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+              >
+                <option value="both">Both (LR + Warehouse)</option>
+                <option value="lr">LR Bills Only</option>
+                <option value="warehouse">Warehouse Bills Only</option>
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={dryRunOnly}
+                onChange={(e) => setDryRunOnly(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="flex items-center gap-1">
+                <Eye className="w-3.5 h-3.5" />
+                Dry Run (preview only)
+              </span>
+            </label>
+
+            <button
+              onClick={handlePushInvoices}
+              disabled={pushing}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ml-auto"
+            >
+              {pushing ? <Loader2 className="w-4 h-4 animate-spin" /> : dryRunOnly ? <Eye className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+              {pushing ? 'Processing...' : dryRunOnly ? 'Preview Push' : 'Push Invoices Now'}
+            </button>
+          </div>
+
+          {/* Info Banner */}
+          <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200 mb-4">
+            <h4 className="text-sm font-semibold text-emerald-900 mb-2">How invoice push works</h4>
+            <ul className="space-y-1.5 text-sm text-emerald-800">
+              <li className="flex items-start gap-2">
+                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                Only bills with status "Active" (LR) or all bills (Warehouse) that haven't been pushed yet are included
+              </li>
+              <li className="flex items-start gap-2">
+                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                Each bill is created as a Zoho Books invoice linked to the synced customer contact
+              </li>
+              <li className="flex items-start gap-2">
+                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                Bills for customers not linked to Zoho are skipped — run Customer Sync first
+              </li>
+              <li className="flex items-start gap-2">
+                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                Use Dry Run to preview which bills would be pushed without creating anything
+              </li>
+              <li className="flex items-start gap-2">
+                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                Each push processes up to 50 bills at a time to avoid timeouts
+              </li>
+            </ul>
+          </div>
+
+          {/* Push Results */}
+          {pushResult && (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="p-4 bg-gray-50 border-b border-gray-200">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <h4 className="text-sm font-semibold text-gray-900">
+                    {pushResult.dryRun ? 'Dry Run Results' : 'Push Results'}
+                  </h4>
+                  <div className="flex items-center gap-4 text-xs">
+                    <span className="text-gray-600">
+                      Total: <strong>{pushResult.total}</strong>
+                    </span>
+                    <span className="text-green-700">
+                      Pushed: <strong>{pushResult.pushed}</strong>
+                    </span>
+                    <span className="text-amber-700">
+                      Skipped: <strong>{pushResult.skipped}</strong>
+                    </span>
+                    <span className="text-red-700">
+                      Errors: <strong>{pushResult.errors}</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Tabs */}
+              <div className="flex items-center gap-1 px-4 py-2 bg-gray-50 border-b border-gray-200">
+                {(['all', 'pushed', 'skipped', 'error'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setPushFilter(f)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      pushFilter === f
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {f === 'all' && `All (${pushResult.details.length})`}
+                    {f === 'pushed' && `Pushed (${pushResult.details.filter(d => d.status === 'pushed').length})`}
+                    {f === 'skipped' && `Skipped (${pushResult.details.filter(d => d.status.startsWith('skipped')).length})`}
+                    {f === 'error' && `Errors (${pushResult.details.filter(d => d.status.includes('error')).length})`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Details Table */}
+              <div className="max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white border-b border-gray-200">
+                    <tr>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Bill No.</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Customer</th>
+                      <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Zoho Invoice</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredInvoiceDetails.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                          No records in this category
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInvoiceDetails.map((d, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-gray-700 font-mono text-xs">{d.bill_number}</td>
+                          <td className="px-4 py-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              d.bill_type === 'LR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                            }`}>
+                              {d.bill_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-gray-900">{d.customer_name}</td>
+                          <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatCurrency(d.amount)}</td>
+                          <td className="px-4 py-2 text-gray-500 font-mono text-xs">{d.zoho_invoice_number || d.zoho_invoice_id || '-'}</td>
+                          <td className="px-4 py-2">
+                            <span className={`text-xs ${
+                              d.status === 'pushed' ? 'text-green-700' :
+                              d.status.startsWith('skipped') ? 'text-amber-700' :
                               d.status.includes('error') ? 'text-red-700' :
                               'text-gray-500'
                             }`}>

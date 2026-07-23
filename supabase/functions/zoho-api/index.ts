@@ -464,6 +464,340 @@ Deno.serve(async (req: Request) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── Push invoices to Zoho Books ──
+    if (action === 'push-invoices') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const body = await req.json().catch(() => ({}));
+      const billType = (body as { bill_type?: string }).bill_type || 'lr'; // 'lr' | 'warehouse' | 'both'
+      const dryRun = (body as { dry_run?: boolean }).dry_run || false;
+      const billIds = (body as { bill_ids?: string[] }).bill_ids; // optional specific bill IDs
+
+      const result = {
+        total: 0,
+        pushed: 0,
+        skipped: 0,
+        errors: 0,
+        dryRun,
+        details: [] as Array<{
+          bill_id: string;
+          bill_number: string;
+          bill_type: string;
+          customer_name: string;
+          amount: number;
+          zoho_invoice_id?: string;
+          zoho_invoice_number?: string;
+          status: string;
+        }>,
+      };
+
+      // Build customer lookup: customer_id -> zoho_customer_id
+      const { data: customers } = await supabase
+        .from('customer_master')
+        .select('customer_id, zoho_customer_id, customer_name')
+        .not('zoho_customer_id', 'is', null);
+
+      const customerMap = new Map<string, { zohoId: string; name: string }>();
+      for (const c of customers || []) {
+        customerMap.set(c.customer_id, { zohoId: c.zoho_customer_id, name: c.customer_name });
+      }
+
+      // Fetch company info (seller)
+      const { data: company } = await supabase
+        .from('company_master')
+        .select('company_name, gstin, company_address, city, state, pin_code')
+        .limit(1)
+        .maybeSingle();
+
+      // ── Helper: push a single invoice to Zoho ──
+      async function pushInvoice(
+        bill: Record<string, any>,
+        type: 'lr' | 'warehouse'
+      ): Promise<{ zoho_invoice_id?: string; zoho_invoice_number?: string; status: string }> {
+        const customerInfo = customerMap.get(bill.billing_party_code);
+        if (!customerInfo) {
+          return { status: `skipped: customer "${bill.billing_party_code}" not linked to Zoho` };
+        }
+
+        const billDate = bill.lr_bill_date || bill.bill_date;
+        const dueDate = bill.lr_bill_due_date || bill.bill_due_date;
+        const billNumber = bill.lr_bill_number || bill.bill_number;
+        const sacCode = bill.sac_code || '';
+        const sacDesc = bill.sac_description || '';
+        const subTotal = parseFloat(bill.sub_total || bill.bill_amount || '0');
+
+        // Build line items
+        const lineItems: Record<string, any>[] = [];
+
+        if (type === 'lr') {
+          // LR bill — single freight line item
+          lineItems.push({
+            name: sacDesc || 'Goods Transport Agency (GTA) Services',
+            description: sacDesc || 'Freight charges',
+            rate: subTotal,
+            quantity: 1,
+            item_order: 1,
+            ...(sacCode ? { sac_code: sacCode } : {}),
+          });
+        } else {
+          // Warehouse bill — warehouse charges + other charges
+          if (parseFloat(bill.warehouse_charges || '0') > 0) {
+            lineItems.push({
+              name: bill.service_type || 'Warehousing Services',
+              description: bill.service_type || sacDesc || 'Warehouse charges',
+              rate: parseFloat(bill.warehouse_charges),
+              quantity: 1,
+              item_order: 1,
+              ...(sacCode ? { sac_code: sacCode } : {}),
+            });
+          }
+          if (parseFloat(bill.other_charges || '0') > 0) {
+            lineItems.push({
+              name: 'Other Charges',
+              description: 'Other charges',
+              rate: parseFloat(bill.other_charges),
+              quantity: 1,
+              item_order: 2,
+            });
+          }
+          if (lineItems.length === 0) {
+            lineItems.push({
+              name: sacDesc || 'Warehousing Services',
+              description: sacDesc || 'Service charges',
+              rate: subTotal,
+              quantity: 1,
+              item_order: 1,
+              ...(sacCode ? { sac_code: sacCode } : {}),
+            });
+          }
+        }
+
+        // Determine GST treatment
+        const billToGstin = (bill.bill_to_gstin || '').trim();
+        const companyGstin = (company?.gstin || '').trim();
+        const isInterState = bill.bill_to_state && company?.state &&
+          bill.bill_to_state.toUpperCase() !== company.state.toUpperCase();
+
+        let gstTreatment = 'business_gst';
+        if (!billToGstin) gstTreatment = 'consumer';
+
+        // Determine tax type from bill data
+        const gstChargeType = bill.gst_charge_type || '';
+        const isRCM = gstChargeType.toLowerCase().includes('rcm');
+        const gstRate = parseFloat(bill.gst_percentage || '0');
+
+        const invoicePayload: Record<string, any> = {
+          customer_id: customerInfo.zohoId,
+          date: billDate ? new Date(billDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          ...(dueDate ? { due_date: new Date(dueDate).toISOString().split('T')[0] } : {}),
+          reference_number: billNumber,
+          is_inclusive_tax: false,
+          line_items: lineItems,
+          custom_fields: [
+            { label: 'Bill Number', value: billNumber || '' },
+            { label: 'Bill Type', value: type === 'lr' ? 'LR Bill' : 'Warehouse Bill' },
+          ],
+        };
+
+        // Add tax if applicable and not RCM
+        if (!isRCM && gstRate > 0) {
+          if (isInterState) {
+            invoicePayload.tax_id = ''; // Let Zoho calculate IGST
+          }
+          // For CGST/SGST intra-state, Zoho auto-calculates based on item tax
+        }
+
+        if (dryRun) {
+          return { status: 'dry run - would push' };
+        }
+
+        const createUrl = new URL(`${apiDomain}/books/v3/invoices`);
+        createUrl.searchParams.set('organization_id', orgId);
+
+        const createRes = await fetch(createUrl.toString(), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${accessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `JSONString=${encodeURIComponent(JSON.stringify(invoicePayload))}`,
+        });
+
+        const createData = await createRes.json();
+
+        if (createData.code === 0 && createData.invoice) {
+          return {
+            zoho_invoice_id: createData.invoice.invoice_id,
+            zoho_invoice_number: createData.invoice.invoice_number,
+            status: 'pushed',
+          };
+        } else {
+          return { status: `push error: ${createData.message || 'unknown'}` };
+        }
+      }
+
+      // ── Process LR Bills ──
+      if (billType === 'lr' || billType === 'both') {
+        let lrQuery = supabase
+          .from('lr_bill')
+          .select('bill_id, tran_id, lr_bill_number, lr_bill_date, lr_bill_due_date, billing_party_code, billing_party_name, bill_to_gstin, bill_to_state, sub_total, bill_amount, sac_code, sac_description, bill_status, credit_days, zoho_invoice_id')
+          .eq('bill_status', 'Active')
+          .is('zoho_invoice_id', null)
+          .order('lr_bill_date', { ascending: false })
+          .limit(50);
+
+        if (billIds && billIds.length > 0) {
+          lrQuery = lrQuery.in('bill_id', billIds);
+        }
+
+        const { data: lrBills, error: lrError } = await lrQuery;
+
+        if (lrError) {
+          return new Response(JSON.stringify({ error: `LR bill fetch error: ${lrError.message}` }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        for (const bill of lrBills || []) {
+          result.total++;
+          const amount = parseFloat(bill.bill_amount || bill.sub_total || '0');
+
+          const pushResult = await pushInvoice(bill, 'lr');
+
+          if (pushResult.status === 'pushed') {
+            result.pushed++;
+            await supabase
+              .from('lr_bill')
+              .update({
+                zoho_invoice_id: pushResult.zoho_invoice_id,
+                zoho_invoice_number: pushResult.zoho_invoice_number,
+                zoho_synced_at: new Date().toISOString(),
+              })
+              .eq('bill_id', bill.bill_id);
+          } else if (pushResult.status.startsWith('skipped')) {
+            result.skipped++;
+          } else {
+            result.errors++;
+          }
+
+          result.details.push({
+            bill_id: bill.bill_id,
+            bill_number: bill.lr_bill_number || '',
+            bill_type: 'LR',
+            customer_name: bill.billing_party_name || '',
+            amount,
+            zoho_invoice_id: pushResult.zoho_invoice_id,
+            zoho_invoice_number: pushResult.zoho_invoice_number,
+            status: pushResult.status,
+          });
+        }
+      }
+
+      // ── Process Warehouse Bills ──
+      if (billType === 'warehouse' || billType === 'both') {
+        let whQuery = supabase
+          .from('warehouse_bill')
+          .select('bill_id, bill_number, bill_date, bill_due_date, billing_party_code, billing_party_name, bill_to_gstin, bill_to_state, warehouse_charges, other_charges, sub_total, gst_percentage, igst_amount, cgst_amount, sgst_amount, total_amount, sac_code, sac_description, bill_status, service_type, gst_charge_type, zoho_invoice_id')
+          .is('zoho_invoice_id', null)
+          .order('bill_date', { ascending: false })
+          .limit(50);
+
+        if (billIds && billIds.length > 0) {
+          whQuery = whQuery.in('bill_id', billIds);
+        }
+
+        const { data: whBills, error: whError } = await whQuery;
+
+        if (whError) {
+          return new Response(JSON.stringify({ error: `Warehouse bill fetch error: ${whError.message}` }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        for (const bill of whBills || []) {
+          result.total++;
+          const amount = parseFloat(bill.total_amount || bill.sub_total || '0');
+
+          const pushResult = await pushInvoice(bill, 'warehouse');
+
+          if (pushResult.status === 'pushed') {
+            result.pushed++;
+            await supabase
+              .from('warehouse_bill')
+              .update({
+                zoho_invoice_id: pushResult.zoho_invoice_id,
+                zoho_invoice_number: pushResult.zoho_invoice_number,
+                zoho_synced_at: new Date().toISOString(),
+              })
+              .eq('bill_id', bill.bill_id);
+          } else if (pushResult.status.startsWith('skipped')) {
+            result.skipped++;
+          } else {
+            result.errors++;
+          }
+
+          result.details.push({
+            bill_id: bill.bill_id,
+            bill_number: bill.bill_number || '',
+            bill_type: 'WH',
+            customer_name: bill.billing_party_name || '',
+            amount,
+            zoho_invoice_id: pushResult.zoho_invoice_id,
+            zoho_invoice_number: pushResult.zoho_invoice_number,
+            status: pushResult.status,
+          });
+        }
+      }
+
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Fetch invoice sync stats ──
+    if (action === 'invoice-sync-stats') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { count: lrTotal } = await supabase
+        .from('lr_bill')
+        .select('*', { count: 'exact', head: true })
+        .eq('bill_status', 'Active');
+
+      const { count: lrSynced } = await supabase
+        .from('lr_bill')
+        .select('*', { count: 'exact', head: true })
+        .eq('bill_status', 'Active')
+        .not('zoho_invoice_id', 'is', null);
+
+      const { count: whTotal } = await supabase
+        .from('warehouse_bill')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: whSynced } = await supabase
+        .from('warehouse_bill')
+        .select('*', { count: 'exact', head: true })
+        .not('zoho_invoice_id', 'is', null);
+
+      return new Response(JSON.stringify({
+        lr: {
+          total: lrTotal || 0,
+          synced: lrSynced || 0,
+          pending: (lrTotal || 0) - (lrSynced || 0),
+        },
+        warehouse: {
+          total: whTotal || 0,
+          synced: whSynced || 0,
+          pending: (whTotal || 0) - (whSynced || 0),
+        },
+        total: (lrTotal || 0) + (whTotal || 0),
+        synced: (lrSynced || 0) + (whSynced || 0),
+        pending: (lrTotal || 0) - (lrSynced || 0) + (whTotal || 0) - (whSynced || 0),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
