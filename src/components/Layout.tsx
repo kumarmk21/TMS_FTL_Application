@@ -67,6 +67,7 @@ import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
 import DownloadBTHBankFile from '../pages/DownloadBTHBankFile';
 import ConsolidatedBTHFile from '../pages/ConsolidatedBTHFile';
+import ZohoBooksIntegration from '../pages/ZohoBooksIntegration';
 import { VehicleTracking } from '../pages/VehicleTracking';
 import { BillCollection } from '../pages/BillCollection';
 
@@ -137,6 +138,7 @@ const menuItems: MenuItem[] = [
       { id: 'consolidated-bth-file', label: 'Consolidated BTH File' },
       { id: 'admin-payment-bank-file', label: 'Admin Payment Bank File' },
       { id: 'bill-collection', label: 'Bill Collection' },
+      { id: 'zoho-books-integration', label: 'Zoho Books Integration' },
       { id: 'generate-debit-note', label: 'Generate Debit Note' },
       { id: 'generate-credit-note', label: 'Generate Credit Note' },
     ],
@@ -323,6 +325,8 @@ export function Layout() {
         return <DownloadBTHBankFile />;
       case 'consolidated-bth-file':
         return <ConsolidatedBTHFile />;
+      case 'zoho-books-integration':
+        return <ZohoBooksIntegration />;
       case 'truck-balance-payment':
         return <GenerateBalanceBankFile />;
       case 'pending-pod':
