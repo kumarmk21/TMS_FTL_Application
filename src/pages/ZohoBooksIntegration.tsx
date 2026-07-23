@@ -43,7 +43,7 @@ export default function ZohoBooksIntegration() {
   useEffect(() => {
     fetchStatus();
     const params = new URLSearchParams(window.location.search);
-    if (params.get('status') === 'connected') {
+    if (params.get('zoho') === 'connected' || params.get('status') === 'connected') {
       setSuccess('Successfully connected to Zoho Books!');
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => setSuccess(''), 5000);

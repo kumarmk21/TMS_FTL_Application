@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const CLIENT_ID = Deno.env.get('ZOHO_CLIENT_ID')!;
 const CLIENT_SECRET = Deno.env.get('ZOHO_CLIENT_SECRET')!;
-const REDIRECT_URI = Deno.env.get('ZOHO_REDIRECT_URI') || 'https://tms.dlslogistics.in/auth/zoho/callback';
+const REDIRECT_URI = 'https://tms.dlslogistics.in/auth/zoho/callback';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -19,11 +19,12 @@ Deno.serve(async (req: Request) => {
   }
 
   const url = new URL(req.url);
-  const action = url.searchParams.get('action') || 'callback';
+  const action = url.searchParams.get('action') || 'status';
 
   try {
+    // GET ?action=authorize — return Zoho consent URL
     if (action === 'authorize') {
-      const authUrl = new URL('https://accounts.zoho.com/oauth/v2/auth');
+      const authUrl = new URL('https://accounts.zoho.in/oauth/v2/auth');
       authUrl.searchParams.set('scope', 'ZohoBooks.fullaccess.all');
       authUrl.searchParams.set('client_id', CLIENT_ID);
       authUrl.searchParams.set('response_type', 'code');
@@ -35,8 +36,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (action === 'callback') {
-      const code = url.searchParams.get('code');
+    // POST ?action=exchange — SPA sends the code received from Zoho redirect
+    if (action === 'exchange') {
+      const { code } = await req.json();
       if (!code) {
         return new Response(JSON.stringify({ error: 'Missing authorization code' }), {
           status: 400,
@@ -44,7 +46,7 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const tokenUrl = new URL('https://accounts.zoho.com/oauth/v2/token');
+      const tokenUrl = new URL('https://accounts.zoho.in/oauth/v2/token');
       tokenUrl.searchParams.set('grant_type', 'authorization_code');
       tokenUrl.searchParams.set('client_id', CLIENT_ID);
       tokenUrl.searchParams.set('client_secret', CLIENT_SECRET);
@@ -80,11 +82,12 @@ Deno.serve(async (req: Request) => {
 
       if (error) throw error;
 
-      const redirectUrl = new URL('/zoho-books', url.origin);
-      redirectUrl.searchParams.set('status', 'connected');
-      return Response.redirect(redirectUrl.toString(), 302);
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
+    // GET ?action=status
     if (action === 'status') {
       const supabase = createClient(supabaseUrl, supabaseKey);
       const { data, error } = await supabase
@@ -112,6 +115,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // GET ?action=disconnect
     if (action === 'disconnect') {
       const supabase = createClient(supabaseUrl, supabaseKey);
       const { error } = await supabase
@@ -121,7 +125,7 @@ Deno.serve(async (req: Request) => {
 
       if (error) throw error;
 
-      return new Response(JSON.stringify({ success: true, message: 'Disconnected from Zoho Books' }), {
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -130,9 +134,9 @@ Deno.serve(async (req: Request) => {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
-    console.error('Zoho OAuth error:', error);
-    return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
+  } catch (err: any) {
+    console.error('Zoho OAuth error:', err);
+    return new Response(JSON.stringify({ error: err.message || 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
