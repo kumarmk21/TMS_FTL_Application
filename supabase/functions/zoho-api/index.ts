@@ -33,7 +33,7 @@ async function getValidAccessToken(): Promise<{ accessToken: string; apiDomain: 
 
   const now = new Date();
   const expiresAt = row.expires_at ? new Date(row.expires_at) : new Date(0);
-  const bufferMs = 5 * 60 * 1000;
+  const bufferMs = 2 * 60 * 1000;
 
   if (expiresAt.getTime() - now.getTime() > bufferMs) {
     return {
@@ -43,6 +43,7 @@ async function getValidAccessToken(): Promise<{ accessToken: string; apiDomain: 
     };
   }
 
+  // Refresh the token
   const clientId = row.client_id || Deno.env.get('ZOHO_CLIENT_ID') || '';
   const clientSecret = row.client_secret || Deno.env.get('ZOHO_CLIENT_SECRET') || '';
 
@@ -56,7 +57,7 @@ async function getValidAccessToken(): Promise<{ accessToken: string; apiDomain: 
   const refreshData = await refreshRes.json();
 
   if (refreshData.error) {
-    throw new Error(`Token refresh failed: ${refreshData.error}`);
+    throw new Error(`Token refresh failed: ${refreshData.error}. Please reconnect Zoho Books.`);
   }
 
   const newExpiresAt = new Date(Date.now() + (refreshData.expires_in_sec || refreshData.expires_in || 3600) * 1000).toISOString();
@@ -96,7 +97,7 @@ async function getOrganizationId(accessToken: string, apiDomain: string): Promis
   const orgData = await res.json();
 
   if (!orgData.organizations || orgData.organizations.length === 0) {
-    throw new Error('No Zoho Books organization found. Please create an organization in Zoho Books first.');
+    throw new Error('No Zoho Books organization found.');
   }
 
   const orgId = orgData.organizations[0].organization_id;
@@ -109,20 +110,9 @@ async function getOrganizationId(accessToken: string, apiDomain: string): Promis
   return orgId;
 }
 
-interface ZohoCustomer {
-  contact_id: string;
-  contact_name: string;
-  company_name?: string;
-  email?: string;
-  phone?: string;
-  gst_treatment?: string;
-  gstin?: string;
-  billing_address?: {
-    address?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-  };
+// Extract GSTIN from a Zoho contact — field name varies by API version
+function extractGstin(c: Record<string, any>): string {
+  return (c.gst_no || c.gstin || c.gst_identification_number || '').trim().toUpperCase();
 }
 
 Deno.serve(async (req: Request) => {
@@ -135,6 +125,62 @@ Deno.serve(async (req: Request) => {
     const action = url.searchParams.get('action') || 'proxy';
 
     const { accessToken, apiDomain } = await getValidAccessToken();
+
+    // ── Debug: see raw Zoho contacts response ──
+    if (action === 'debug-contacts') {
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+      const debugUrl = new URL(`${apiDomain}/books/v3/contacts`);
+      debugUrl.searchParams.set('organization_id', orgId);
+      debugUrl.searchParams.set('page', '1');
+      debugUrl.searchParams.set('per_page', '5');
+
+      const res = await fetch(debugUrl.toString(), {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const raw = await res.json();
+
+      // Also try with contact_type filter
+      const filteredUrl = new URL(`${apiDomain}/books/v3/contacts`);
+      filteredUrl.searchParams.set('organization_id', orgId);
+      filteredUrl.searchParams.set('contact_type', 'customer');
+      filteredUrl.searchParams.set('page', '1');
+      filteredUrl.searchParams.set('per_page', '5');
+
+      const filteredRes = await fetch(filteredUrl.toString(), {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const filtered = await filteredRes.json();
+
+      return new Response(JSON.stringify({
+        orgId,
+        apiDomain,
+        allContacts: {
+          code: raw.code,
+          message: raw.message,
+          count: raw.contacts?.length || 0,
+          sample: (raw.contacts || []).slice(0, 3).map((c: any) => ({
+            contact_id: c.contact_id,
+            contact_name: c.contact_name,
+            contact_type: c.contact_type,
+            gst_no: c.gst_no,
+            gstin: c.gstin,
+          })),
+          page_context: raw.page_context,
+        },
+        customerContacts: {
+          code: filtered.code,
+          message: filtered.message,
+          count: filtered.contacts?.length || 0,
+          sample: (filtered.contacts || []).slice(0, 3).map((c: any) => ({
+            contact_id: c.contact_id,
+            contact_name: c.contact_name,
+            contact_type: c.contact_type,
+            gst_no: c.gst_no,
+            gstin: c.gstin,
+          })),
+        },
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // ── Generic proxy ──
     if (action === 'proxy') {
@@ -163,9 +209,6 @@ Deno.serve(async (req: Request) => {
       const headers: Record<string, string> = {
         'Authorization': `Zoho-oauthtoken ${accessToken}`,
       };
-      if (method && method !== 'GET') {
-        headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      }
 
       const apiRes = await fetch(targetUrl.toString(), {
         method: method || 'GET',
@@ -174,27 +217,27 @@ Deno.serve(async (req: Request) => {
       });
 
       const apiData = await apiRes.json();
-
       return new Response(JSON.stringify(apiData), {
         status: apiRes.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // ── Sync: fetch all Zoho customers ──
+    // ── Sync customers ──
     if (action === 'sync-customers') {
       const supabase = createClient(supabaseUrl, supabaseKey);
       const orgId = await getOrganizationId(accessToken, apiDomain);
 
-      // Fetch all contacts from Zoho (paginated)
-      let allZohoCustomers: ZohoCustomer[] = [];
+      // Fetch ALL contacts without contact_type filter first, then filter client-side
+      // (Zoho Books India sometimes ignores contact_type query param)
+      let allZohoCustomers: Record<string, any>[] = [];
       let page = 1;
       let hasMore = true;
+      let fetchError = '';
 
       while (hasMore) {
         const contactsUrl = new URL(`${apiDomain}/books/v3/contacts`);
         contactsUrl.searchParams.set('organization_id', orgId);
-        contactsUrl.searchParams.set('contact_type', 'customer');
         contactsUrl.searchParams.set('page', String(page));
         contactsUrl.searchParams.set('per_page', '200');
 
@@ -203,17 +246,32 @@ Deno.serve(async (req: Request) => {
         });
         const data = await res.json();
 
-        if (data.code && data.code !== 0) {
-          throw new Error(`Zoho API error: ${data.message || data.code}`);
+        if (data.code !== undefined && data.code !== 0) {
+          fetchError = `Zoho API error (code ${data.code}): ${data.message || 'Unknown error'}`;
+          break;
         }
 
-        const contacts = data.contacts || [];
-        allZohoCustomers = allZohoCustomers.concat(contacts);
-        hasMore = data.page_context && data.page_context.has_more;
+        const contacts = (data.contacts || []) as Record<string, any>[];
+        // Keep only customers (contact_type = 'customer') or all if no type set
+        const customers = contacts.filter((c: Record<string, any>) =>
+          !c.contact_type || c.contact_type === 'customer'
+        );
+        allZohoCustomers = allZohoCustomers.concat(customers);
+        hasMore = !!(data.page_context?.has_more_page || data.page_context?.has_more);
         page++;
+
+        // Safety limit
+        if (page > 50) break;
       }
 
-      // Fetch all local customers
+      if (fetchError) {
+        return new Response(JSON.stringify({ error: fetchError }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Fetch all local active customers
       const { data: localCustomers, error: localError } = await supabase
         .from('customer_master')
         .select('id, customer_id, customer_name, gstin, customer_email, customer_phone, customer_city, customer_state, customer_address, zoho_customer_id')
@@ -221,12 +279,13 @@ Deno.serve(async (req: Request) => {
 
       if (localError) throw localError;
 
-      // Build GSTIN lookup from Zoho
-      const zohoByGstin = new Map<string, ZohoCustomer>();
-      const zohoByName = new Map<string, ZohoCustomer>();
+      // Build lookup maps — GSTIN primary, name fallback
+      const zohoByGstin = new Map<string, Record<string, any>>();
+      const zohoByName = new Map<string, Record<string, any>>();
       for (const zc of allZohoCustomers) {
-        if (zc.gstin) zohoByGstin.set(zc.gstin.toUpperCase(), zc);
-        zohoByName.set(zc.contact_name.toLowerCase().trim(), zc);
+        const gstin = extractGstin(zc);
+        if (gstin) zohoByGstin.set(gstin, zc);
+        zohoByName.set((zc.contact_name as string).toLowerCase().trim(), zc);
       }
 
       const result = {
@@ -235,28 +294,37 @@ Deno.serve(async (req: Request) => {
         matched: 0,
         unmatched: 0,
         pushed: 0,
-        details: [] as Array<{ customer_id: string; customer_name: string; action: string; zoho_id?: string; status: string }>,
+        errors: 0,
+        details: [] as Array<{
+          customer_id: string;
+          customer_name: string;
+          action: string;
+          zoho_id?: string;
+          status: string;
+        }>,
       };
 
-      // Match local customers to Zoho contacts
       for (const local of localCustomers || []) {
-        const matchByGstin = local.gstin ? zohoByGstin.get(local.gstin.toUpperCase()) : null;
+        const localGstin = (local.gstin || '').trim().toUpperCase();
+        const matchByGstin = localGstin ? zohoByGstin.get(localGstin) : null;
         const matchByName = zohoByName.get(local.customer_name.toLowerCase().trim());
         const zohoMatch = matchByGstin || matchByName;
 
         if (zohoMatch) {
-          if (local.zoho_customer_id !== zohoMatch.contact_id) {
+          const zohoContactId = zohoMatch.contact_id as string;
+          if (local.zoho_customer_id !== zohoContactId) {
             const { error: updateErr } = await supabase
               .from('customer_master')
-              .update({ zoho_customer_id: zohoMatch.contact_id })
+              .update({ zoho_customer_id: zohoContactId })
               .eq('id', local.id);
 
             if (updateErr) {
+              result.errors++;
               result.details.push({
                 customer_id: local.customer_id,
                 customer_name: local.customer_name,
                 action: 'link',
-                zoho_id: zohoMatch.contact_id,
+                zoho_id: zohoContactId,
                 status: `error: ${updateErr.message}`,
               });
             } else {
@@ -265,12 +333,20 @@ Deno.serve(async (req: Request) => {
                 customer_id: local.customer_id,
                 customer_name: local.customer_name,
                 action: 'link',
-                zoho_id: zohoMatch.contact_id,
+                zoho_id: zohoContactId,
                 status: 'linked',
               });
             }
           } else {
+            // Already linked — still count it
             result.matched++;
+            result.details.push({
+              customer_id: local.customer_id,
+              customer_name: local.customer_name,
+              action: 'link',
+              zoho_id: zohoContactId,
+              status: 'already linked',
+            });
           }
         } else {
           result.unmatched++;
@@ -296,9 +372,8 @@ Deno.serve(async (req: Request) => {
         const contactPayload: Record<string, any> = {
           contact_name: local.customer_name,
           contact_type: 'customer',
-          gstin: local.gstin || '',
-          email: local.customer_email || '',
-          phone: local.customer_phone || '',
+          gst_treatment: local.gstin ? 'business_gst' : 'consumer',
+          gst_no: local.gstin || '',
           billing_address: {
             address: local.customer_address || '',
             city: local.customer_city || '',
@@ -306,6 +381,8 @@ Deno.serve(async (req: Request) => {
             country: 'India',
           },
         };
+        if (local.customer_email) contactPayload.email = local.customer_email;
+        if (local.customer_phone) contactPayload.phone = local.customer_phone;
 
         const createRes = await fetch(createUrl.toString(), {
           method: 'POST',
@@ -319,15 +396,17 @@ Deno.serve(async (req: Request) => {
         const createData = await createRes.json();
 
         if (createData.code === 0 && createData.contact) {
+          const newZohoId = createData.contact.contact_id;
           await supabase
             .from('customer_master')
-            .update({ zoho_customer_id: createData.contact.contact_id })
+            .update({ zoho_customer_id: newZohoId })
             .eq('id', local.id);
 
           result.pushed++;
           item.status = 'pushed';
-          item.zoho_id = createData.contact.contact_id;
+          item.zoho_id = newZohoId;
         } else {
+          result.errors++;
           item.status = `push error: ${createData.message || 'unknown'}`;
         }
       }
@@ -337,18 +416,16 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ── Sync: fetch Zoho customers only (no push) ──
+    // ── Fetch Zoho customers only (preview, no changes) ──
     if (action === 'fetch-zoho-customers') {
       const orgId = await getOrganizationId(accessToken, apiDomain);
-
-      let allZohoCustomers: ZohoCustomer[] = [];
+      let allCustomers: Record<string, any>[] = [];
       let page = 1;
       let hasMore = true;
 
       while (hasMore) {
         const contactsUrl = new URL(`${apiDomain}/books/v3/contacts`);
         contactsUrl.searchParams.set('organization_id', orgId);
-        contactsUrl.searchParams.set('contact_type', 'customer');
         contactsUrl.searchParams.set('page', String(page));
         contactsUrl.searchParams.set('per_page', '200');
 
@@ -357,28 +434,30 @@ Deno.serve(async (req: Request) => {
         });
         const data = await res.json();
 
-        if (data.code && data.code !== 0) {
+        if (data.code !== undefined && data.code !== 0) {
           throw new Error(`Zoho API error: ${data.message || data.code}`);
         }
 
-        const contacts = data.contacts || [];
-        allZohoCustomers = allZohoCustomers.concat(contacts);
-        hasMore = data.page_context && data.page_context.has_more;
+        const contacts = (data.contacts || []) as Record<string, any>[];
+        const customers = contacts.filter((c: Record<string, any>) =>
+          !c.contact_type || c.contact_type === 'customer'
+        );
+        allCustomers = allCustomers.concat(customers);
+        hasMore = !!(data.page_context?.has_more_page || data.page_context?.has_more);
         page++;
+        if (page > 50) break;
       }
 
       return new Response(JSON.stringify({
-        count: allZohoCustomers.length,
-        customers: allZohoCustomers.map(c => ({
+        count: allCustomers.length,
+        customers: allCustomers.map(c => ({
           contact_id: c.contact_id,
           contact_name: c.contact_name,
           email: c.email || '',
           phone: c.phone || '',
-          gstin: c.gstin || '',
+          gst_no: c.gst_no || c.gstin || '',
         })),
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
@@ -386,7 +465,7 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error('Zoho API proxy error:', error);
+    console.error('Zoho API error:', error);
     return new Response(JSON.stringify({ error: (error as Error).message || 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
