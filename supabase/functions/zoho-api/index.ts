@@ -6,9 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const CLIENT_ID = Deno.env.get('ZOHO_CLIENT_ID')!;
-const CLIENT_SECRET = Deno.env.get('ZOHO_CLIENT_SECRET')!;
-
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -16,7 +13,7 @@ async function getValidAccessToken(): Promise<{ accessToken: string; apiDomain: 
   const supabase = createClient(supabaseUrl, supabaseKey);
   const { data, error } = await supabase
     .from('zoho_oauth_tokens')
-    .select('access_token, refresh_token, expires_at, api_domain')
+    .select('access_token, refresh_token, expires_at, api_domain, client_id, client_secret')
     .eq('id', 1)
     .maybeSingle();
 
@@ -24,17 +21,20 @@ async function getValidAccessToken(): Promise<{ accessToken: string; apiDomain: 
   if (!data) throw new Error('Zoho Books not connected. Please authorize the connection first.');
 
   const now = new Date();
-  const expiresAt = new Date(data.expires_at);
+  const expiresAt = data.expires_at ? new Date(data.expires_at) : new Date(0);
   const bufferMs = 5 * 60 * 1000;
 
   if (expiresAt.getTime() - now.getTime() > bufferMs) {
     return { accessToken: data.access_token, apiDomain: data.api_domain || 'https://www.zohoapis.in' };
   }
 
-  const refreshUrl = new URL('https://accounts.zoho.com/oauth/v2/token');
+  const clientId = data.client_id || Deno.env.get('ZOHO_CLIENT_ID') || '';
+  const clientSecret = data.client_secret || Deno.env.get('ZOHO_CLIENT_SECRET') || '';
+
+  const refreshUrl = new URL('https://accounts.zoho.in/oauth/v2/token');
   refreshUrl.searchParams.set('grant_type', 'refresh_token');
-  refreshUrl.searchParams.set('client_id', CLIENT_ID);
-  refreshUrl.searchParams.set('client_secret', CLIENT_SECRET);
+  refreshUrl.searchParams.set('client_id', clientId);
+  refreshUrl.searchParams.set('client_secret', clientSecret);
   refreshUrl.searchParams.set('refresh_token', data.refresh_token);
 
   const refreshRes = await fetch(refreshUrl.toString(), { method: 'POST' });
@@ -112,7 +112,7 @@ Deno.serve(async (req: Request) => {
     });
   } catch (error) {
     console.error('Zoho API proxy error:', error);
-    return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
+    return new Response(JSON.stringify({ error: (error as Error).message || 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
