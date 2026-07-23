@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const CLIENT_ID = Deno.env.get('ZOHO_CLIENT_ID')!;
 const CLIENT_SECRET = Deno.env.get('ZOHO_CLIENT_SECRET')!;
-const REDIRECT_URI = 'https://tms.dlslogistics.in/auth/zoho/callback';
+const REDIRECT_URI = Deno.env.get('ZOHO_REDIRECT_URI') || 'https://tms.dlslogistics.in/auth/zoho/callback';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
