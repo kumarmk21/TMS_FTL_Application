@@ -302,6 +302,38 @@ async function ensureValidCustomer(
 
 
 
+/**
+ * Look up a Zoho Books account ID by its name from the Chart of Accounts.
+ * Returns the account_id string or null if not found.
+ */
+async function getZohoAccountIdByName(
+  accessToken: string,
+  apiDomain: string,
+  orgId: string,
+  accountName: string,
+): Promise<string | null> {
+  const url = new URL(`${apiDomain}/books/v3/chartofaccounts`);
+  url.searchParams.set('organization_id', orgId);
+  url.searchParams.set('filter_by', 'AccountType.Expense');
+
+  const res = await fetch(url.toString(), {
+    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+  });
+  const data = await res.json();
+
+  if (data.code !== 0) {
+    console.error('[Zoho] Chart of accounts error:', JSON.stringify(data));
+    return null;
+  }
+
+  const accounts: Record<string, any>[] = data.chartofaccounts || [];
+  const nameLower = accountName.toLowerCase().trim();
+  const match = accounts.find(
+    (a) => (a.account_name || '').toLowerCase().trim() === nameLower,
+  );
+  return match ? (match.account_id as string) : null;
+}
+
 /** Fetch all active customer contacts from Zoho Books (paginated). */
 async function fetchActiveZohoContacts(
   accessToken: string,
@@ -1306,6 +1338,16 @@ Deno.serve(async (req: Request) => {
       const supabase = createClient(supabaseUrl, supabaseKey);
       const orgId = await getOrganizationId(accessToken, apiDomain);
 
+      // Resolve the "Vehicle Hire Charges" account ID from Zoho Chart of Accounts
+      const vehicleHireAccountId = await getZohoAccountIdByName(
+        accessToken, apiDomain, orgId, 'Vehicle Hire Charges',
+      );
+      if (!vehicleHireAccountId) {
+        return new Response(JSON.stringify({
+          error: 'Could not find "Vehicle Hire Charges" account in your Zoho Books Chart of Accounts. Please ensure the account exists under Expenses.',
+        }), { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       const body = await req.json().catch(() => ({}));
       const thcIds = (body as { thc_ids?: string[] }).thc_ids;
       const dryRun = (body as { dry_run?: boolean }).dry_run || false;
@@ -1412,6 +1454,7 @@ Deno.serve(async (req: Request) => {
             rate: grossAmount,
             quantity: 1,
             item_order: 1,
+            account_id: vehicleHireAccountId,
           });
         }
         const loadingCharges = parseFloat(thc.thc_loading_charges || '0');
@@ -1422,6 +1465,7 @@ Deno.serve(async (req: Request) => {
             rate: loadingCharges,
             quantity: 1,
             item_order: 2,
+            account_id: vehicleHireAccountId,
           });
         }
         const unloadingCharges = parseFloat(thc.thc_unloading_charges || '0');
@@ -1432,6 +1476,7 @@ Deno.serve(async (req: Request) => {
             rate: unloadingCharges,
             quantity: 1,
             item_order: 3,
+            account_id: vehicleHireAccountId,
           });
         }
         const detentionCharges = parseFloat(thc.thc_detention_charges || '0');
@@ -1442,6 +1487,7 @@ Deno.serve(async (req: Request) => {
             rate: detentionCharges,
             quantity: 1,
             item_order: 4,
+            account_id: vehicleHireAccountId,
           });
         }
         const otherCharges = parseFloat(thc.thc_other_charges || '0');
@@ -1452,6 +1498,7 @@ Deno.serve(async (req: Request) => {
             rate: otherCharges,
             quantity: 1,
             item_order: 5,
+            account_id: vehicleHireAccountId,
           });
         }
         const munshiyana = parseFloat(thc.thc_munshiyana_amount || '0');
@@ -1462,6 +1509,7 @@ Deno.serve(async (req: Request) => {
             rate: munshiyana,
             quantity: 1,
             item_order: 6,
+            account_id: vehicleHireAccountId,
           });
         }
 
@@ -1473,6 +1521,7 @@ Deno.serve(async (req: Request) => {
             rate: amount,
             quantity: 1,
             item_order: 1,
+            account_id: vehicleHireAccountId,
           });
         }
 
