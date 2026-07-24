@@ -1909,6 +1909,132 @@ Deno.serve(async (req: Request) => {
       }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── Push a single ATH payment to Zoho Books ──
+    if (action === 'push-ath-payment') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const body = await req.json().catch(() => ({}));
+      const thcId = (body as { thc_id?: string }).thc_id;
+
+      if (!thcId) {
+        return new Response(JSON.stringify({ error: 'Missing thc_id' }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Fetch the THC record
+      const { data: thc, error: thcError } = await supabase
+        .from('thc_details')
+        .select(`
+          thc_id, thc_id_number, thc_number, thc_vendor,
+          thc_advance_amount, ath_date,
+          ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank,
+          vendor_master:thc_vendor (vendor_code, vendor_name, zoho_vendor_id)
+        `)
+        .eq('thc_id', thcId)
+        .maybeSingle();
+
+      if (thcError) throw thcError;
+      if (!thc) {
+        return new Response(JSON.stringify({ error: `THC record ${thcId} not found` }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const vendor = (thc as any).vendor_master;
+      if (!vendor?.zoho_vendor_id) {
+        return new Response(JSON.stringify({
+          error: `Vendor "${vendor?.vendor_name || 'Unknown'}" is not linked to Zoho Books. Run Vendor Sync first.`,
+        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const advanceAmount = parseFloat((thc as any).thc_advance_amount || '0');
+      if (advanceAmount <= 0) {
+        return new Response(JSON.stringify({ error: 'Advance amount is zero — nothing to pay.' }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Resolve bank account from Zoho
+      const bankUrl = new URL(`${apiDomain}/books/v3/bankaccounts`);
+      bankUrl.searchParams.set('organization_id', orgId);
+      const bankRes = await fetch(bankUrl.toString(), {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const bankData = await bankRes.json();
+
+      if (bankData.code !== undefined && bankData.code !== 0) {
+        return new Response(JSON.stringify({ error: `Failed to fetch bank accounts: ${bankData.message}` }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const bankAccounts = (bankData.bankaccounts || []) as Record<string, any>[];
+      // Prefer "HDFC Bank CA" as default; fall back to first active account
+      const bankAccount = bankAccounts.find(
+        (a) => (a.account_name || '').toLowerCase().includes('hdfc')
+      ) || bankAccounts[0];
+
+      if (!bankAccount) {
+        return new Response(JSON.stringify({ error: 'No bank accounts found in Zoho Books.' }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const paymentDate = (thc as any).ath_date
+        ? new Date((thc as any).ath_date).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+
+      const refNumber = (thc as any).thc_id_number || (thc as any).thc_number || thcId;
+
+      const paymentPayload: Record<string, any> = {
+        vendor_id: vendor.zoho_vendor_id,
+        payment_mode: 'bank_transfer',
+        amount: advanceAmount,
+        date: paymentDate,
+        account_id: bankAccount.account_id,
+        reference_number: refNumber,
+        description: `Advance Payment (ATH) — ${refNumber}`,
+      };
+
+      const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
+      payUrl.searchParams.set('organization_id', orgId);
+
+      const payRes = await fetch(payUrl.toString(), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `JSONString=${encodeURIComponent(JSON.stringify(paymentPayload))}`,
+      });
+      const payData = await payRes.json();
+
+      if (payData.code === 0 && payData.payment) {
+        return new Response(JSON.stringify({
+          success: true,
+          zoho_payment_id: payData.payment.payment_id,
+          zoho_payment_number: payData.payment.payment_number || '',
+          thc_id: thcId,
+          thc_number: refNumber,
+          vendor_name: vendor.vendor_name,
+          amount: advanceAmount,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      console.error('[Zoho] ATH payment push failed:', JSON.stringify(payData));
+      return new Response(JSON.stringify({
+        error: payData.message || 'Failed to create ATH payment in Zoho Books',
+        zoho_error: payData,
+      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
