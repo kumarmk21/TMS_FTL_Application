@@ -2017,6 +2017,16 @@ Deno.serve(async (req: Request) => {
       const payData = await payRes.json();
 
       if (payData.code === 0 && payData.payment) {
+        // Write the Zoho payment info back to thc_details
+        await supabase
+          .from('thc_details')
+          .update({
+            zoho_books_id: payData.payment.payment_id,
+            zoho_sync_status: 'synced',
+            zoho_synced_at: new Date().toISOString(),
+          } as any)
+          .eq('thc_id', thcId);
+
         return new Response(JSON.stringify({
           success: true,
           zoho_payment_id: payData.payment.payment_id,
@@ -2027,6 +2037,12 @@ Deno.serve(async (req: Request) => {
           amount: advanceAmount,
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+
+      // Mark as failed in DB so UI can reflect it
+      await supabase
+        .from('thc_details')
+        .update({ zoho_sync_status: 'failed' } as any)
+        .eq('thc_id', thcId);
 
       console.error('[Zoho] ATH payment push failed:', JSON.stringify(payData));
       return new Response(JSON.stringify({

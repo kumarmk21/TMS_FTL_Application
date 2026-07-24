@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X, Wallet, ArrowLeft, Pencil, CreditCard, History, Settings } from 'lucide-react';
+import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X, Wallet, ArrowLeft, Pencil, CreditCard, History, Settings, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import VendorPaymentsDashboard from './VendorPaymentsDashboard';
 import VendorPaymentHistory from './VendorPaymentHistory';
@@ -156,6 +156,8 @@ interface AthRecord {
   ven_act_branch: string | null;
   ath_date: string | null;
   thc_date: string | null;
+  zoho_sync_status: string | null;
+  zoho_books_id: string | null;
 }
 
 export default function ZohoBooksIntegration() {
@@ -348,7 +350,7 @@ export default function ZohoBooksIntegration() {
           vehicle_type, vehicle_number, thc_vendor,
           thc_amount, thc_advance_amount, thc_net_payable_amount,
           ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank, ven_act_branch,
-          ath_date, thc_date
+          ath_date, thc_date, zoho_sync_status, zoho_books_id
         `)
         .eq('thc_status_fin', athUploadedStatusId)
         .not('ath_date', 'is', null)
@@ -2261,6 +2263,7 @@ export default function ZohoBooksIntegration() {
                       <th className="px-4 py-3 text-right font-semibold text-gray-700">Advance</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">ATH Date</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Bank Account</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-700">Zoho Status</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
                     </tr>
                   </thead>
@@ -2346,6 +2349,24 @@ export default function ZohoBooksIntegration() {
                               <div className="text-gray-400">{record.ven_act_number || ''}</div>
                               <div className="text-gray-400">{record.ven_act_bank || ''} {record.ven_act_ifsc || ''}</div>
                             </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {record.zoho_sync_status === 'synced' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full">
+                              <CheckCircle className="w-3 h-3" />
+                              Pushed
+                            </span>
+                          ) : record.zoho_sync_status === 'failed' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
+                              <AlertCircle className="w-3 h-3" />
+                              Failed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-full">
+                              <Clock className="w-3 h-3" />
+                              Not Pushed
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3">
