@@ -300,6 +300,32 @@ async function ensureValidCustomer(
   throw new Error(`Customer not found and creation failed: ${createData.message || 'unknown error'}`);
 }
 
+/** Fetch invoice-level custom field IDs from Zoho Books, keyed by label. */
+async function fetchInvoiceCustomFieldIds(
+  accessToken: string,
+  apiDomain: string,
+  orgId: string,
+): Promise<Map<string, string>> {
+  const url = new URL(`${apiDomain}/books/v3/settings/customfields`);
+  url.searchParams.set('organization_id', orgId);
+  url.searchParams.set('module', 'invoices');
+
+  const res = await fetch(url.toString(), {
+    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+  });
+  const data = await res.json();
+
+  const map = new Map<string, string>();
+  if (data.code === 0 && Array.isArray(data.custom_fields)) {
+    for (const cf of data.custom_fields as Record<string, any>[]) {
+      const label = (cf.label || cf.field_name || '').toString().trim();
+      const id = (cf.customfield_id || cf.field_id || '').toString();
+      if (label && id) map.set(label, id);
+    }
+  }
+  return map;
+}
+
 /** Fetch all active customer contacts from Zoho Books (paginated). */
 async function fetchActiveZohoContacts(
   accessToken: string,
@@ -766,10 +792,23 @@ Deno.serve(async (req: Request) => {
         .limit(1)
         .maybeSingle();
 
+      // Fetch Zoho invoice custom field IDs (cached for the entire push batch)
+      const customFieldMap = await fetchInvoiceCustomFieldIds(accessToken, apiDomain, orgId);
+      const requiredFieldLabels = ['Origin', 'Destination', 'LRN', 'Vehicle Number', 'LR Date'];
+      const missingLabels = requiredFieldLabels.filter(l => !customFieldMap.has(l));
+      if (missingLabels.length > 0) {
+        console.warn(`[Zoho] Custom fields not found in Zoho (will be skipped): ${missingLabels.join(', ')}`);
+      }
+
+      // Booking data lookup map (populated when LR bills are fetched)
+      const bookingMap = new Map<string, Record<string, any>>();
+
       // ── Helper: push a single invoice to Zoho ──
       async function pushInvoice(
         bill: Record<string, any>,
         type: 'lr' | 'warehouse',
+        cfMap: Map<string, string>,
+        bookings: Map<string, Record<string, any>>,
       ): Promise<{ zoho_invoice_id?: string; zoho_invoice_number?: string; status: string; detail?: string }> {
         const customer = customerMap.get(bill.billing_party_code);
         if (!customer || !customer.zoho_customer_id) {
@@ -876,6 +915,34 @@ Deno.serve(async (req: Request) => {
           line_items: lineItems,
         };
 
+        // LR bills: attach custom fields (Origin, Destination, LRN, Vehicle Number, LR Date) and reverse charge
+        if (type === 'lr') {
+          const booking = bill.tran_id ? bookings.get(bill.tran_id) : null;
+          const lrn = booking?.manual_lr_no || billNumber || '';
+          const origin = booking?.from_city || '';
+          const destination = booking?.to_city || '';
+          const vehicleNumber = booking?.vehicle_number || '';
+          const lrDate = booking?.lr_date
+            ? new Date(booking.lr_date).toISOString().split('T')[0]
+            : (billDate ? new Date(billDate).toISOString().split('T')[0] : '');
+
+          const customFields: Array<{ customfield_id: string; value: string }> = [];
+          const addField = (label: string, value: string) => {
+            const id = cfMap.get(label);
+            if (id && value) customFields.push({ customfield_id: id, value });
+          };
+          addField('Origin', origin);
+          addField('Destination', destination);
+          addField('LRN', lrn);
+          addField('Vehicle Number', vehicleNumber);
+          addField('LR Date', lrDate);
+
+          if (customFields.length > 0) {
+            invoicePayload.custom_fields = customFields;
+          }
+          invoicePayload.is_reverse_charge_applied = true;
+        }
+
         if (!isRCM && gstRate > 0) {
           if (isInterState) {
             invoicePayload.tax_id = '';
@@ -942,6 +1009,18 @@ Deno.serve(async (req: Request) => {
 
         const { data: lrBills, error: lrError } = await lrQuery;
 
+        // Batch-fetch booking data for all LR bills (origin, destination, vehicle, LR number, LR date)
+        const tranIds = (lrBills || []).map((b: Record<string, any>) => b.tran_id).filter(Boolean);
+        if (tranIds.length > 0) {
+          const { data: bookings } = await supabase
+            .from('booking_lr')
+            .select('tran_id, manual_lr_no, vehicle_number, lr_date, from_city, to_city')
+            .in('tran_id', tranIds);
+          for (const bk of (bookings || []) as Record<string, any>[]) {
+            bookingMap.set(bk.tran_id, bk);
+          }
+        }
+
         if (lrError) {
           return new Response(JSON.stringify({ error: `LR bill fetch error: ${lrError.message}` }), {
             status: 500,
@@ -953,7 +1032,7 @@ Deno.serve(async (req: Request) => {
           result.total++;
           const amount = parseFloat(bill.bill_amount || bill.sub_total || '0');
 
-          const pushResult = await pushInvoice(bill, 'lr');
+          const pushResult = await pushInvoice(bill, 'lr', customFieldMap, bookingMap);
 
           if (pushResult.status === 'pushed') {
             result.pushed++;
@@ -1011,7 +1090,7 @@ Deno.serve(async (req: Request) => {
           result.total++;
           const amount = parseFloat(bill.total_amount || bill.sub_total || '0');
 
-          const pushResult = await pushInvoice(bill, 'warehouse');
+          const pushResult = await pushInvoice(bill, 'warehouse', customFieldMap, bookingMap);
 
           if (pushResult.status === 'pushed') {
             result.pushed++;
