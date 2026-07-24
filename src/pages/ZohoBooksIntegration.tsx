@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, Download, ArrowRight, FileText, Eye, Send, Wrench } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface ConnectionStatus {
   connected: boolean;
@@ -75,6 +76,15 @@ interface FixLinkResult {
   }>;
 }
 
+interface PendingInvoice {
+  bill_id: string;
+  bill_number: string;
+  bill_type: 'LR' | 'WH';
+  bill_date: string;
+  customer_name: string;
+  amount: number;
+}
+
 export default function ZohoBooksIntegration() {
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,9 +103,16 @@ export default function ZohoBooksIntegration() {
   const [pushResult, setPushResult] = useState<InvoicePushResult | null>(null);
   const [pushFilter, setPushFilter] = useState<'all' | 'pushed' | 'skipped' | 'error'>('all');
   const [billTypeFilter, setBillTypeFilter] = useState<'lr' | 'warehouse' | 'both'>('both');
+  const [dateRange, setDateRange] = useState<{ startDate: string | null; endDate: string | null }>({ startDate: null, endDate: null });
   const [dryRunOnly, setDryRunOnly] = useState(false);
   const [fixingLinks, setFixingLinks] = useState(false);
   const [fixLinkResult, setFixLinkResult] = useState<FixLinkResult | null>(null);
+
+  const [pendingInvoices, setPendingInvoices] = useState<PendingInvoice[]>([]);
+  const [loadingPending, setLoadingPending] = useState(false);
+  const [selectedBillIds, setSelectedBillIds] = useState<Set<string>>(new Set());
+  const [showGstWarning, setShowGstWarning] = useState(false);
+  const [pendingPushAction, setPendingPushAction] = useState<(() => void) | null>(null);
 
   const oauthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-oauth`;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api`;
@@ -115,6 +132,7 @@ export default function ZohoBooksIntegration() {
       if (data.connected) {
         await fetchSyncStats();
         await fetchInvoiceStats();
+        await fetchPendingInvoices();
       }
     } catch (err: any) {
       setError(err.message || 'Failed to check connection status');
@@ -122,6 +140,56 @@ export default function ZohoBooksIntegration() {
       setLoading(false);
     }
   }, [oauthUrl]);
+
+  const fetchPendingInvoices = useCallback(async () => {
+    setLoadingPending(true);
+    try {
+      const { data: lrBills, error: lrError } = await supabase
+        .from('lr_bill')
+        .select('bill_id, lr_bill_number, lr_bill_date, billing_party_name, bill_amount, sub_total')
+        .eq('bill_status', 'Active')
+        .is('zoho_invoice_id', null)
+        .order('lr_bill_date', { ascending: false })
+        .limit(500);
+
+      if (lrError) throw lrError;
+
+      const { data: whBills, error: whError } = await supabase
+        .from('warehouse_bill')
+        .select('bill_id, bill_number, bill_date, billing_party_name, total_amount, sub_total')
+        .is('zoho_invoice_id', null)
+        .order('bill_date', { ascending: false })
+        .limit(500);
+
+      if (whError) throw whError;
+
+      const invoices: PendingInvoice[] = [
+        ...(lrBills || []).map((b: any) => ({
+          bill_id: b.bill_id,
+          bill_number: b.lr_bill_number || '',
+          bill_type: 'LR' as const,
+          bill_date: b.lr_bill_date || '',
+          customer_name: b.billing_party_name || '',
+          amount: parseFloat(b.bill_amount || b.sub_total || '0'),
+        })),
+        ...(whBills || []).map((b: any) => ({
+          bill_id: b.bill_id,
+          bill_number: b.bill_number || '',
+          bill_type: 'WH' as const,
+          bill_date: b.bill_date || '',
+          customer_name: b.billing_party_name || '',
+          amount: parseFloat(b.total_amount || b.sub_total || '0'),
+        })),
+      ];
+
+      setPendingInvoices(invoices);
+      setSelectedBillIds(new Set());
+    } catch (err) {
+      console.error('Failed to fetch pending invoices:', err);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, []);
 
   const fetchInvoiceStats = useCallback(async () => {
     try {
@@ -138,14 +206,12 @@ export default function ZohoBooksIntegration() {
 
   const fetchSyncStats = useCallback(async () => {
     try {
-      const { supabase: sb } = await import('../lib/supabase');
-
-      const { count: total } = await sb
+      const { count: total } = await supabase
         .from('customer_master')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true);
 
-      const { count: linked } = await sb
+      const { count: linked } = await supabase
         .from('customer_master')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true)
@@ -276,21 +342,26 @@ export default function ZohoBooksIntegration() {
     }
   };
 
-  const handlePushInvoices = async () => {
+  const handlePushInvoices = useCallback(async (billIds?: string[]) => {
     setPushing(true);
     setError('');
     setPushResult(null);
     try {
+      const payload: Record<string, any> = {
+        bill_type: billTypeFilter,
+        dry_run: dryRunOnly,
+      };
+      if (billIds && billIds.length > 0) {
+        payload.bill_ids = billIds;
+      }
+
       const res = await fetch(`${apiUrl}?action=push-invoices`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         },
-        body: JSON.stringify({
-          bill_type: billTypeFilter,
-          dry_run: dryRunOnly,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok || data.error) {
@@ -301,12 +372,13 @@ export default function ZohoBooksIntegration() {
       setSuccess(`${mode}${data.pushed} invoices pushed, ${data.skipped} skipped, ${data.errors} errors out of ${data.total} processed.`);
       setTimeout(() => setSuccess(''), 8000);
       await fetchInvoiceStats();
+      await fetchPendingInvoices();
     } catch (err: any) {
       setError(err.message || 'Failed to push invoices');
     } finally {
       setPushing(false);
     }
-  };
+  }, [apiUrl, billTypeFilter, dryRunOnly, fetchInvoiceStats, fetchPendingInvoices]);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
@@ -316,6 +388,15 @@ export default function ZohoBooksIntegration() {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+    });
+  };
+
+  const formatDateShort = (dateStr: string) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
     });
   };
 
@@ -342,19 +423,112 @@ export default function ZohoBooksIntegration() {
   const isErrorStatus = (status: string): boolean =>
     status.includes('error') || status === 'customer-inactive' || status === 'customer-not-found' || status === 'auth-error' || status === 'invoice-duplicate' || status === 'api-error';
 
-  const getErrorLabel = (status: string): string => {
-    switch (status) {
-      case 'customer-inactive': return 'Customer Inactive';
-      case 'customer-not-found': return 'Customer Not Found';
-      case 'auth-error': return 'Auth Error';
-      case 'invoice-duplicate': return 'Duplicate Invoice';
-      case 'api-error': return 'API Error';
-      default: return status;
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+  };
+
+  // ── Client-side filtering of pending invoices ──
+  const filteredInvoices = useMemo(() => {
+    return pendingInvoices.filter(inv => {
+      if (billTypeFilter === 'lr' && inv.bill_type !== 'LR') return false;
+      if (billTypeFilter === 'warehouse' && inv.bill_type !== 'WH') return false;
+
+      if (dateRange.startDate) {
+        const invDate = inv.bill_date ? new Date(inv.bill_date).getTime() : 0;
+        const startDate = new Date(dateRange.startDate).getTime();
+        if (invDate < startDate) return false;
+      }
+      if (dateRange.endDate) {
+        const invDate = inv.bill_date ? new Date(inv.bill_date).getTime() : 0;
+        const endDate = new Date(dateRange.endDate).getTime() + 24 * 60 * 60 * 1000 - 1;
+        if (invDate > endDate) return false;
+      }
+
+      return true;
+    });
+  }, [pendingInvoices, billTypeFilter, dateRange]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (billTypeFilter !== 'both') count++;
+    if (dateRange.startDate || dateRange.endDate) count++;
+    return count;
+  }, [billTypeFilter, dateRange]);
+
+  // ── GST filing period check ──
+  const isInFiledGstPeriod = (billDate: string): boolean => {
+    if (!billDate) return false;
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const filingCutoff = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 11);
+    filingCutoff.setHours(23, 59, 59, 999);
+    return new Date(billDate).getTime() <= filingCutoff.getTime();
+  };
+
+  const selectedInvoices = useMemo(() => {
+    return filteredInvoices.filter(inv => selectedBillIds.has(inv.bill_id));
+  }, [filteredInvoices, selectedBillIds]);
+
+  const hasFiledPeriodSelection = useMemo(() => {
+    return selectedInvoices.some(inv => isInFiledGstPeriod(inv.bill_date));
+  }, [selectedInvoices]);
+
+  const toggleBillSelection = (billId: string) => {
+    setSelectedBillIds(prev => {
+      const next = new Set(prev);
+      if (next.has(billId)) next.delete(billId);
+      else next.add(billId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedBillIds.has(inv.bill_id))) {
+      setSelectedBillIds(new Set());
+    } else {
+      setSelectedBillIds(new Set(filteredInvoices.map(inv => inv.bill_id)));
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+  const clearDateRange = () => {
+    setDateRange({ startDate: null, endDate: null });
+  };
+
+  const handlePushSelected = () => {
+    if (selectedBillIds.size === 0) {
+      setError('Please select at least one invoice to push.');
+      return;
+    }
+
+    if (hasFiledPeriodSelection) {
+      setShowGstWarning(true);
+      setPendingPushAction(() => () => {
+        setShowGstWarning(false);
+        handlePushInvoices(Array.from(selectedBillIds));
+      });
+    } else {
+      handlePushInvoices(Array.from(selectedBillIds));
+    }
+  };
+
+  const handlePushAllFiltered = () => {
+    if (filteredInvoices.length === 0) {
+      setError('No invoices match the current filters.');
+      return;
+    }
+
+    const allFilteredIds = filteredInvoices.map(inv => inv.bill_id);
+    const hasFiled = filteredInvoices.some(inv => isInFiledGstPeriod(inv.bill_date));
+
+    if (hasFiled) {
+      setShowGstWarning(true);
+      setPendingPushAction(() => () => {
+        setShowGstWarning(false);
+        handlePushInvoices(allFilteredIds);
+      });
+    } else {
+      handlePushInvoices(allFilteredIds);
+    }
   };
 
   return (
@@ -373,6 +547,9 @@ export default function ZohoBooksIntegration() {
         <div className="flex items-center gap-3 p-4 rounded-lg border bg-red-50 border-red-200 text-red-800">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <p className="font-medium">{error}</p>
+          <button onClick={() => setError('')} className="ml-auto text-red-600 hover:text-red-800">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
@@ -768,42 +945,237 @@ export default function ZohoBooksIntegration() {
             </div>
           )}
 
-          {/* Controls */}
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium text-gray-600">Bill Type:</label>
-              <select
-                value={billTypeFilter}
-                onChange={(e) => setBillTypeFilter(e.target.value as 'lr' | 'warehouse' | 'both')}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+          {/* Enhanced Filter Bar */}
+          <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50/50">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="w-4 h-4 text-gray-600" />
+              <h4 className="text-sm font-semibold text-gray-700">Filters</h4>
+              {activeFilterCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
+                  Filters Active: {activeFilterCount}
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  setBillTypeFilter('both');
+                  setDateRange({ startDate: null, endDate: null });
+                }}
+                className="ml-auto text-xs text-gray-500 hover:text-gray-700 font-medium flex items-center gap-1"
               >
-                <option value="both">Both (LR + Warehouse)</option>
-                <option value="lr">LR Bills Only</option>
-                <option value="warehouse">Warehouse Bills Only</option>
-              </select>
+                <X className="w-3 h-3" />
+                Clear All
+              </button>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={dryRunOnly}
-                onChange={(e) => setDryRunOnly(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="flex items-center gap-1">
-                <Eye className="w-3.5 h-3.5" />
-                Dry Run (preview only)
-              </span>
-            </label>
+            <div className="flex flex-wrap items-end gap-4">
+              {/* Bill Type Filter */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600">Bill Type</label>
+                <select
+                  value={billTypeFilter}
+                  onChange={(e) => setBillTypeFilter(e.target.value as 'lr' | 'warehouse' | 'both')}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                >
+                  <option value="both">Both (LR + Warehouse)</option>
+                  <option value="lr">LR Bills Only</option>
+                  <option value="warehouse">Warehouse Bills Only</option>
+                </select>
+              </div>
 
+              {/* Date Range Filter */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.startDate || ''}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value || null }))}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={dateRange.endDate || ''}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value || null }))}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* Clear Dates Button */}
+              {(dateRange.startDate || dateRange.endDate) && (
+                <button
+                  onClick={clearDateRange}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Clear Dates
+                </button>
+              )}
+
+              {/* Dry Run Toggle */}
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer ml-auto">
+                <input
+                  type="checkbox"
+                  checked={dryRunOnly}
+                  onChange={(e) => setDryRunOnly(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="flex items-center gap-1">
+                  <Eye className="w-3.5 h-3.5" />
+                  Dry Run (preview only)
+                </span>
+              </label>
+            </div>
+
+            {/* Selected Date Range Display */}
+            {(dateRange.startDate || dateRange.endDate) && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-gray-600">
+                <span className="font-medium">Date Range:</span>
+                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200">
+                  {dateRange.startDate ? formatDateShort(dateRange.startDate) : 'Any'}
+                </span>
+                <span className="text-gray-400">to</span>
+                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200">
+                  {dateRange.endDate ? formatDateShort(dateRange.endDate) : 'Any'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Reactive Summary Bar */}
+          <div className="flex items-center justify-between flex-wrap gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200 mb-4">
+            <div className="flex items-center gap-3">
+              <FileText className="w-4 h-4 text-emerald-600" />
+              <p className="text-sm font-medium text-emerald-900">
+                Showing <strong>{filteredInvoices.length}</strong> of <strong>{pendingInvoices.length}</strong> pending invoices
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {selectedBillIds.size > 0 && (
+                <span className="text-sm text-emerald-700 font-medium">
+                  {selectedBillIds.size} selected
+                </span>
+              )}
+              <button
+                onClick={fetchPendingInvoices}
+                disabled={loadingPending}
+                className="flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-900 font-medium"
+              >
+                {loadingPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                Refresh List
+              </button>
+            </div>
+          </div>
+
+          {/* Pending Invoices Selection Table */}
+          {loadingPending ? (
+            <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
+              <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+              <span className="ml-3 text-gray-500 text-sm">Loading pending invoices...</span>
+            </div>
+          ) : filteredInvoices.length === 0 ? (
+            <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
+              <p className="text-gray-400 text-sm">No pending invoices match the current filters.</p>
+            </div>
+          ) : (
+            <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+              <div className="max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white border-b border-gray-200 z-10">
+                    <tr>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide w-10">
+                        <input
+                          type="checkbox"
+                          checked={filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedBillIds.has(inv.bill_id))}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
+                      </th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Bill No.</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Customer</th>
+                      <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredInvoices.map((inv) => {
+                      const isSelected = selectedBillIds.has(inv.bill_id);
+                      const isFiled = isInFiledGstPeriod(inv.bill_date);
+                      return (
+                        <tr key={inv.bill_id} className={`hover:bg-gray-50 ${isSelected ? 'bg-emerald-50/50' : ''}`}>
+                          <td className="px-4 py-2">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleBillSelection(inv.bill_id)}
+                              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-gray-700 font-mono text-xs">{inv.bill_number}</td>
+                          <td className="px-4 py-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              inv.bill_type === 'LR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                            }`}>
+                              {inv.bill_type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-gray-600 text-xs">
+                            <span className="flex items-center gap-1.5">
+                              {formatDateShort(inv.bill_date)}
+                              {isFiled && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded" title="This invoice falls within a potentially filed GST period">
+                                  <AlertTriangle className="w-3 h-3" />
+                                </span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-gray-900">{inv.customer_name}</td>
+                          <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatCurrency(inv.amount)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Push Action Buttons */}
+          <div className="flex flex-wrap items-center gap-3 mb-4">
             <button
-              onClick={handlePushInvoices}
-              disabled={pushing}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ml-auto"
+              onClick={handlePushSelected}
+              disabled={pushing || selectedBillIds.size === 0}
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {pushing ? <Loader2 className="w-4 h-4 animate-spin" /> : dryRunOnly ? <Eye className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-              {pushing ? 'Processing...' : dryRunOnly ? 'Preview Push' : 'Push Invoices Now'}
+              {pushing ? 'Processing...' : dryRunOnly ? `Preview ${selectedBillIds.size} Selected` : `Push ${selectedBillIds.size} Selected`}
             </button>
+            <button
+              onClick={handlePushAllFiltered}
+              disabled={pushing || filteredInvoices.length === 0}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {pushing ? <Loader2 className="w-4 h-4 animate-spin" /> : dryRunOnly ? <Eye className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+              {pushing ? 'Processing...' : dryRunOnly ? `Preview All ${filteredInvoices.length}` : `Push All ${filteredInvoices.length} Filtered`}
+            </button>
+            {selectedBillIds.size > 0 && (
+              <button
+                onClick={() => setSelectedBillIds(new Set())}
+                className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
+              >
+                <X className="w-3.5 h-3.5" />
+                Clear Selection
+              </button>
+            )}
           </div>
 
           {/* Info Banner */}
@@ -812,7 +1184,15 @@ export default function ZohoBooksIntegration() {
             <ul className="space-y-1.5 text-sm text-emerald-800">
               <li className="flex items-start gap-2">
                 <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                Only bills with status "Active" (LR) or all bills (Warehouse) that haven't been pushed yet are included
+                Use the filters above to narrow down pending invoices by bill type and/or date range
+              </li>
+              <li className="flex items-start gap-2">
+                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                Select specific invoices using the checkboxes, or push all filtered results at once
+              </li>
+              <li className="flex items-start gap-2">
+                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                Invoices marked with <AlertTriangle className="w-3 h-3 inline" /> may fall within an already-filed GST period
               </li>
               <li className="flex items-start gap-2">
                 <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
@@ -820,15 +1200,7 @@ export default function ZohoBooksIntegration() {
               </li>
               <li className="flex items-start gap-2">
                 <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                Bills for customers not linked to Zoho are skipped — run Customer Sync first
-              </li>
-              <li className="flex items-start gap-2">
-                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                 Use Dry Run to preview which bills would be pushed without creating anything
-              </li>
-              <li className="flex items-start gap-2">
-                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                Each push processes up to 50 bills at a time to avoid timeouts
               </li>
             </ul>
           </div>
@@ -957,6 +1329,62 @@ export default function ZohoBooksIntegration() {
               <br />
               <span className="text-gray-400">{'{ "method": "GET", "path": "/books/v3/invoices" }'}</span>
             </code>
+          </div>
+        </div>
+      )}
+
+      {/* GST Period Warning Modal */}
+      {showGstWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="flex items-center gap-3 p-5 bg-amber-50 border-b border-amber-200">
+              <div className="p-2 bg-amber-100 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-amber-600" />
+              </div>
+              <h3 className="text-lg font-bold text-amber-900">GST Filed Period Warning</h3>
+              <button
+                onClick={() => {
+                  setShowGstWarning(false);
+                  setPendingPushAction(null);
+                }}
+                className="ml-auto text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-gray-700 leading-relaxed">
+                Some selected invoices belong to a GST-filed period. Generating invoices for this period may cause
+                discrepancies in your GST returns.
+              </p>
+              <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <p className="text-xs text-amber-800">
+                  <strong>{selectedInvoices.filter(inv => isInFiledGstPeriod(inv.bill_date)).length}</strong> of{' '}
+                  <strong>{selectedInvoices.length}</strong> selected invoices fall within a potentially filed GST period
+                  (on or before the 11th of last month).
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-4 bg-gray-50 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowGstWarning(false);
+                  setPendingPushAction(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (pendingPushAction) pendingPushAction();
+                  else setShowGstWarning(false);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors"
+              >
+                Proceed Anyway
+              </button>
+            </div>
           </div>
         </div>
       )}
