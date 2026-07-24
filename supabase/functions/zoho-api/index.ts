@@ -306,9 +306,9 @@ async function fetchInvoiceCustomFieldIds(
   apiDomain: string,
   orgId: string,
 ): Promise<Map<string, string>> {
-  const url = new URL(`${apiDomain}/books/v3/settings/customfields`);
+  const url = new URL(`${apiDomain}/books/v3/customfields`);
   url.searchParams.set('organization_id', orgId);
-  url.searchParams.set('module', 'invoices');
+  url.searchParams.set('entity', 'invoice');
 
   const res = await fetch(url.toString(), {
     headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
@@ -319,7 +319,7 @@ async function fetchInvoiceCustomFieldIds(
   if (data.code === 0 && Array.isArray(data.custom_fields)) {
     for (const cf of data.custom_fields as Record<string, any>[]) {
       const label = (cf.label || cf.field_name || '').toString().trim();
-      const id = (cf.customfield_id || cf.field_id || '').toString();
+      const id = (cf.field_id || cf.customfield_id || '').toString();
       if (label && id) map.set(label, id);
     }
   }
