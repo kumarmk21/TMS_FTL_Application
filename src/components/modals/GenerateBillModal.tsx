@@ -258,6 +258,7 @@ export default function GenerateBillModal({
       const billAmount = subTotal;
 
       const billRecord = {
+        tran_id: selectedLRs[0].tran_id,
         lr_bill_number: formData.bill_number,
         lr_bill_date: formData.bill_date,
         lr_bill_due_date: formData.bill_due_date,
@@ -273,6 +274,7 @@ export default function GenerateBillModal({
         sac_code: formData.sac_code || null,
         sac_description: formData.sac_description || null,
         lr_bill_status: 'Generated',
+        bill_status: 'Active',
         created_by: user?.id,
       };
 
@@ -304,9 +306,10 @@ export default function GenerateBillModal({
       );
       onBillGenerated();
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating bill:', error);
-      alert('Error generating bill. Please try again.');
+      const detail = error?.message || error?.details || 'Unknown error';
+      alert(`Error generating bill: ${detail}`);
     } finally {
       setLoading(false);
     }

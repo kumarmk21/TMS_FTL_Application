@@ -92,14 +92,18 @@ export default function GenerateCustomerBill() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Search query error:', error);
+        throw error;
+      }
 
       setUnbilledLRs(data || []);
       setShowResults(true);
       setSelectedLRs(new Set());
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error searching LRs:', error);
-      alert('Error searching unbilled LRs');
+      const detail = error?.message || error?.details || 'Unknown error';
+      alert(`Error searching unbilled LRs: ${detail}`);
     } finally {
       setLoading(false);
     }
