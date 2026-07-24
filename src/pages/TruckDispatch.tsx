@@ -446,7 +446,7 @@ export function TruckDispatch() {
                 title={
                   selectedTHCIds.size === 0
                     ? 'Select THC records to push'
-                    : 'Zoho Books Integration coming soon'
+                    : 'Push selected THCs to Zoho Books as purchase bills'
                 }
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -657,6 +657,11 @@ export function TruckDispatch() {
         isOpen={isPushModalOpen}
         onClose={() => setIsPushModalOpen(false)}
         selectedItems={pushItems}
+        onPushComplete={() => {
+          setIsPushModalOpen(false);
+          setSelectedTHCIds(new Set());
+          fetchRecords();
+        }}
       />
     </div>
   );

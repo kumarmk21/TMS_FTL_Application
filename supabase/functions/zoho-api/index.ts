@@ -1134,6 +1134,485 @@ Deno.serve(async (req: Request) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── Sync vendors with Zoho Books vendor contacts ──
+    if (action === 'sync-vendors') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      // Fetch all active vendor contacts from Zoho (paginated)
+      let allZohoVendors: Record<string, any>[] = [];
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        const vUrl = new URL(`${apiDomain}/books/v3/contacts`);
+        vUrl.searchParams.set('organization_id', orgId);
+        vUrl.searchParams.set('status', 'active');
+        vUrl.searchParams.set('contact_type', 'vendor');
+        vUrl.searchParams.set('page', String(page));
+        vUrl.searchParams.set('per_page', '200');
+
+        const vRes = await fetch(vUrl.toString(), {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        const vData = await vRes.json();
+        if (vData.code !== undefined && vData.code !== 0) {
+          throw new Error(`Zoho API error (code ${vData.code}): ${vData.message || 'Unknown error'}`);
+        }
+        const vendors = (vData.contacts || []) as Record<string, any>[];
+        allZohoVendors = allZohoVendors.concat(vendors);
+        hasMore = !!(vData.page_context?.has_more_page || vData.page_context?.has_more);
+        page++;
+        if (page > 50) break;
+      }
+
+      // Fetch all local active vendors
+      const { data: localVendors, error: localError } = await supabase
+        .from('vendor_master')
+        .select('id, vendor_code, vendor_name, vendor_address, vendor_phone, email_id, pan, zoho_vendor_id')
+        .eq('is_active', true);
+
+      if (localError) throw localError;
+
+      // Build lookup map by name (vendor_master has no GSTIN column)
+      const zohoByName = new Map<string, Record<string, any>>();
+      for (const zv of allZohoVendors) {
+        zohoByName.set((zv.contact_name as string).toLowerCase().trim(), zv);
+      }
+
+      const result = {
+        zohoCount: allZohoVendors.length,
+        localCount: localVendors?.length || 0,
+        matched: 0,
+        unmatched: 0,
+        pushed: 0,
+        errors: 0,
+        details: [] as Array<{
+          vendor_code: string;
+          vendor_name: string;
+          action: string;
+          zoho_id?: string;
+          status: string;
+        }>,
+      };
+
+      for (const local of localVendors || []) {
+        const localName = (local.vendor_name || '').toLowerCase().trim();
+        const zohoMatch = localName ? zohoByName.get(localName) : null;
+
+        if (zohoMatch) {
+          const zohoContactId = zohoMatch.contact_id as string;
+          if (local.zoho_vendor_id !== zohoContactId) {
+            const { error: updateErr } = await supabase
+              .from('vendor_master')
+              .update({ zoho_vendor_id: zohoContactId })
+              .eq('id', local.id);
+
+            if (updateErr) {
+              result.errors++;
+              result.details.push({
+                vendor_code: local.vendor_code,
+                vendor_name: local.vendor_name,
+                action: 'link',
+                zoho_id: zohoContactId,
+                status: `error: ${updateErr.message}`,
+              });
+            } else {
+              result.matched++;
+              result.details.push({
+                vendor_code: local.vendor_code,
+                vendor_name: local.vendor_name,
+                action: 'link',
+                zoho_id: zohoContactId,
+                status: local.zoho_vendor_id ? 'relinked (was stale)' : 'linked',
+              });
+            }
+          } else {
+            result.matched++;
+            result.details.push({
+              vendor_code: local.vendor_code,
+              vendor_name: local.vendor_name,
+              action: 'link',
+              zoho_id: zohoContactId,
+              status: 'already linked',
+            });
+          }
+        } else {
+          result.unmatched++;
+          result.details.push({
+            vendor_code: local.vendor_code,
+            vendor_name: local.vendor_name,
+            action: 'push',
+            status: 'not in Zoho',
+          });
+        }
+      }
+
+      // Push unmatched local vendors to Zoho as new vendor contacts
+      const toPush = result.details.filter(d => d.action === 'push' && d.status === 'not in Zoho');
+      for (const item of toPush) {
+        const local = (localVendors || []).find((v: any) => v.vendor_code === item.vendor_code);
+        if (!local) continue;
+
+        const createUrl = new URL(`${apiDomain}/books/v3/contacts`);
+        createUrl.searchParams.set('organization_id', orgId);
+
+        const contactPayload: Record<string, any> = {
+          contact_name: local.vendor_name,
+          contact_type: 'vendor',
+        };
+        if (local.vendor_address) {
+          contactPayload.billing_address = {
+            address: local.vendor_address,
+            country: 'India',
+          };
+        }
+        if (local.email_id) contactPayload.email = local.email_id;
+        if (local.vendor_phone) contactPayload.phone = local.vendor_phone;
+        if (local.pan) contactPayload.pan = local.pan;
+
+        const createRes = await fetch(createUrl.toString(), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${accessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `JSONString=${encodeURIComponent(JSON.stringify(contactPayload))}`,
+        });
+        const createData = await createRes.json();
+
+        if (createData.code === 0 && createData.contact) {
+          const newZohoId = createData.contact.contact_id;
+          await supabase
+            .from('vendor_master')
+            .update({ zoho_vendor_id: newZohoId })
+            .eq('id', local.id);
+          result.pushed++;
+          item.status = 'pushed';
+          item.zoho_id = newZohoId;
+        } else {
+          result.errors++;
+          item.status = `push error: ${createData.message || 'unknown'}`;
+          console.error('[Zoho] Sync create vendor failed:', JSON.stringify(createData));
+        }
+      }
+
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Push THC purchases to Zoho Books as Bills ──
+    if (action === 'push-purchases') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const body = await req.json().catch(() => ({}));
+      const thcIds = (body as { thc_ids?: string[] }).thc_ids;
+      const dryRun = (body as { dry_run?: boolean }).dry_run || false;
+
+      if (!thcIds || thcIds.length === 0) {
+        return new Response(JSON.stringify({ error: 'No THC IDs provided' }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Fetch THC records
+      const { data: thcRecords, error: thcError } = await supabase
+        .from('thc_details')
+        .select(`
+          thc_id, thc_number, thc_id_number, thc_date, thc_vendor,
+          thc_gross_amount, thc_amount, thc_loading_charges, thc_unloading_charges,
+          thc_detention_charges, thc_other_charges, thc_munshiyana_amount,
+          thc_deduction_delay, thc_deduction_damage, thc_tds_amount,
+          thc_net_payable_amount, thc_advance_amount, thc_balance_amount,
+          zoho_books_id, zoho_sync_status,
+          vendor_master:thc_vendor (vendor_code, vendor_name, zoho_vendor_id)
+        `)
+        .in('thc_id', thcIds);
+
+      if (thcError) throw thcError;
+
+      // Build vendor lookup
+      const vendorCodes = (thcRecords || [])
+        .map((r: any) => r.vendor_master?.vendor_code)
+        .filter(Boolean);
+      let vendorMap = new Map<string, any>();
+      if (vendorCodes.length > 0) {
+        const { data: vendors } = await supabase
+          .from('vendor_master')
+          .select('id, vendor_code, vendor_name, zoho_vendor_id, vendor_address, vendor_phone, email_id, pan')
+          .in('vendor_code', vendorCodes);
+        for (const v of (vendors || []) as any[]) {
+          vendorMap.set(v.vendor_code, v);
+        }
+      }
+
+      const result = {
+        total: 0,
+        pushed: 0,
+        skipped: 0,
+        errors: 0,
+        dryRun,
+        details: [] as Array<{
+          thc_id: string;
+          thc_number: string;
+          vendor_name: string;
+          amount: number;
+          zoho_bill_id?: string;
+          zoho_bill_number?: string;
+          status: string;
+          detail?: string;
+        }>,
+      };
+
+      for (const thc of (thcRecords || []) as any[]) {
+        result.total++;
+        const amount = parseFloat(thc.thc_gross_amount || thc.thc_amount || '0');
+
+        const vendor = thc.vendor_master
+          ? vendorMap.get(thc.vendor_master.vendor_code) || thc.vendor_master
+          : null;
+
+        if (!vendor || !vendor.zoho_vendor_id) {
+          result.skipped++;
+          result.details.push({
+            thc_id: thc.thc_id,
+            thc_number: thc.thc_number || '',
+            vendor_name: vendor?.vendor_name || '',
+            amount,
+            status: 'skipped',
+            detail: `Vendor "${vendor?.vendor_name || thc.thc_vendor}" is not linked to any Zoho contact. Run Vendor Sync first.`,
+          });
+          continue;
+        }
+
+        // Skip already-synced THCs
+        if (thc.zoho_books_id) {
+          result.skipped++;
+          result.details.push({
+            thc_id: thc.thc_id,
+            thc_number: thc.thc_number || '',
+            vendor_name: vendor.vendor_name || '',
+            amount,
+            zoho_bill_id: thc.zoho_books_id,
+            status: 'skipped',
+            detail: 'Already synced to Zoho Books.',
+          });
+          continue;
+        }
+
+        // Build line items from THC charges
+        const lineItems: Record<string, any>[] = [];
+        const grossAmount = parseFloat(thc.thc_gross_amount || thc.thc_amount || '0');
+        if (grossAmount > 0) {
+          lineItems.push({
+            name: 'Freight Charges',
+            description: `THC freight for ${thc.thc_number || thc.thc_id_number || ''}`,
+            rate: grossAmount,
+            quantity: 1,
+            item_order: 1,
+          });
+        }
+        const loadingCharges = parseFloat(thc.thc_loading_charges || '0');
+        if (loadingCharges > 0) {
+          lineItems.push({
+            name: 'Loading Charges',
+            description: 'Loading charges',
+            rate: loadingCharges,
+            quantity: 1,
+            item_order: 2,
+          });
+        }
+        const unloadingCharges = parseFloat(thc.thc_unloading_charges || '0');
+        if (unloadingCharges > 0) {
+          lineItems.push({
+            name: 'Unloading Charges',
+            description: 'Unloading charges',
+            rate: unloadingCharges,
+            quantity: 1,
+            item_order: 3,
+          });
+        }
+        const detentionCharges = parseFloat(thc.thc_detention_charges || '0');
+        if (detentionCharges > 0) {
+          lineItems.push({
+            name: 'Detention Charges',
+            description: 'Detention charges',
+            rate: detentionCharges,
+            quantity: 1,
+            item_order: 4,
+          });
+        }
+        const otherCharges = parseFloat(thc.thc_other_charges || '0');
+        if (otherCharges > 0) {
+          lineItems.push({
+            name: 'Other Charges',
+            description: 'Other charges',
+            rate: otherCharges,
+            quantity: 1,
+            item_order: 5,
+          });
+        }
+        const munshiyana = parseFloat(thc.thc_munshiyana_amount || '0');
+        if (munshiyana > 0) {
+          lineItems.push({
+            name: 'Munshiyana',
+            description: 'Munshiyana amount',
+            rate: munshiyana,
+            quantity: 1,
+            item_order: 6,
+          });
+        }
+
+        // Fallback: if no line items have amounts, use gross as single line
+        if (lineItems.length === 0) {
+          lineItems.push({
+            name: 'Transportation Charges',
+            description: `THC ${thc.thc_number || thc.thc_id_number || ''}`,
+            rate: amount,
+            quantity: 1,
+            item_order: 1,
+          });
+        }
+
+        const billDate = thc.thc_date
+          ? new Date(thc.thc_date).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0];
+
+        const billPayload: Record<string, any> = {
+          vendor_id: vendor.zoho_vendor_id,
+          bill_number: thc.thc_id_number || thc.thc_number || '',
+          date: billDate,
+          is_inclusive_tax: false,
+          line_items: lineItems,
+        };
+
+        // Add reference to THC number
+        if (thc.thc_number) {
+          billPayload.reference_number = thc.thc_number;
+        }
+
+        if (dryRun) {
+          result.details.push({
+            thc_id: thc.thc_id,
+            thc_number: thc.thc_number || '',
+            vendor_name: vendor.vendor_name || '',
+            amount,
+            status: 'dry run - would push',
+          });
+          continue;
+        }
+
+        const createUrl = new URL(`${apiDomain}/books/v3/bills`);
+        createUrl.searchParams.set('organization_id', orgId);
+
+        const createRes = await fetch(createUrl.toString(), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${accessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `JSONString=${encodeURIComponent(JSON.stringify(billPayload))}`,
+        });
+        const createData = await createRes.json();
+
+        if (createData.code === 0 && createData.bill) {
+          const zohoBillId = createData.bill.bill_id;
+          const zohoBillNumber = createData.bill.bill_number;
+          await supabase
+            .from('thc_details')
+            .update({
+              zoho_books_id: zohoBillId,
+              zoho_sync_status: 'synced',
+              zoho_synced_at: new Date().toISOString(),
+            })
+            .eq('thc_id', thc.thc_id);
+
+          result.pushed++;
+          result.details.push({
+            thc_id: thc.thc_id,
+            thc_number: thc.thc_number || '',
+            vendor_name: vendor.vendor_name || '',
+            amount,
+            zoho_bill_id: zohoBillId,
+            zoho_bill_number: zohoBillNumber,
+            status: 'pushed',
+          });
+        } else {
+          console.error('[Zoho] Bill push failed:', JSON.stringify(createData));
+          const zohoMsg = createData.message || 'unknown error';
+
+          // Mark as failed in the database
+          await supabase
+            .from('thc_details')
+            .update({ zoho_sync_status: 'failed' })
+            .eq('thc_id', thc.thc_id);
+
+          result.errors++;
+          result.details.push({
+            thc_id: thc.thc_id,
+            thc_number: thc.thc_number || '',
+            vendor_name: vendor.vendor_name || '',
+            amount,
+            status: 'api-error',
+            detail: zohoMsg,
+          });
+        }
+      }
+
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Fetch purchase (THC) sync stats ──
+    if (action === 'purchase-sync-stats') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { count: total } = await supabase
+        .from('thc_details')
+        .select('*', { count: 'exact', head: true })
+        .not('thc_id_number', 'is', null);
+
+      const { count: synced } = await supabase
+        .from('thc_details')
+        .select('*', { count: 'exact', head: true })
+        .not('thc_id_number', 'is', null)
+        .eq('zoho_sync_status', 'synced');
+
+      const { count: failed } = await supabase
+        .from('thc_details')
+        .select('*', { count: 'exact', head: true })
+        .not('thc_id_number', 'is', null)
+        .eq('zoho_sync_status', 'failed');
+
+      const { count: vendorLinked } = await supabase
+        .from('vendor_master')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .not('zoho_vendor_id', 'is', null);
+
+      const { count: vendorTotal } = await supabase
+        .from('vendor_master')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      return new Response(JSON.stringify({
+        thc: {
+          total: total || 0,
+          synced: synced || 0,
+          pending: (total || 0) - (synced || 0),
+          failed: failed || 0,
+        },
+        vendors: {
+          total: vendorTotal || 0,
+          linked: vendorLinked || 0,
+          unlinked: (vendorTotal || 0) - (vendorLinked || 0),
+        },
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

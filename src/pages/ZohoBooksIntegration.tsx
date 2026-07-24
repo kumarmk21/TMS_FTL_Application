@@ -76,6 +76,54 @@ interface FixLinkResult {
   }>;
 }
 
+interface VendorSyncResult {
+  zohoCount: number;
+  localCount: number;
+  matched: number;
+  unmatched: number;
+  pushed: number;
+  errors: number;
+  details: Array<{
+    vendor_code: string;
+    vendor_name: string;
+    action: string;
+    zoho_id?: string;
+    status: string;
+  }>;
+}
+
+interface PurchaseSyncStats {
+  thc: { total: number; synced: number; pending: number; failed: number };
+  vendors: { total: number; linked: number; unlinked: number };
+}
+
+interface PurchasePushResult {
+  total: number;
+  pushed: number;
+  skipped: number;
+  errors: number;
+  dryRun: boolean;
+  details: Array<{
+    thc_id: string;
+    thc_number: string;
+    vendor_name: string;
+    amount: number;
+    zoho_bill_id?: string;
+    zoho_bill_number?: string;
+    status: string;
+    detail?: string;
+  }>;
+}
+
+interface PendingTHC {
+  thc_id: string;
+  thc_number: string;
+  thc_id_number: string;
+  thc_date: string;
+  vendor_name: string;
+  thc_gross_amount: number;
+}
+
 interface PendingInvoice {
   bill_id: string;
   bill_number: string;
@@ -114,6 +162,18 @@ export default function ZohoBooksIntegration() {
   const [showGstWarning, setShowGstWarning] = useState(false);
   const [pendingPushAction, setPendingPushAction] = useState<(() => void) | null>(null);
 
+  const [activeTab, setActiveTab] = useState<'invoices' | 'purchases'>('invoices');
+  const [vendorSyncing, setVendorSyncing] = useState(false);
+  const [vendorSyncResult, setVendorSyncResult] = useState<VendorSyncResult | null>(null);
+  const [purchaseStats, setPurchaseStats] = useState<PurchaseSyncStats | null>(null);
+  const [pushingPurchases, setPushingPurchases] = useState(false);
+  const [purchasePushResult, setPurchasePushResult] = useState<PurchasePushResult | null>(null);
+  const [pendingTHCs, setPendingTHCs] = useState<PendingTHC[]>([]);
+  const [loadingPendingTHCs, setLoadingPendingTHCs] = useState(false);
+  const [selectedTHCIds, setSelectedTHCIds] = useState<Set<string>>(new Set());
+  const [vendorSyncFilter, setVendorSyncFilter] = useState<'all' | 'linked' | 'pushed' | 'error'>('all');
+  const [purchasePushFilter, setPurchasePushFilter] = useState<'all' | 'pushed' | 'skipped' | 'error'>('all');
+
   const oauthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-oauth`;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api`;
 
@@ -133,6 +193,8 @@ export default function ZohoBooksIntegration() {
         await fetchSyncStats();
         await fetchInvoiceStats();
         await fetchPendingInvoices();
+        await fetchPurchaseStats();
+        await fetchPendingTHCs();
       }
     } catch (err: any) {
       setError(err.message || 'Failed to check connection status');
@@ -493,6 +555,161 @@ export default function ZohoBooksIntegration() {
   const clearDateRange = () => {
     setDateRange({ startDate: null, endDate: null });
   };
+
+  // ── Vendor & Purchase helpers ──
+  const fetchPurchaseStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiUrl}?action=purchase-sync-stats`, {
+        headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setPurchaseStats(data);
+    } catch {
+      // non-critical
+    }
+  }, [apiUrl]);
+
+  const fetchPendingTHCs = useCallback(async () => {
+    setLoadingPendingTHCs(true);
+    try {
+      const { data, error } = await supabase
+        .from('thc_details')
+        .select(`
+          thc_id, thc_number, thc_id_number, thc_date, thc_vendor,
+          thc_gross_amount, zoho_sync_status,
+          vendor_master:thc_vendor (vendor_name)
+        `)
+        .not('thc_id_number', 'is', null)
+        .in('zoho_sync_status', ['not_synced', 'failed'])
+        .order('thc_date', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+
+      const thcs: PendingTHC[] = (data || []).map((t: any) => ({
+        thc_id: t.thc_id,
+        thc_number: t.thc_number || '',
+        thc_id_number: t.thc_id_number || '',
+        thc_date: t.thc_date || '',
+        vendor_name: t.vendor_master?.vendor_name || t.thc_vendor || '',
+        thc_gross_amount: parseFloat(t.thc_gross_amount || '0'),
+      }));
+
+      setPendingTHCs(thcs);
+      setSelectedTHCIds(new Set());
+    } catch (err) {
+      console.error('Failed to fetch pending THCs:', err);
+    } finally {
+      setLoadingPendingTHCs(false);
+    }
+  }, []);
+
+  const handleSyncVendors = async () => {
+    setVendorSyncing(true);
+    setError('');
+    setVendorSyncResult(null);
+    try {
+      const res = await fetch(`${apiUrl}?action=sync-vendors`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Sync failed (${res.status})`);
+      }
+      setVendorSyncResult(data);
+      setSuccess(`Vendor sync complete: ${data.matched} linked, ${data.pushed} pushed to Zoho, ${data.errors} errors.`);
+      setTimeout(() => setSuccess(''), 8000);
+      await fetchPurchaseStats();
+    } catch (err: any) {
+      setError(err.message || 'Failed to sync vendors');
+    } finally {
+      setVendorSyncing(false);
+    }
+  };
+
+  const handlePushPurchases = async (thcIds?: string[]) => {
+    setPushingPurchases(true);
+    setError('');
+    setPurchasePushResult(null);
+    try {
+      const payload: Record<string, any> = { dry_run: false };
+      if (thcIds && thcIds.length > 0) {
+        payload.thc_ids = thcIds;
+      } else {
+        payload.thc_ids = Array.from(selectedTHCIds);
+      }
+
+      if (payload.thc_ids.length === 0) {
+        setError('Please select at least one THC to push.');
+        setPushingPurchases(false);
+        return;
+      }
+
+      const res = await fetch(`${apiUrl}?action=push-purchases`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Push failed (${res.status})`);
+      }
+      setPurchasePushResult(data);
+      setSuccess(`${data.pushed} purchase bills pushed, ${data.skipped} skipped, ${data.errors} errors out of ${data.total} processed.`);
+      setTimeout(() => setSuccess(''), 8000);
+      await fetchPurchaseStats();
+      await fetchPendingTHCs();
+    } catch (err: any) {
+      setError(err.message || 'Failed to push purchases');
+    } finally {
+      setPushingPurchases(false);
+    }
+  };
+
+  const toggleTHCSelection = (thcId: string) => {
+    setSelectedTHCIds(prev => {
+      const next = new Set(prev);
+      if (next.has(thcId)) next.delete(thcId);
+      else next.add(thcId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllTHCs = () => {
+    if (pendingTHCs.length > 0 && pendingTHCs.every(t => selectedTHCIds.has(t.thc_id))) {
+      setSelectedTHCIds(new Set());
+    } else {
+      setSelectedTHCIds(new Set(pendingTHCs.map(t => t.thc_id)));
+    }
+  };
+
+  const filteredVendorSyncDetails = vendorSyncResult
+    ? vendorSyncResult.details.filter(d => {
+        if (vendorSyncFilter === 'all') return true;
+        if (vendorSyncFilter === 'linked') return d.action === 'link' && (d.status === 'linked' || d.status === 'already linked' || d.status.includes('relinked'));
+        if (vendorSyncFilter === 'pushed') return d.action === 'push' && d.status === 'pushed';
+        if (vendorSyncFilter === 'error') return d.status.includes('error') || d.status === 'not in Zoho';
+        return true;
+      })
+    : [];
+
+  const filteredPurchaseDetails = purchasePushResult
+    ? purchasePushResult.details.filter(d => {
+        if (purchasePushFilter === 'all') return true;
+        if (purchasePushFilter === 'pushed') return d.status === 'pushed';
+        if (purchasePushFilter === 'skipped') return d.status.startsWith('skipped');
+        if (purchasePushFilter === 'error') return d.status.includes('error') || d.status === 'api-error';
+        return true;
+      })
+    : [];
 
   const handlePushSelected = () => {
     if (selectedBillIds.size === 0) {
@@ -905,8 +1122,30 @@ export default function ZohoBooksIntegration() {
         </div>
       )}
 
-      {/* Push Invoices Card */}
+      {/* Tab Switcher */}
       {status?.connected && (
+        <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveTab('invoices')}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              activeTab === 'invoices' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Sales Invoices
+          </button>
+          <button
+            onClick={() => setActiveTab('purchases')}
+            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              activeTab === 'purchases' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Purchase Bills (THC)
+          </button>
+        </div>
+      )}
+
+      {/* Push Invoices Card */}
+      {status?.connected && activeTab === 'invoices' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="p-2 bg-emerald-50 rounded-lg">
@@ -1305,8 +1544,399 @@ export default function ZohoBooksIntegration() {
         </div>
       )}
 
+      {/* Purchase Bills (THC) Card */}
+      {status?.connected && activeTab === 'purchases' && (
+        <div className="space-y-6">
+          {/* Vendor Sync Card */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2 bg-orange-50 rounded-lg">
+                <Users className="w-5 h-5 text-orange-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-bold text-gray-900">Vendor Sync</h2>
+                <p className="text-sm text-gray-500">Sync your local vendors with Zoho Books vendor contacts before pushing purchase bills</p>
+              </div>
+            </div>
+
+            {purchaseStats && (
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                <div className="p-3 bg-gray-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-gray-900">{purchaseStats.vendors.total}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Total Vendors</p>
+                </div>
+                <div className="p-3 bg-green-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-green-700">{purchaseStats.vendors.linked}</p>
+                  <p className="text-xs text-green-600 mt-0.5">Linked to Zoho</p>
+                </div>
+                <div className="p-3 bg-amber-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-amber-700">{purchaseStats.vendors.unlinked}</p>
+                  <p className="text-xs text-amber-600 mt-0.5">Not Yet Linked</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 mb-4">
+              <button
+                onClick={handleSyncVendors}
+                disabled={vendorSyncing}
+                className="flex items-center gap-2 px-5 py-2.5 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {vendorSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                {vendorSyncing ? 'Syncing...' : 'Sync Vendors Now'}
+              </button>
+            </div>
+
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200 mb-4">
+              <h4 className="text-sm font-semibold text-orange-900 mb-2">How vendor sync works</h4>
+              <ul className="space-y-1.5 text-sm text-orange-800">
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Fetches all vendor contacts from Zoho Books
+                </li>
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Matches local vendors to Zoho contacts by name
+                </li>
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Unmatched vendors are automatically created in Zoho Books
+                </li>
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Links are stored in the vendor master table
+                </li>
+              </ul>
+            </div>
+
+            {vendorSyncResult && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="p-4 bg-gray-50 border-b border-gray-200">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <h4 className="text-sm font-semibold text-gray-900">Vendor Sync Results</h4>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-gray-600">Zoho: <strong>{vendorSyncResult.zohoCount}</strong></span>
+                      <span className="text-gray-600">Local: <strong>{vendorSyncResult.localCount}</strong></span>
+                      <span className="text-green-700">Linked: <strong>{vendorSyncResult.matched}</strong></span>
+                      <span className="text-blue-700">Pushed: <strong>{vendorSyncResult.pushed}</strong></span>
+                      <span className="text-red-700">Errors: <strong>{vendorSyncResult.errors}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 px-4 py-2 bg-gray-50 border-b border-gray-200">
+                  {(['all', 'linked', 'pushed', 'error'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setVendorSyncFilter(f)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        vendorSyncFilter === f ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {f === 'all' && `All (${vendorSyncResult.details.length})`}
+                      {f === 'linked' && `Linked (${vendorSyncResult.details.filter(d => d.action === 'link' && (d.status === 'linked' || d.status === 'already linked' || d.status.includes('relinked'))).length})`}
+                      {f === 'pushed' && `Pushed (${vendorSyncResult.details.filter(d => d.action === 'push' && d.status === 'pushed').length})`}
+                      {f === 'error' && `Errors (${vendorSyncResult.details.filter(d => d.status.includes('error') || d.status === 'not in Zoho').length})`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="max-h-64 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Vendor Code</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Name</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Action</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Zoho ID</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredVendorSyncDetails.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-400">No records in this category</td>
+                        </tr>
+                      ) : (
+                        filteredVendorSyncDetails.map((d, i) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-700 font-mono text-xs">{d.vendor_code}</td>
+                            <td className="px-4 py-2 text-gray-900">{d.vendor_name}</td>
+                            <td className="px-4 py-2">
+                              {d.action === 'link' ? (
+                                <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                                  <Link2 className="w-3 h-3" /> Link
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs text-blue-700">
+                                  <Upload className="w-3 h-3" /> Push
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-gray-500 font-mono text-xs">{d.zoho_id || '-'}</td>
+                            <td className="px-4 py-2">
+                              <span className={`text-xs ${
+                                d.status === 'linked' || d.status === 'already linked' ? 'text-green-700' :
+                                d.status === 'pushed' ? 'text-blue-700' :
+                                d.status.includes('error') ? 'text-red-700' :
+                                'text-gray-500'
+                              }`}>{d.status}</span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Push Purchases Card */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2 bg-emerald-50 rounded-lg">
+                <FileText className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-bold text-gray-900">Push Purchase Bills to Zoho Books</h2>
+                <p className="text-sm text-gray-500">Export THC records as purchase bills to Zoho Books</p>
+              </div>
+            </div>
+
+            {purchaseStats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                <div className="p-3 bg-gray-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-gray-900">{purchaseStats.thc.total}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Total THCs</p>
+                </div>
+                <div className="p-3 bg-green-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-green-700">{purchaseStats.thc.synced}</p>
+                  <p className="text-xs text-green-600 mt-0.5">Pushed to Zoho</p>
+                </div>
+                <div className="p-3 bg-amber-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-amber-700">{purchaseStats.thc.pending}</p>
+                  <p className="text-xs text-amber-600 mt-0.5">Pending</p>
+                </div>
+                <div className="p-3 bg-red-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-red-700">{purchaseStats.thc.failed}</p>
+                  <p className="text-xs text-red-600 mt-0.5">Failed</p>
+                </div>
+              </div>
+            )}
+
+            {/* Summary bar */}
+            <div className="flex items-center justify-between flex-wrap gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200 mb-4">
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 text-emerald-600" />
+                <p className="text-sm font-medium text-emerald-900">
+                  <strong>{pendingTHCs.length}</strong> pending THCs ready to push
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {selectedTHCIds.size > 0 && (
+                  <span className="text-sm text-emerald-700 font-medium">
+                    {selectedTHCIds.size} selected
+                  </span>
+                )}
+                <button
+                  onClick={fetchPendingTHCs}
+                  disabled={loadingPendingTHCs}
+                  className="flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-900 font-medium"
+                >
+                  {loadingPendingTHCs ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  Refresh List
+                </button>
+              </div>
+            </div>
+
+            {/* Pending THCs table */}
+            {loadingPendingTHCs ? (
+              <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
+                <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+                <span className="ml-3 text-gray-500 text-sm">Loading pending THCs...</span>
+              </div>
+            ) : pendingTHCs.length === 0 ? (
+              <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
+                <p className="text-gray-400 text-sm">No pending THCs to push. All caught up!</p>
+              </div>
+            ) : (
+              <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white border-b border-gray-200 z-10">
+                      <tr>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide w-10">
+                          <input
+                            type="checkbox"
+                            checked={pendingTHCs.length > 0 && pendingTHCs.every(t => selectedTHCIds.has(t.thc_id))}
+                            onChange={toggleSelectAllTHCs}
+                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                        </th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">THC No.</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">THC ID</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Vendor</th>
+                        <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {pendingTHCs.map((t) => {
+                        const isSelected = selectedTHCIds.has(t.thc_id);
+                        return (
+                          <tr key={t.thc_id} className={`hover:bg-gray-50 ${isSelected ? 'bg-emerald-50/50' : ''}`}>
+                            <td className="px-4 py-2">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleTHCSelection(t.thc_id)}
+                                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                              />
+                            </td>
+                            <td className="px-4 py-2 text-gray-700 font-mono text-xs">{t.thc_number || '-'}</td>
+                            <td className="px-4 py-2 text-gray-600 font-mono text-xs">{t.thc_id_number || '-'}</td>
+                            <td className="px-4 py-2 text-gray-600 text-xs">{formatDateShort(t.thc_date)}</td>
+                            <td className="px-4 py-2 text-gray-900">{t.vendor_name || '-'}</td>
+                            <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatCurrency(t.thc_gross_amount)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Push buttons */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <button
+                onClick={() => handlePushPurchases()}
+                disabled={pushingPurchases || selectedTHCIds.size === 0}
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {pushingPurchases ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {pushingPurchases ? 'Processing...' : `Push ${selectedTHCIds.size} Selected`}
+              </button>
+              <button
+                onClick={() => handlePushPurchases(pendingTHCs.map(t => t.thc_id))}
+                disabled={pushingPurchases || pendingTHCs.length === 0}
+                className="flex items-center gap-2 px-5 py-2.5 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {pushingPurchases ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                {pushingPurchases ? 'Processing...' : `Push All ${pendingTHCs.length} Pending`}
+              </button>
+              {selectedTHCIds.size > 0 && (
+                <button
+                  onClick={() => setSelectedTHCIds(new Set())}
+                  className="flex items-center gap-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 font-medium"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Clear Selection
+                </button>
+              )}
+            </div>
+
+            {/* Info banner */}
+            <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200 mb-4">
+              <h4 className="text-sm font-semibold text-emerald-900 mb-2">How purchase bill push works</h4>
+              <ul className="space-y-1.5 text-sm text-emerald-800">
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Each THC is created as a Zoho Books Purchase Bill linked to the synced vendor contact
+                </li>
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Line items include freight, loading, unloading, detention, other charges, and munshiyana
+                </li>
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  THCs with unlinked vendors are skipped — run Vendor Sync first
+                </li>
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  Already-synced THCs are skipped automatically
+                </li>
+              </ul>
+            </div>
+
+            {/* Push results */}
+            {purchasePushResult && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="p-4 bg-gray-50 border-b border-gray-200">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <h4 className="text-sm font-semibold text-gray-900">Push Results</h4>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-gray-600">Total: <strong>{purchasePushResult.total}</strong></span>
+                      <span className="text-green-700">Pushed: <strong>{purchasePushResult.pushed}</strong></span>
+                      <span className="text-amber-700">Skipped: <strong>{purchasePushResult.skipped}</strong></span>
+                      <span className="text-red-700">Errors: <strong>{purchasePushResult.errors}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 px-4 py-2 bg-gray-50 border-b border-gray-200">
+                  {(['all', 'pushed', 'skipped', 'error'] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setPurchasePushFilter(f)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        purchasePushFilter === f ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {f === 'all' && `All (${purchasePushResult.details.length})`}
+                      {f === 'pushed' && `Pushed (${purchasePushResult.details.filter(d => d.status === 'pushed').length})`}
+                      {f === 'skipped' && `Skipped (${purchasePushResult.details.filter(d => d.status.startsWith('skipped')).length})`}
+                      {f === 'error' && `Errors (${purchasePushResult.details.filter(d => d.status.includes('error') || d.status === 'api-error').length})`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="max-h-96 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-white border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">THC No.</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Vendor</th>
+                        <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Zoho Bill</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredPurchaseDetails.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-8 text-center text-gray-400">No records in this category</td>
+                        </tr>
+                      ) : (
+                        filteredPurchaseDetails.map((d, i) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-700 font-mono text-xs">{d.thc_number || '-'}</td>
+                            <td className="px-4 py-2 text-gray-900">{d.vendor_name || '-'}</td>
+                            <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatCurrency(d.amount)}</td>
+                            <td className="px-4 py-2 text-gray-500 font-mono text-xs">{d.zoho_bill_number || d.zoho_bill_id || '-'}</td>
+                            <td className="px-4 py-2">
+                              <span className={`text-xs ${
+                                d.status === 'pushed' ? 'text-green-700' :
+                                d.status.startsWith('skipped') ? 'text-amber-700' :
+                                'text-red-700'
+                              }`}>{d.status}</span>
+                              {d.detail && <p className="text-xs text-gray-400 mt-0.5">{d.detail}</p>}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* API Access Card */}
-      {status?.connected && (
+      {status?.connected && activeTab === 'invoices' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">API Access</h2>
