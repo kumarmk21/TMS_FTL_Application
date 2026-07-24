@@ -11,6 +11,9 @@ interface GenerateTHCModalProps {
     tran_id: string;
     manual_lr_no: string;
     vehicle_number: string;
+    from_city?: string;
+    to_city?: string;
+    vehicle_type?: string;
   };
 }
 
@@ -26,19 +29,11 @@ interface Vendor {
   tds_rate: number;
 }
 
-interface LRDetails {
-  vehicle_number: string;
-  driver_number: string;
-  vendor_code: string;
-  expected_rate: number;
-}
-
 export function GenerateTHCModal({ isOpen, onClose, onSuccess, lrRecord }: GenerateTHCModalProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
-  const [lrDetails, setLrDetails] = useState<LRDetails | null>(null);
 
   const [formData, setFormData] = useState({
     thc_date: new Date().toISOString().split('T')[0],
@@ -90,7 +85,6 @@ export function GenerateTHCModal({ isOpen, onClose, onSuccess, lrRecord }: Gener
         .single();
 
       if (error) throw error;
-      setLrDetails(data);
 
       setFormData(prev => ({
         ...prev,
