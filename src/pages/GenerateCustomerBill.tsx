@@ -22,6 +22,7 @@ interface UnbilledLR {
   lr_total_amount: number;
   freight_amount: number;
   booking_branch: string;
+  lr_financial_status: string;
 }
 
 export default function GenerateCustomerBill() {
@@ -45,7 +46,6 @@ export default function GenerateCustomerBill() {
         .from('booking_lr')
         .select('billing_party_code, billing_party_name')
         .is('bill_no', null)
-        .gt('lr_total_amount', 0)
         .not('billing_party_code', 'is', null)
         .order('billing_party_name');
 
@@ -85,7 +85,6 @@ export default function GenerateCustomerBill() {
         .select('*')
         .eq('billing_party_code', selectedParty)
         .is('bill_no', null)
-        .gt('lr_total_amount', 0)
         .gte('lr_date', fromDate)
         .lte('lr_date', toDate)
         .order('lr_date', { ascending: true });
@@ -110,6 +109,11 @@ export default function GenerateCustomerBill() {
   };
 
   const handleSelectLR = (tranId: string) => {
+    const lr = unbilledLRs.find(l => l.tran_id === tranId);
+    if (lr && (lr.lr_financial_status !== 'LR Finalised' || (lr.lr_total_amount || 0) <= 0)) {
+      alert('This LR is not finalised yet. Please finalise the LR in LR Financial Edit before generating a bill.');
+      return;
+    }
     if (selectedLRs.has(tranId)) {
       setSelectedLRs(new Set());
     } else {
@@ -311,14 +315,19 @@ export default function GenerateCustomerBill() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total Amount
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {unbilledLRs.map((lr) => (
+                  {unbilledLRs.map((lr) => {
+                    const isFinalised = lr.lr_financial_status === 'LR Finalised' && (lr.lr_total_amount || 0) > 0;
+                    return (
                     <tr
                       key={lr.tran_id}
-                      className={`hover:bg-gray-50 transition-colors ${
-                        selectedLRs.has(lr.tran_id) ? 'bg-blue-50' : ''
+                      className={`transition-colors ${
+                        selectedLRs.has(lr.tran_id) ? 'bg-blue-50' : isFinalised ? 'hover:bg-gray-50' : 'bg-gray-50 opacity-60'
                       }`}
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -327,6 +336,7 @@ export default function GenerateCustomerBill() {
                           name="selected_lr"
                           checked={selectedLRs.has(lr.tran_id)}
                           onChange={() => handleSelectLR(lr.tran_id)}
+                          disabled={!isFinalised}
                           className="w-4 h-4 accent-blue-600"
                         />
                       </td>
@@ -348,8 +358,20 @@ export default function GenerateCustomerBill() {
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900">
                         ₹{(lr.lr_total_amount || 0).toFixed(2)}
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        {isFinalised ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Ready to Bill
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                            Not Finalised
+                          </span>
+                        )}
+                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
                 <tfoot className="bg-gray-50 font-semibold">
                   <tr>
@@ -359,6 +381,7 @@ export default function GenerateCustomerBill() {
                     <td className="px-4 py-3 text-sm text-gray-900">
                       ₹{calculateTotalAmount().toFixed(2)}
                     </td>
+                    <td></td>
                   </tr>
                 </tfoot>
               </table>
