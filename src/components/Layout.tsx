@@ -70,9 +70,6 @@ import ConsolidatedBTHFile from '../pages/ConsolidatedBTHFile';
 import ZohoBooksIntegration from '../pages/ZohoBooksIntegration';
 import { VehicleTracking } from '../pages/VehicleTracking';
 import { BillCollection } from '../pages/BillCollection';
-import VendorPaymentsDashboard from '../pages/VendorPaymentsDashboard';
-import VendorPaymentHistory from '../pages/VendorPaymentHistory';
-import VendorPaymentSettings from '../pages/VendorPaymentSettings';
 
 export interface MenuItem {
   id: string;
@@ -142,9 +139,6 @@ const menuItems: MenuItem[] = [
       { id: 'admin-payment-bank-file', label: 'Admin Payment Bank File' },
       { id: 'bill-collection', label: 'Bill Collection' },
       { id: 'zoho-books-integration', label: 'Zoho Books Integration' },
-      { id: 'vendor-payments-dashboard', label: 'Vendor Bill Payments' },
-      { id: 'vendor-payment-history', label: 'Vendor Payment History' },
-      { id: 'vendor-payment-settings', label: 'Vendor Payment Settings' },
       { id: 'generate-debit-note', label: 'Generate Debit Note' },
       { id: 'generate-credit-note', label: 'Generate Credit Note' },
     ],
@@ -333,12 +327,6 @@ export function Layout() {
         return <ConsolidatedBTHFile />;
       case 'zoho-books-integration':
         return <ZohoBooksIntegration />;
-      case 'vendor-payments-dashboard':
-        return <VendorPaymentsDashboard />;
-      case 'vendor-payment-history':
-        return <VendorPaymentHistory />;
-      case 'vendor-payment-settings':
-        return <VendorPaymentSettings />;
       case 'truck-balance-payment':
         return <GenerateBalanceBankFile />;
       case 'pending-pod':

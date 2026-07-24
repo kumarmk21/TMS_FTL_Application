@@ -1,6 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X, Wallet, ArrowLeft, Pencil, CreditCard, History, Settings } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import VendorPaymentsDashboard from './VendorPaymentsDashboard';
+import VendorPaymentHistory from './VendorPaymentHistory';
+import VendorPaymentSettings from './VendorPaymentSettings';
 
 interface ConnectionStatus {
   connected: boolean;
@@ -133,6 +136,28 @@ interface PendingInvoice {
   amount: number;
 }
 
+interface AthRecord {
+  thc_id: string;
+  thc_id_number: string;
+  lr_number: string | null;
+  origin: string | null;
+  destination: string | null;
+  vehicle_type: string | null;
+  vehicle_number: string | null;
+  thc_vendor: string;
+  vendor_name: string;
+  thc_amount: number | null;
+  thc_advance_amount: number | null;
+  thc_net_payable_amount: number | null;
+  ven_act_name: string | null;
+  ven_act_number: string | null;
+  ven_act_ifsc: string | null;
+  ven_act_bank: string | null;
+  ven_act_branch: string | null;
+  ath_date: string | null;
+  thc_date: string | null;
+}
+
 export default function ZohoBooksIntegration() {
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -162,7 +187,9 @@ export default function ZohoBooksIntegration() {
   const [showGstWarning, setShowGstWarning] = useState(false);
   const [pendingPushAction, setPendingPushAction] = useState<(() => void) | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'invoices' | 'purchases'>('invoices');
+  const [activeTab, setActiveTab] = useState<'invoices' | 'purchases' | 'ath-payment'>('invoices');
+  const [view, setView] = useState<'main' | 'payment-info'>('main');
+  const [paymentInfoPage, setPaymentInfoPage] = useState<'dashboard' | 'history' | 'settings'>('dashboard');
   const [vendorSyncing, setVendorSyncing] = useState(false);
   const [vendorSyncResult, setVendorSyncResult] = useState<VendorSyncResult | null>(null);
   const [purchaseStats, setPurchaseStats] = useState<PurchaseSyncStats | null>(null);
@@ -173,6 +200,16 @@ export default function ZohoBooksIntegration() {
   const [selectedTHCIds, setSelectedTHCIds] = useState<Set<string>>(new Set());
   const [vendorSyncFilter, setVendorSyncFilter] = useState<'all' | 'linked' | 'pushed' | 'error'>('all');
   const [purchasePushFilter, setPurchasePushFilter] = useState<'all' | 'pushed' | 'skipped' | 'error'>('all');
+
+  // ATH Payment tab state
+  const athUploadedStatusId = 'cd7d2d24-ab28-4aab-ab01-11b8074580f1';
+  const [athRecords, setAthRecords] = useState<AthRecord[]>([]);
+  const [loadingAth, setLoadingAth] = useState(false);
+  const [athError, setAthError] = useState('');
+  const [editingAth, setEditingAth] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ ven_act_name: '', ven_act_number: '', ven_act_ifsc: '', ven_act_bank: '', ven_act_branch: '', thc_advance_amount: 0 });
+  const [viewingAth, setViewingAth] = useState<AthRecord | null>(null);
+  const [submittingAth, setSubmittingAth] = useState<string | null>(null);
 
   const oauthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-oauth`;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api`;
@@ -298,6 +335,137 @@ export default function ZohoBooksIntegration() {
       setTimeout(() => setSuccess(''), 5000);
     }
   }, [fetchStatus]);
+
+  // ── ATH Payment tab: fetch, real-time subscription, actions ──
+  const fetchAthRecords = useCallback(async () => {
+    setLoadingAth(true);
+    setAthError('');
+    try {
+      const { data, error } = await supabase
+        .from('thc_details')
+        .select(`
+          thc_id, thc_id_number, lr_number, origin, destination,
+          vehicle_type, vehicle_number, thc_vendor,
+          thc_amount, thc_advance_amount, thc_net_payable_amount,
+          ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank, ven_act_branch,
+          ath_date, thc_date
+        `)
+        .eq('thc_status_fin', athUploadedStatusId)
+        .not('ath_date', 'is', null)
+        .order('ath_date', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+
+      const vendorIds = [...new Set((data || []).map((r: any) => r.thc_vendor).filter(Boolean))];
+      const vendorMap = new Map<string, string>();
+      if (vendorIds.length > 0) {
+        const { data: vendorData } = await supabase
+          .from('vendor_master')
+          .select('id, vendor_name')
+          .in('id', vendorIds);
+        (vendorData || []).forEach((v: any) => vendorMap.set(v.id, v.vendor_name));
+      }
+
+      const enriched: AthRecord[] = (data || []).map((r: any) => ({
+        ...r,
+        vendor_name: vendorMap.get(r.thc_vendor) || 'Unknown',
+      }));
+      setAthRecords(enriched);
+    } catch (err: any) {
+      setAthError(err.message || 'Failed to fetch ATH payment records');
+    } finally {
+      setLoadingAth(false);
+    }
+  }, [athUploadedStatusId]);
+
+  useEffect(() => {
+    if (status?.connected && view === 'main' && activeTab === 'ath-payment') {
+      fetchAthRecords();
+    }
+  }, [status?.connected, view, activeTab, fetchAthRecords]);
+
+  // Real-time subscription for thc_details changes
+  const athChannelRef = useRef<any>(null);
+  useEffect(() => {
+    if (view === 'main' && activeTab === 'ath-payment' && status?.connected) {
+      const channel = supabase
+        .channel('ath-payment-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'thc_details', filter: `thc_status_fin=eq.${athUploadedStatusId}` },
+          () => fetchAthRecords()
+        )
+        .subscribe();
+      athChannelRef.current = channel;
+      return () => {
+        supabase.removeChannel(channel);
+        athChannelRef.current = null;
+      };
+    }
+  }, [view, activeTab, status?.connected, athUploadedStatusId, fetchAthRecords]);
+
+  const startEditAth = (record: AthRecord) => {
+    setEditingAth(record.thc_id);
+    setEditForm({
+      ven_act_name: record.ven_act_name || '',
+      ven_act_number: record.ven_act_number || '',
+      ven_act_ifsc: record.ven_act_ifsc || '',
+      ven_act_bank: record.ven_act_bank || '',
+      ven_act_branch: record.ven_act_branch || '',
+      thc_advance_amount: record.thc_advance_amount || 0,
+    });
+  };
+
+  const saveEditAth = async () => {
+    if (!editingAth) return;
+    try {
+      const { error } = await supabase
+        .from('thc_details')
+        .update({
+          ven_act_name: editForm.ven_act_name,
+          ven_act_number: editForm.ven_act_number,
+          ven_act_ifsc: editForm.ven_act_ifsc,
+          ven_act_bank: editForm.ven_act_bank,
+          ven_act_branch: editForm.ven_act_branch,
+          thc_advance_amount: editForm.thc_advance_amount,
+        } as any)
+        .eq('thc_id', editingAth);
+      if (error) throw error;
+      setEditingAth(null);
+      await fetchAthRecords();
+    } catch (err: any) {
+      setAthError(err.message || 'Failed to save changes');
+    }
+  };
+
+  const submitAthPayment = async (record: AthRecord) => {
+    setSubmittingAth(record.thc_id);
+    setAthError('');
+    try {
+      const res = await fetch(`${apiUrl}?action=push-ath-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ thc_id: record.thc_id }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Push failed (${res.status})`);
+      setSuccess(`ATH payment submitted for ${record.thc_id_number}.`);
+      setTimeout(() => setSuccess(''), 5000);
+      await fetchAthRecords();
+    } catch (err: any) {
+      setAthError(err.message || 'Failed to submit ATH payment');
+    } finally {
+      setSubmittingAth(null);
+    }
+  };
+
+  const athTotalAmount = useMemo(() => {
+    return athRecords.reduce((sum, r) => sum + (r.thc_advance_amount || 0), 0);
+  }, [athRecords]);
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -1122,30 +1290,47 @@ export default function ZohoBooksIntegration() {
         </div>
       )}
 
-      {/* Tab Switcher */}
-      {status?.connected && (
-        <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+      {/* Tab Switcher + Payment Info Nav */}
+      {status?.connected && view === 'main' && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+            <button
+              onClick={() => setActiveTab('invoices')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'invoices' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Sales Invoices
+            </button>
+            <button
+              onClick={() => setActiveTab('purchases')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'purchases' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Purchase Bills (THC)
+            </button>
+            <button
+              onClick={() => setActiveTab('ath-payment')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'ath-payment' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              ATH Payment
+            </button>
+          </div>
           <button
-            onClick={() => setActiveTab('invoices')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              activeTab === 'invoices' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-            }`}
+            onClick={() => setView('payment-info')}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            Sales Invoices
-          </button>
-          <button
-            onClick={() => setActiveTab('purchases')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              activeTab === 'purchases' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Purchase Bills (THC)
+            <Wallet className="w-4 h-4" />
+            Payment Information
           </button>
         </div>
       )}
 
       {/* Push Invoices Card */}
-      {status?.connected && activeTab === 'invoices' && (
+      {status?.connected && view === 'main' && activeTab === 'invoices' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="p-2 bg-emerald-50 rounded-lg">
@@ -1545,7 +1730,7 @@ export default function ZohoBooksIntegration() {
       )}
 
       {/* Purchase Bills (THC) Card */}
-      {status?.connected && activeTab === 'purchases' && (
+      {status?.connected && view === 'main' && activeTab === 'purchases' && (
         <div className="space-y-6">
           {/* Vendor Sync Card */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -1936,7 +2121,7 @@ export default function ZohoBooksIntegration() {
       )}
 
       {/* API Access Card */}
-      {status?.connected && activeTab === 'invoices' && (
+      {status?.connected && view === 'main' && activeTab === 'invoices' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">API Access</h2>
@@ -2015,6 +2200,285 @@ export default function ZohoBooksIntegration() {
                 Proceed Anyway
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ATH Payment Tab ── */}
+      {status?.connected && view === 'main' && activeTab === 'ath-payment' && (
+        <div className="space-y-4">
+          {/* Summary bar */}
+          <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Total Records</p>
+                <p className="text-xl font-bold text-gray-900">{athRecords.length}</p>
+              </div>
+              <div className="h-8 w-px bg-gray-200" />
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Total Advance Amount</p>
+                <p className="text-xl font-bold text-gray-900">₹{athTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+            <button
+              onClick={fetchAthRecords}
+              disabled={loadingAth}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingAth ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+
+          {athError && (
+            <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p className="text-sm font-medium">{athError}</p>
+            </div>
+          )}
+
+          {loadingAth && athRecords.length === 0 ? (
+            <div className="flex items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            </div>
+          ) : athRecords.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
+              <Wallet className="w-12 h-12 text-gray-300 mb-3" />
+              <p className="text-gray-500 font-medium">No ATH payment records found</p>
+              <p className="text-sm text-gray-400 mt-1">Records processed through "Generate Advance Bank File" will appear here.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">THC No</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">LR No</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Vendor</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Vehicle</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Route</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Advance</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">ATH Date</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Bank Account</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {athRecords.map((record) => (
+                      <tr key={record.thc_id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-gray-900">{record.thc_id_number}</td>
+                        <td className="px-4 py-3 text-gray-600">{record.lr_number || '-'}</td>
+                        <td className="px-4 py-3 text-gray-600">{record.vendor_name}</td>
+                        <td className="px-4 py-3 text-gray-600">{record.vehicle_number || '-'}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {record.origin || '-'} → {record.destination || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-gray-900">
+                          ₹{(record.thc_advance_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {record.ath_date ? new Date(record.ath_date).toLocaleDateString('en-GB') : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {editingAth === record.thc_id ? (
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                value={editForm.ven_act_name}
+                                onChange={(e) => setEditForm({ ...editForm, ven_act_name: e.target.value })}
+                                placeholder="Account Name"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={editForm.ven_act_number}
+                                onChange={(e) => setEditForm({ ...editForm, ven_act_number: e.target.value })}
+                                placeholder="Account No"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={editForm.ven_act_ifsc}
+                                onChange={(e) => setEditForm({ ...editForm, ven_act_ifsc: e.target.value })}
+                                placeholder="IFSC"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={editForm.ven_act_bank}
+                                onChange={(e) => setEditForm({ ...editForm, ven_act_bank: e.target.value })}
+                                placeholder="Bank"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={editForm.ven_act_branch}
+                                onChange={(e) => setEditForm({ ...editForm, ven_act_branch: e.target.value })}
+                                placeholder="Branch"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="number"
+                                value={editForm.thc_advance_amount}
+                                onChange={(e) => setEditForm({ ...editForm, thc_advance_amount: parseFloat(e.target.value) || 0 })}
+                                placeholder="Advance Amount"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={saveEditAth}
+                                  className="px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => setEditingAth(null)}
+                                  className="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs">
+                              <div>{record.ven_act_name || '-'}</div>
+                              <div className="text-gray-400">{record.ven_act_number || ''}</div>
+                              <div className="text-gray-400">{record.ven_act_bank || ''} {record.ven_act_ifsc || ''}</div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => setViewingAth(record)}
+                              className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="View"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            {editingAth !== record.thc_id && (
+                              <button
+                                onClick={() => startEditAth(record)}
+                                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Edit"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => submitAthPayment(record)}
+                              disabled={submittingAth === record.thc_id}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                              title="Submit Payment to Zoho"
+                            >
+                              {submittingAth === record.thc_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* View modal */}
+          {viewingAth && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                  <h2 className="text-lg font-bold text-gray-900">ATH Payment Details</h2>
+                  <button onClick={() => setViewingAth(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><p className="text-xs text-gray-500 uppercase">THC Number</p><p className="font-medium text-gray-900">{viewingAth.thc_id_number}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">LR Number</p><p className="font-medium text-gray-900">{viewingAth.lr_number || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Vendor</p><p className="font-medium text-gray-900">{viewingAth.vendor_name}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Vehicle</p><p className="font-medium text-gray-900">{viewingAth.vehicle_number || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Origin</p><p className="font-medium text-gray-900">{viewingAth.origin || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Destination</p><p className="font-medium text-gray-900">{viewingAth.destination || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Vehicle Type</p><p className="font-medium text-gray-900">{viewingAth.vehicle_type || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">ATH Date</p><p className="font-medium text-gray-900">{viewingAth.ath_date ? new Date(viewingAth.ath_date).toLocaleDateString('en-GB') : '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">THC Amount</p><p className="font-medium text-gray-900">₹{(viewingAth.thc_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Advance Amount</p><p className="font-medium text-gray-900">₹{(viewingAth.thc_advance_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Net Payable</p><p className="font-medium text-gray-900">₹{(viewingAth.thc_net_payable_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-4">
+                    <p className="text-xs text-gray-500 uppercase mb-2">Bank Account Details</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><p className="text-xs text-gray-400">Account Name</p><p className="font-medium text-gray-900">{viewingAth.ven_act_name || '-'}</p></div>
+                      <div><p className="text-xs text-gray-400">Account Number</p><p className="font-medium text-gray-900">{viewingAth.ven_act_number || '-'}</p></div>
+                      <div><p className="text-xs text-gray-400">IFSC Code</p><p className="font-medium text-gray-900">{viewingAth.ven_act_ifsc || '-'}</p></div>
+                      <div><p className="text-xs text-gray-400">Bank</p><p className="font-medium text-gray-900">{viewingAth.ven_act_bank || '-'}</p></div>
+                      <div><p className="text-xs text-gray-400">Branch</p><p className="font-medium text-gray-900">{viewingAth.ven_act_branch || '-'}</p></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 p-4 bg-gray-50 border-t border-gray-200">
+                  <button onClick={() => setViewingAth(null)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Payment Information View ── */}
+      {status?.connected && view === 'payment-info' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setView('main')}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Zoho Books
+            </button>
+          </div>
+          <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">
+            <button
+              onClick={() => setPaymentInfoPage('dashboard')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                paymentInfoPage === 'dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              Dashboard
+            </button>
+            <button
+              onClick={() => setPaymentInfoPage('history')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                paymentInfoPage === 'history' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              History
+            </button>
+            <button
+              onClick={() => setPaymentInfoPage('settings')}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                paymentInfoPage === 'settings' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              Settings
+            </button>
+          </div>
+          <div className="mt-2">
+            {paymentInfoPage === 'dashboard' && <VendorPaymentsDashboard />}
+            {paymentInfoPage === 'history' && <VendorPaymentHistory />}
+            {paymentInfoPage === 'settings' && <VendorPaymentSettings />}
           </div>
         </div>
       )}
