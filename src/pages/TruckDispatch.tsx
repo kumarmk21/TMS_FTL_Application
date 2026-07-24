@@ -95,8 +95,10 @@ export function TruckDispatch() {
         )
       `);
 
+      query = query.eq('pay_basis', 'TBB');
+
       if (viewMode === 'pending') {
-        query = query.is('thc_no', null).eq('pay_basis', 'TBB');
+        query = query.is('thc_no', null);
       } else {
         query = query.not('thc_no', 'is', null);
       }
