@@ -300,31 +300,7 @@ async function ensureValidCustomer(
   throw new Error(`Customer not found and creation failed: ${createData.message || 'unknown error'}`);
 }
 
-/** Fetch invoice-level custom field IDs from Zoho Books, keyed by label. */
-async function fetchInvoiceCustomFieldIds(
-  accessToken: string,
-  apiDomain: string,
-  orgId: string,
-): Promise<Map<string, string>> {
-  const url = new URL(`${apiDomain}/books/v3/customfields`);
-  url.searchParams.set('organization_id', orgId);
-  url.searchParams.set('entity', 'invoice');
 
-  const res = await fetch(url.toString(), {
-    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-  });
-  const data = await res.json();
-
-  const map = new Map<string, string>();
-  if (data.code === 0 && Array.isArray(data.custom_fields)) {
-    for (const cf of data.custom_fields as Record<string, any>[]) {
-      const label = (cf.label || cf.field_name || '').toString().trim();
-      const id = (cf.field_id || cf.customfield_id || '').toString();
-      if (label && id) map.set(label, id);
-    }
-  }
-  return map;
-}
 
 /** Fetch all active customer contacts from Zoho Books (paginated). */
 async function fetchActiveZohoContacts(
@@ -792,14 +768,6 @@ Deno.serve(async (req: Request) => {
         .limit(1)
         .maybeSingle();
 
-      // Fetch Zoho invoice custom field IDs (cached for the entire push batch)
-      const customFieldMap = await fetchInvoiceCustomFieldIds(accessToken, apiDomain, orgId);
-      const requiredFieldLabels = ['Origin', 'Destination', 'LRN', 'Vehicle Number', 'LR Date'];
-      const missingLabels = requiredFieldLabels.filter(l => !customFieldMap.has(l));
-      if (missingLabels.length > 0) {
-        console.warn(`[Zoho] Custom fields not found in Zoho (will be skipped): ${missingLabels.join(', ')}`);
-      }
-
       // Booking data lookup map (populated when LR bills are fetched)
       const bookingMap = new Map<string, Record<string, any>>();
 
@@ -807,7 +775,6 @@ Deno.serve(async (req: Request) => {
       async function pushInvoice(
         bill: Record<string, any>,
         type: 'lr' | 'warehouse',
-        cfMap: Map<string, string>,
         bookings: Map<string, Record<string, any>>,
       ): Promise<{ zoho_invoice_id?: string; zoho_invoice_number?: string; status: string; detail?: string }> {
         const customer = customerMap.get(bill.billing_party_code);
@@ -926,10 +893,9 @@ Deno.serve(async (req: Request) => {
             ? new Date(booking.lr_date).toISOString().split('T')[0]
             : (billDate ? new Date(billDate).toISOString().split('T')[0] : '');
 
-          const customFields: Array<{ customfield_id: string; value: string }> = [];
+          const customFields: Array<{ label: string; value: string }> = [];
           const addField = (label: string, value: string) => {
-            const id = cfMap.get(label);
-            if (id && value) customFields.push({ customfield_id: id, value });
+            if (value) customFields.push({ label, value });
           };
           addField('Origin', origin);
           addField('Destination', destination);
@@ -1032,7 +998,7 @@ Deno.serve(async (req: Request) => {
           result.total++;
           const amount = parseFloat(bill.bill_amount || bill.sub_total || '0');
 
-          const pushResult = await pushInvoice(bill, 'lr', customFieldMap, bookingMap);
+          const pushResult = await pushInvoice(bill, 'lr', bookingMap);
 
           if (pushResult.status === 'pushed') {
             result.pushed++;
@@ -1090,7 +1056,7 @@ Deno.serve(async (req: Request) => {
           result.total++;
           const amount = parseFloat(bill.total_amount || bill.sub_total || '0');
 
-          const pushResult = await pushInvoice(bill, 'warehouse', customFieldMap, bookingMap);
+          const pushResult = await pushInvoice(bill, 'warehouse', bookingMap);
 
           if (pushResult.status === 'pushed') {
             result.pushed++;
