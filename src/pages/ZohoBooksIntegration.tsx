@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, Download, ArrowRight, FileText, Eye, Send } from 'lucide-react';
+import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, Download, ArrowRight, FileText, Eye, Send, Wrench } from 'lucide-react';
 
 interface ConnectionStatus {
   connected: boolean;
@@ -53,6 +53,25 @@ interface InvoicePushResult {
     zoho_invoice_id?: string;
     zoho_invoice_number?: string;
     status: string;
+    detail?: string;
+  }>;
+}
+
+interface FixLinkResult {
+  total: number;
+  valid: number;
+  reactivated: number;
+  relinked: number;
+  created: number;
+  cleared: number;
+  errors: number;
+  details: Array<{
+    customer_id: string;
+    customer_name: string;
+    old_zoho_id: string;
+    new_zoho_id?: string;
+    action: string;
+    status: string;
   }>;
 }
 
@@ -75,6 +94,8 @@ export default function ZohoBooksIntegration() {
   const [pushFilter, setPushFilter] = useState<'all' | 'pushed' | 'skipped' | 'error'>('all');
   const [billTypeFilter, setBillTypeFilter] = useState<'lr' | 'warehouse' | 'both'>('both');
   const [dryRunOnly, setDryRunOnly] = useState(false);
+  const [fixingLinks, setFixingLinks] = useState(false);
+  const [fixLinkResult, setFixLinkResult] = useState<FixLinkResult | null>(null);
 
   const oauthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-oauth`;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api`;
@@ -222,6 +243,39 @@ export default function ZohoBooksIntegration() {
     }
   };
 
+  const handleFixCustomerLinks = async () => {
+    setFixingLinks(true);
+    setError('');
+    setFixLinkResult(null);
+    try {
+      const res = await fetch(`${apiUrl}?action=fix-customer-links`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Fix failed (${res.status})`);
+      }
+      setFixLinkResult(data);
+      const parts: string[] = [];
+      if (data.valid) parts.push(`${data.valid} valid`);
+      if (data.reactivated) parts.push(`${data.reactivated} reactivated`);
+      if (data.relinked) parts.push(`${data.relinked} relinked`);
+      if (data.created) parts.push(`${data.created} created`);
+      if (data.errors) parts.push(`${data.errors} errors`);
+      setSuccess(`Customer links validated: ${parts.join(', ')}.`);
+      setTimeout(() => setSuccess(''), 8000);
+      await fetchSyncStats();
+    } catch (err: any) {
+      setError(err.message || 'Failed to fix customer links');
+    } finally {
+      setFixingLinks(false);
+    }
+  };
+
   const handlePushInvoices = async () => {
     setPushing(true);
     setError('');
@@ -280,10 +334,24 @@ export default function ZohoBooksIntegration() {
         if (pushFilter === 'all') return true;
         if (pushFilter === 'pushed') return d.status === 'pushed';
         if (pushFilter === 'skipped') return d.status.startsWith('skipped');
-        if (pushFilter === 'error') return d.status.includes('error') || d.status.includes('push error');
+        if (pushFilter === 'error') return d.status.includes('error') || d.status === 'customer-inactive' || d.status === 'customer-not-found' || d.status === 'auth-error' || d.status === 'invoice-duplicate' || d.status === 'api-error';
         return true;
       })
     : [];
+
+  const isErrorStatus = (status: string): boolean =>
+    status.includes('error') || status === 'customer-inactive' || status === 'customer-not-found' || status === 'auth-error' || status === 'invoice-duplicate' || status === 'api-error';
+
+  const getErrorLabel = (status: string): string => {
+    switch (status) {
+      case 'customer-inactive': return 'Customer Inactive';
+      case 'customer-not-found': return 'Customer Not Found';
+      case 'auth-error': return 'Auth Error';
+      case 'invoice-duplicate': return 'Duplicate Invoice';
+      case 'api-error': return 'API Error';
+      default: return status;
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
@@ -458,7 +526,84 @@ export default function ZohoBooksIntegration() {
               {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               {syncing ? 'Syncing...' : 'Sync Customers Now'}
             </button>
+            <button
+              onClick={handleFixCustomerLinks}
+              disabled={fixingLinks}
+              className="flex items-center gap-2 px-5 py-2.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {fixingLinks ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
+              {fixingLinks ? 'Fixing...' : 'Fix Customer Links'}
+            </button>
           </div>
+
+          {/* Fix Links Info Banner */}
+          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200 mb-4">
+            <h4 className="text-sm font-semibold text-amber-900 mb-2">Fix Customer Links</h4>
+            <p className="text-sm text-amber-800">
+              Validates every stored Zoho contact ID. If a contact is inactive, it reactivates it. If the ID is wrong,
+              it searches for the correct active contact by GSTIN or name and relinks. If no match is found, it creates
+              a new contact. Run this if invoice pushes fail with "Customer not found or inactive".
+            </p>
+          </div>
+
+          {/* Fix Links Results */}
+          {fixLinkResult && (
+            <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+              <div className="p-4 bg-gray-50 border-b border-gray-200">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <h4 className="text-sm font-semibold text-gray-900">Fix Links Results</h4>
+                  <div className="flex items-center gap-4 text-xs">
+                    <span className="text-gray-600">Total: <strong>{fixLinkResult.total}</strong></span>
+                    <span className="text-green-700">Valid: <strong>{fixLinkResult.valid}</strong></span>
+                    <span className="text-blue-700">Reactivated: <strong>{fixLinkResult.reactivated}</strong></span>
+                    <span className="text-blue-700">Relinked: <strong>{fixLinkResult.relinked}</strong></span>
+                    <span className="text-blue-700">Created: <strong>{fixLinkResult.created}</strong></span>
+                    <span className="text-red-700">Errors: <strong>{fixLinkResult.errors}</strong></span>
+                  </div>
+                </div>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white border-b border-gray-200">
+                    <tr>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Customer</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Old Zoho ID</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">New Zoho ID</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Action</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {fixLinkResult.details.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-gray-400">No records</td>
+                      </tr>
+                    ) : (
+                      fixLinkResult.details.map((d, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-gray-900">{d.customer_name}</td>
+                          <td className="px-4 py-2 text-gray-500 font-mono text-xs">{d.old_zoho_id}</td>
+                          <td className="px-4 py-2 text-gray-500 font-mono text-xs">{d.new_zoho_id || '-'}</td>
+                          <td className="px-4 py-2">
+                            <span className={`text-xs ${
+                              d.action === 'valid' ? 'text-green-700' :
+                              d.action === 'reactivated' ? 'text-blue-700' :
+                              d.action === 'relinked' ? 'text-blue-700' :
+                              d.action === 'created' ? 'text-blue-700' :
+                              'text-red-700'
+                            }`}>
+                              {d.action}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-xs text-gray-600">{d.status}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Sync Info */}
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4">
@@ -728,7 +873,7 @@ export default function ZohoBooksIntegration() {
                     {f === 'all' && `All (${pushResult.details.length})`}
                     {f === 'pushed' && `Pushed (${pushResult.details.filter(d => d.status === 'pushed').length})`}
                     {f === 'skipped' && `Skipped (${pushResult.details.filter(d => d.status.startsWith('skipped')).length})`}
-                    {f === 'error' && `Errors (${pushResult.details.filter(d => d.status.includes('error')).length})`}
+                    {f === 'error' && `Errors (${pushResult.details.filter(d => isErrorStatus(d.status)).length})`}
                   </button>
                 ))}
               </div>

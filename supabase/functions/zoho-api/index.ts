@@ -100,7 +100,6 @@ async function getOrganizationId(accessToken: string, apiDomain: string): Promis
     throw new Error('No Zoho Books organization found.');
   }
 
-  // Prefer the active, non-trial-expired org; fall back to the first
   const activeOrg = orgData.organizations.find((o: any) =>
     o.is_org_active !== false && !o.is_trial_expired
   );
@@ -117,6 +116,229 @@ async function getOrganizationId(accessToken: string, apiDomain: string): Promis
 // Extract GSTIN from a Zoho contact — field name varies by API version
 function extractGstin(c: Record<string, any>): string {
   return (c.gst_no || c.gstin || c.gst_identification_number || '').trim().toUpperCase();
+}
+
+interface CustomerRecord {
+  id?: string;
+  customer_id: string;
+  customer_name: string;
+  gstin?: string | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  customer_city?: string | null;
+  customer_state?: string | null;
+  customer_address?: string | null;
+  zoho_customer_id?: string | null;
+}
+
+interface EnsureResult {
+  zohoId: string;
+  action: 'active' | 'reactivated' | 'relinked' | 'created';
+  detail: string;
+}
+
+/**
+ * Validates that a Zoho contact ID is active before pushing an invoice.
+ * - If active: returns as-is.
+ * - If inactive: reactivates via POST /contacts/{id}/active.
+ * - If not found: searches active contacts by GSTIN then name; if found, relinks.
+ * - If still not found: creates a new contact and links it.
+ */
+async function ensureValidCustomer(
+  accessToken: string,
+  apiDomain: string,
+  orgId: string,
+  supabase: ReturnType<typeof createClient>,
+  zohoId: string,
+  customer: CustomerRecord,
+): Promise<EnsureResult> {
+  // Step 1: Verify the stored contact ID exists and is active
+  const checkUrl = new URL(`${apiDomain}/books/v3/contacts/${zohoId}`);
+  checkUrl.searchParams.set('organization_id', orgId);
+
+  const checkRes = await fetch(checkUrl.toString(), {
+    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+  });
+  const checkData = await checkRes.json();
+
+  if (checkData.code === 0 && checkData.contact) {
+    const contact = checkData.contact;
+    const status = (contact.status || '').toLowerCase();
+
+    if (status === 'active' || status === '') {
+      return { zohoId, action: 'active', detail: '' };
+    }
+
+    if (status === 'inactive') {
+      // Step 2: Reactivate the inactive contact
+      const activateUrl = new URL(`${apiDomain}/books/v3/contacts/${zohoId}/active`);
+      activateUrl.searchParams.set('organization_id', orgId);
+
+      const activateRes = await fetch(activateUrl.toString(), {
+        method: 'POST',
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const activateData = await activateRes.json();
+
+      if (activateData.code === 0) {
+        return { zohoId, action: 'reactivated', detail: 'Contact was inactive — reactivated automatically.' };
+      }
+
+      console.error('[Zoho] Reactivate failed:', JSON.stringify(activateData));
+      // Fall through to re-lookup
+    }
+  }
+
+  // Step 3: Stored ID is invalid — search active contacts by GSTIN then name
+  const localGstin = (customer.gstin || '').trim().toUpperCase();
+  const localName = (customer.customer_name || '').toLowerCase().trim();
+
+  let searchResult: Record<string, any> | null = null;
+
+  if (localGstin) {
+    const gstinSearchUrl = new URL(`${apiDomain}/books/v3/contacts`);
+    gstinSearchUrl.searchParams.set('organization_id', orgId);
+    gstinSearchUrl.searchParams.set('status', 'active');
+    gstinSearchUrl.searchParams.set('contact_type', 'customer');
+    gstinSearchUrl.searchParams.set('gst_number', localGstin);
+
+    const gstinRes = await fetch(gstinSearchUrl.toString(), {
+      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+    });
+    const gstinData = await gstinRes.json();
+
+    if (gstinData.code === 0 && gstinData.contacts?.length > 0) {
+      searchResult = gstinData.contacts[0];
+    }
+  }
+
+  if (!searchResult && localName) {
+    const nameSearchUrl = new URL(`${apiDomain}/books/v3/contacts`);
+    nameSearchUrl.searchParams.set('organization_id', orgId);
+    nameSearchUrl.searchParams.set('status', 'active');
+    nameSearchUrl.searchParams.set('contact_type', 'customer');
+    nameSearchUrl.searchParams.set('contact_name', localName);
+
+    const nameRes = await fetch(nameSearchUrl.toString(), {
+      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+    });
+    const nameData = await nameRes.json();
+
+    if (nameData.code === 0 && nameData.contacts?.length > 0) {
+      // Find exact name match (case-insensitive)
+      searchResult = nameData.contacts.find(
+        (c: any) => (c.contact_name || '').toLowerCase().trim() === localName,
+      ) || nameData.contacts[0];
+    }
+  }
+
+  if (searchResult) {
+    const newZohoId = searchResult.contact_id as string;
+
+    // Update the stored link in customer_master
+    if (customer.id) {
+      await supabase
+        .from('customer_master')
+        .update({ zoho_customer_id: newZohoId })
+        .eq('id', customer.id);
+    }
+
+    return {
+      zohoId: newZohoId,
+      action: 'relinked',
+      detail: `Old Zoho ID ${zohoId} was invalid — relinked to active contact ${newZohoId}.`,
+    };
+  }
+
+  // Step 4: No active match found — create a new contact
+  const createUrl = new URL(`${apiDomain}/books/v3/contacts`);
+  createUrl.searchParams.set('organization_id', orgId);
+
+  const contactPayload: Record<string, any> = {
+    contact_name: customer.customer_name,
+    contact_type: 'customer',
+    gst_treatment: customer.gstin ? 'business_gst' : 'consumer',
+    gst_no: customer.gstin || '',
+    billing_address: {
+      address: customer.customer_address || '',
+      city: customer.customer_city || '',
+      state: customer.customer_state || '',
+      country: 'India',
+    },
+  };
+  if (customer.customer_email) contactPayload.email = customer.customer_email;
+  if (customer.customer_phone) contactPayload.phone = customer.customer_phone;
+
+  const createRes = await fetch(createUrl.toString(), {
+    method: 'POST',
+    headers: {
+      'Authorization': `Zoho-oauthtoken ${accessToken}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: `JSONString=${encodeURIComponent(JSON.stringify(contactPayload))}`,
+  });
+  const createData = await createRes.json();
+
+  if (createData.code === 0 && createData.contact) {
+    const newZohoId = createData.contact.contact_id;
+
+    if (customer.id) {
+      await supabase
+        .from('customer_master')
+        .update({ zoho_customer_id: newZohoId })
+        .eq('id', customer.id);
+    }
+
+    return {
+      zohoId: newZohoId,
+      action: 'created',
+      detail: `Customer not found in Zoho — created new contact ${newZohoId}.`,
+    };
+  }
+
+  console.error('[Zoho] Create contact failed:', JSON.stringify(createData));
+  throw new Error(`Customer not found and creation failed: ${createData.message || 'unknown error'}`);
+}
+
+/** Fetch all active customer contacts from Zoho Books (paginated). */
+async function fetchActiveZohoContacts(
+  accessToken: string,
+  apiDomain: string,
+  orgId: string,
+): Promise<Record<string, any>[]> {
+  let allContacts: Record<string, any>[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const contactsUrl = new URL(`${apiDomain}/books/v3/contacts`);
+    contactsUrl.searchParams.set('organization_id', orgId);
+    contactsUrl.searchParams.set('status', 'active');
+    contactsUrl.searchParams.set('page', String(page));
+    contactsUrl.searchParams.set('per_page', '200');
+
+    const res = await fetch(contactsUrl.toString(), {
+      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+    });
+    const data = await res.json();
+
+    if (data.code !== undefined && data.code !== 0) {
+      throw new Error(`Zoho API error (code ${data.code}): ${data.message || 'Unknown error'}`);
+    }
+
+    const contacts = (data.contacts || []) as Record<string, any>[];
+    // Keep only customers, and only active ones (double-guard in case API ignores status param)
+    const customers = contacts.filter((c: Record<string, any>) =>
+      (!c.contact_type || c.contact_type === 'customer') &&
+      (!c.status || c.status.toLowerCase() === 'active'),
+    );
+    allContacts = allContacts.concat(customers);
+    hasMore = !!(data.page_context?.has_more_page || data.page_context?.has_more);
+    page++;
+    if (page > 50) break;
+  }
+
+  return allContacts;
 }
 
 Deno.serve(async (req: Request) => {
@@ -143,10 +365,10 @@ Deno.serve(async (req: Request) => {
       });
       const raw = await res.json();
 
-      // Also try with contact_type filter
       const filteredUrl = new URL(`${apiDomain}/books/v3/contacts`);
       filteredUrl.searchParams.set('organization_id', orgId);
       filteredUrl.searchParams.set('contact_type', 'customer');
+      filteredUrl.searchParams.set('status', 'active');
       filteredUrl.searchParams.set('page', '1');
       filteredUrl.searchParams.set('per_page', '5');
 
@@ -166,6 +388,7 @@ Deno.serve(async (req: Request) => {
             contact_id: c.contact_id,
             contact_name: c.contact_name,
             contact_type: c.contact_type,
+            status: c.status,
             gst_no: c.gst_no,
             gstin: c.gstin,
           })),
@@ -179,6 +402,7 @@ Deno.serve(async (req: Request) => {
             contact_id: c.contact_id,
             contact_name: c.contact_name,
             contact_type: c.contact_type,
+            status: c.status,
             gst_no: c.gst_no,
             gstin: c.gstin,
           })),
@@ -232,48 +456,8 @@ Deno.serve(async (req: Request) => {
       const supabase = createClient(supabaseUrl, supabaseKey);
       const orgId = await getOrganizationId(accessToken, apiDomain);
 
-      // Fetch ALL contacts without contact_type filter first, then filter client-side
-      // (Zoho Books India sometimes ignores contact_type query param)
-      let allZohoCustomers: Record<string, any>[] = [];
-      let page = 1;
-      let hasMore = true;
-      let fetchError = '';
-
-      while (hasMore) {
-        const contactsUrl = new URL(`${apiDomain}/books/v3/contacts`);
-        contactsUrl.searchParams.set('organization_id', orgId);
-        contactsUrl.searchParams.set('page', String(page));
-        contactsUrl.searchParams.set('per_page', '200');
-
-        const res = await fetch(contactsUrl.toString(), {
-          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-        });
-        const data = await res.json();
-
-        if (data.code !== undefined && data.code !== 0) {
-          fetchError = `Zoho API error (code ${data.code}): ${data.message || 'Unknown error'}`;
-          break;
-        }
-
-        const contacts = (data.contacts || []) as Record<string, any>[];
-        // Keep only customers (contact_type = 'customer') or all if no type set
-        const customers = contacts.filter((c: Record<string, any>) =>
-          !c.contact_type || c.contact_type === 'customer'
-        );
-        allZohoCustomers = allZohoCustomers.concat(customers);
-        hasMore = !!(data.page_context?.has_more_page || data.page_context?.has_more);
-        page++;
-
-        // Safety limit
-        if (page > 50) break;
-      }
-
-      if (fetchError) {
-        return new Response(JSON.stringify({ error: fetchError }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      // Fetch only ACTIVE customer contacts
+      const allZohoCustomers = await fetchActiveZohoContacts(accessToken, apiDomain, orgId);
 
       // Fetch all local active customers
       const { data: localCustomers, error: localError } = await supabase
@@ -283,7 +467,7 @@ Deno.serve(async (req: Request) => {
 
       if (localError) throw localError;
 
-      // Build lookup maps — GSTIN primary, name fallback
+      // Build lookup maps — GSTIN primary, name fallback (active contacts only)
       const zohoByGstin = new Map<string, Record<string, any>>();
       const zohoByName = new Map<string, Record<string, any>>();
       for (const zc of allZohoCustomers) {
@@ -338,11 +522,10 @@ Deno.serve(async (req: Request) => {
                 customer_name: local.customer_name,
                 action: 'link',
                 zoho_id: zohoContactId,
-                status: 'linked',
+                status: local.zoho_customer_id ? 'relinked (was stale)' : 'linked',
               });
             }
           } else {
-            // Already linked — still count it
             result.matched++;
             result.details.push({
               customer_id: local.customer_id,
@@ -412,6 +595,7 @@ Deno.serve(async (req: Request) => {
         } else {
           result.errors++;
           item.status = `push error: ${createData.message || 'unknown'}`;
+          console.error('[Zoho] Sync create contact failed:', JSON.stringify(createData));
         }
       }
 
@@ -423,34 +607,7 @@ Deno.serve(async (req: Request) => {
     // ── Fetch Zoho customers only (preview, no changes) ──
     if (action === 'fetch-zoho-customers') {
       const orgId = await getOrganizationId(accessToken, apiDomain);
-      let allCustomers: Record<string, any>[] = [];
-      let page = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        const contactsUrl = new URL(`${apiDomain}/books/v3/contacts`);
-        contactsUrl.searchParams.set('organization_id', orgId);
-        contactsUrl.searchParams.set('page', String(page));
-        contactsUrl.searchParams.set('per_page', '200');
-
-        const res = await fetch(contactsUrl.toString(), {
-          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-        });
-        const data = await res.json();
-
-        if (data.code !== undefined && data.code !== 0) {
-          throw new Error(`Zoho API error: ${data.message || data.code}`);
-        }
-
-        const contacts = (data.contacts || []) as Record<string, any>[];
-        const customers = contacts.filter((c: Record<string, any>) =>
-          !c.contact_type || c.contact_type === 'customer'
-        );
-        allCustomers = allCustomers.concat(customers);
-        hasMore = !!(data.page_context?.has_more_page || data.page_context?.has_more);
-        page++;
-        if (page > 50) break;
-      }
+      const allCustomers = await fetchActiveZohoContacts(accessToken, apiDomain, orgId);
 
       return new Response(JSON.stringify({
         count: allCustomers.length,
@@ -460,8 +617,106 @@ Deno.serve(async (req: Request) => {
           email: c.email || '',
           phone: c.phone || '',
           gst_no: c.gst_no || c.gstin || '',
+          status: c.status || 'active',
         })),
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ── Fix customer links: re-validate every stored zoho_customer_id ──
+    if (action === 'fix-customer-links') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const { data: linkedCustomers, error } = await supabase
+        .from('customer_master')
+        .select('id, customer_id, customer_name, gstin, customer_email, customer_phone, customer_city, customer_state, customer_address, zoho_customer_id')
+        .not('zoho_customer_id', 'is', null);
+
+      if (error) throw error;
+
+      const result = {
+        total: 0,
+        valid: 0,
+        reactivated: 0,
+        relinked: 0,
+        created: 0,
+        cleared: 0,
+        errors: 0,
+        details: [] as Array<{
+          customer_id: string;
+          customer_name: string;
+          old_zoho_id: string;
+          new_zoho_id?: string;
+          action: string;
+          status: string;
+        }>,
+      };
+
+      for (const customer of (linkedCustomers || []) as CustomerRecord[]) {
+        result.total++;
+        const oldZohoId = customer.zoho_customer_id!;
+
+        try {
+          const ensureResult = await ensureValidCustomer(
+            accessToken, apiDomain, orgId, supabase, oldZohoId, customer,
+          );
+
+          if (ensureResult.action === 'active') {
+            result.valid++;
+            result.details.push({
+              customer_id: customer.customer_id,
+              customer_name: customer.customer_name,
+              old_zoho_id: oldZohoId,
+              new_zoho_id: ensureResult.zohoId,
+              action: 'valid',
+              status: 'OK',
+            });
+          } else if (ensureResult.action === 'reactivated') {
+            result.reactivated++;
+            result.details.push({
+              customer_id: customer.customer_id,
+              customer_name: customer.customer_name,
+              old_zoho_id: oldZohoId,
+              new_zoho_id: ensureResult.zohoId,
+              action: 'reactivated',
+              status: ensureResult.detail,
+            });
+          } else if (ensureResult.action === 'relinked') {
+            result.relinked++;
+            result.details.push({
+              customer_id: customer.customer_id,
+              customer_name: customer.customer_name,
+              old_zoho_id: oldZohoId,
+              new_zoho_id: ensureResult.zohoId,
+              action: 'relinked',
+              status: ensureResult.detail,
+            });
+          } else if (ensureResult.action === 'created') {
+            result.created++;
+            result.details.push({
+              customer_id: customer.customer_id,
+              customer_name: customer.customer_name,
+              old_zoho_id: oldZohoId,
+              new_zoho_id: ensureResult.zohoId,
+              action: 'created',
+              status: ensureResult.detail,
+            });
+          }
+        } catch (err) {
+          result.errors++;
+          result.details.push({
+            customer_id: customer.customer_id,
+            customer_name: customer.customer_name,
+            old_zoho_id: oldZohoId,
+            action: 'error',
+            status: (err as Error).message,
+          });
+        }
+      }
+
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // ── Push invoices to Zoho Books ──
@@ -470,9 +725,9 @@ Deno.serve(async (req: Request) => {
       const orgId = await getOrganizationId(accessToken, apiDomain);
 
       const body = await req.json().catch(() => ({}));
-      const billType = (body as { bill_type?: string }).bill_type || 'lr'; // 'lr' | 'warehouse' | 'both'
+      const billType = (body as { bill_type?: string }).bill_type || 'lr';
       const dryRun = (body as { dry_run?: boolean }).dry_run || false;
-      const billIds = (body as { bill_ids?: string[] }).bill_ids; // optional specific bill IDs
+      const billIds = (body as { bill_ids?: string[] }).bill_ids;
 
       const result = {
         total: 0,
@@ -489,18 +744,19 @@ Deno.serve(async (req: Request) => {
           zoho_invoice_id?: string;
           zoho_invoice_number?: string;
           status: string;
+          detail?: string;
         }>,
       };
 
-      // Build customer lookup: customer_id -> zoho_customer_id
+      // Build customer lookup with full customer record for fallback create
       const { data: customers } = await supabase
         .from('customer_master')
-        .select('customer_id, zoho_customer_id, customer_name')
+        .select('id, customer_id, zoho_customer_id, customer_name, gstin, customer_email, customer_phone, customer_city, customer_state, customer_address')
         .not('zoho_customer_id', 'is', null);
 
-      const customerMap = new Map<string, { zohoId: string; name: string }>();
-      for (const c of customers || []) {
-        customerMap.set(c.customer_id, { zohoId: c.zoho_customer_id, name: c.customer_name });
+      const customerMap = new Map<string, CustomerRecord>();
+      for (const c of (customers || []) as CustomerRecord[]) {
+        customerMap.set(c.customer_id, c);
       }
 
       // Fetch company info (seller)
@@ -513,11 +769,38 @@ Deno.serve(async (req: Request) => {
       // ── Helper: push a single invoice to Zoho ──
       async function pushInvoice(
         bill: Record<string, any>,
-        type: 'lr' | 'warehouse'
-      ): Promise<{ zoho_invoice_id?: string; zoho_invoice_number?: string; status: string }> {
-        const customerInfo = customerMap.get(bill.billing_party_code);
-        if (!customerInfo) {
-          return { status: `skipped: customer "${bill.billing_party_code}" not linked to Zoho` };
+        type: 'lr' | 'warehouse',
+      ): Promise<{ zoho_invoice_id?: string; zoho_invoice_number?: string; status: string; detail?: string }> {
+        const customer = customerMap.get(bill.billing_party_code);
+        if (!customer || !customer.zoho_customer_id) {
+          return {
+            status: 'skipped',
+            detail: `Customer "${bill.billing_party_code}" is not linked to any Zoho contact. Run Customer Sync first.`,
+          };
+        }
+
+        // Pre-push validation: ensure the Zoho contact is valid and active
+        let validatedZohoId = customer.zoho_customer_id!;
+        let validationDetail = '';
+
+        if (!dryRun) {
+          try {
+            const ensureResult = await ensureValidCustomer(
+              accessToken, apiDomain, orgId, supabase, customer.zoho_customer_id!, customer,
+            );
+            validatedZohoId = ensureResult.zohoId;
+            validationDetail = ensureResult.detail;
+
+            // Update the map so subsequent bills for the same customer skip re-validation
+            customer.zoho_customer_id = validatedZohoId;
+          } catch (err) {
+            const msg = (err as Error).message;
+            console.error(`[Zoho] Customer validation failed for ${bill.billing_party_code}:`, msg);
+            if (msg.toLowerCase().includes('token') || msg.toLowerCase().includes('auth')) {
+              return { status: 'auth-error', detail: msg };
+            }
+            return { status: 'customer-not-found', detail: msg };
+          }
         }
 
         const billDate = bill.lr_bill_date || bill.bill_date;
@@ -531,7 +814,6 @@ Deno.serve(async (req: Request) => {
         const lineItems: Record<string, any>[] = [];
 
         if (type === 'lr') {
-          // LR bill — single freight line item
           lineItems.push({
             name: sacDesc || 'Goods Transport Agency (GTA) Services',
             description: sacDesc || 'Freight charges',
@@ -541,7 +823,6 @@ Deno.serve(async (req: Request) => {
             ...(sacCode ? { sac_code: sacCode } : {}),
           });
         } else {
-          // Warehouse bill — warehouse charges + other charges
           if (parseFloat(bill.warehouse_charges || '0') > 0) {
             lineItems.push({
               name: bill.service_type || 'Warehousing Services',
@@ -575,20 +856,18 @@ Deno.serve(async (req: Request) => {
 
         // Determine GST treatment
         const billToGstin = (bill.bill_to_gstin || '').trim();
-        const companyGstin = (company?.gstin || '').trim();
         const isInterState = bill.bill_to_state && company?.state &&
           bill.bill_to_state.toUpperCase() !== company.state.toUpperCase();
 
         let gstTreatment = 'business_gst';
         if (!billToGstin) gstTreatment = 'consumer';
 
-        // Determine tax type from bill data
         const gstChargeType = bill.gst_charge_type || '';
         const isRCM = gstChargeType.toLowerCase().includes('rcm');
         const gstRate = parseFloat(bill.gst_percentage || '0');
 
         const invoicePayload: Record<string, any> = {
-          customer_id: customerInfo.zohoId,
+          customer_id: validatedZohoId,
           date: billDate ? new Date(billDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           ...(dueDate ? { due_date: new Date(dueDate).toISOString().split('T')[0] } : {}),
           invoice_number: billNumber,
@@ -597,16 +876,14 @@ Deno.serve(async (req: Request) => {
           line_items: lineItems,
         };
 
-        // Add tax if applicable and not RCM
         if (!isRCM && gstRate > 0) {
           if (isInterState) {
-            invoicePayload.tax_id = ''; // Let Zoho calculate IGST
+            invoicePayload.tax_id = '';
           }
-          // For CGST/SGST intra-state, Zoho auto-calculates based on item tax
         }
 
         if (dryRun) {
-          return { status: 'dry run - would push' };
+          return { status: 'dry run - would push', detail: validationDetail || undefined };
         }
 
         const createUrl = new URL(`${apiDomain}/books/v3/invoices`);
@@ -628,10 +905,25 @@ Deno.serve(async (req: Request) => {
             zoho_invoice_id: createData.invoice.invoice_id,
             zoho_invoice_number: createData.invoice.invoice_number,
             status: 'pushed',
+            detail: validationDetail || undefined,
           };
-        } else {
-          return { status: `push error: ${createData.message || 'unknown'}` };
         }
+
+        // Categorize the error
+        console.error('[Zoho] Invoice push failed:', JSON.stringify(createData));
+        const zohoMsg = createData.message || 'unknown error';
+        const msgLower = zohoMsg.toLowerCase();
+
+        if (msgLower.includes('customer') && (msgLower.includes('inactive') || msgLower.includes('not found'))) {
+          return { status: 'customer-inactive', detail: zohoMsg };
+        }
+        if (msgLower.includes('duplicate') || msgLower.includes('already exists')) {
+          return { status: 'invoice-duplicate', detail: zohoMsg };
+        }
+        if (msgLower.includes('auth') || msgLower.includes('token') || msgLower.includes('unauthorized')) {
+          return { status: 'auth-error', detail: zohoMsg };
+        }
+        return { status: 'api-error', detail: zohoMsg };
       }
 
       // ── Process LR Bills ──
@@ -688,6 +980,7 @@ Deno.serve(async (req: Request) => {
             zoho_invoice_id: pushResult.zoho_invoice_id,
             zoho_invoice_number: pushResult.zoho_invoice_number,
             status: pushResult.status,
+            detail: pushResult.detail,
           });
         }
       }
@@ -745,6 +1038,7 @@ Deno.serve(async (req: Request) => {
             zoho_invoice_id: pushResult.zoho_invoice_id,
             zoho_invoice_number: pushResult.zoho_invoice_number,
             status: pushResult.status,
+            detail: pushResult.detail,
           });
         }
       }
