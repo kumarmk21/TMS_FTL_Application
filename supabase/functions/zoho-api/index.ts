@@ -1662,6 +1662,253 @@ Deno.serve(async (req: Request) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── Fetch active vendor contacts from Zoho Books ──
+    if (action === 'fetch-vendors') {
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+      let allVendors: Record<string, any>[] = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const vUrl = new URL(`${apiDomain}/books/v3/contacts`);
+        vUrl.searchParams.set('organization_id', orgId);
+        vUrl.searchParams.set('contact_type', 'vendor');
+        vUrl.searchParams.set('status', 'active');
+        vUrl.searchParams.set('page', String(page));
+        vUrl.searchParams.set('per_page', '200');
+
+        const vRes = await fetch(vUrl.toString(), {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        const vData = await vRes.json();
+
+        if (vData.code !== undefined && vData.code !== 0) {
+          throw new Error(`Zoho API error (code ${vData.code}): ${vData.message || 'Unknown error'}`);
+        }
+
+        const vendors = (vData.contacts || []) as Record<string, any>[];
+        allVendors = allVendors.concat(vendors);
+        hasMore = !!(vData.page_context?.has_more_page || vData.page_context?.has_more);
+        page++;
+        if (page > 50) break;
+      }
+
+      return new Response(JSON.stringify({
+        count: allVendors.length,
+        vendors: allVendors.map((v) => ({
+          contact_id: v.contact_id,
+          contact_name: v.contact_name,
+          email: v.email || '',
+          phone: v.phone || '',
+          company_name: v.company_name || '',
+          status: v.status || 'active',
+        })),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ── Fetch open bills for a vendor from Zoho Books ──
+    if (action === 'fetch-bills') {
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+      const body = await req.json().catch(() => ({}));
+      const vendorId = (body as { vendor_id?: string }).vendor_id;
+
+      if (!vendorId) {
+        return new Response(JSON.stringify({ error: 'Missing vendor_id' }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const billsUrl = new URL(`${apiDomain}/books/v3/bills`);
+      billsUrl.searchParams.set('organization_id', orgId);
+      billsUrl.searchParams.set('vendor_id', vendorId);
+      billsUrl.searchParams.set('status', 'open');
+
+      const billsRes = await fetch(billsUrl.toString(), {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const billsData = await billsRes.json();
+
+      if (billsData.code !== undefined && billsData.code !== 0) {
+        return new Response(JSON.stringify({ error: billsData.message || 'Failed to fetch bills' }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const bills = (billsData.bills || []) as Record<string, any>[];
+      return new Response(JSON.stringify({
+        count: bills.length,
+        bills: bills.map((b) => ({
+          bill_id: b.bill_id,
+          bill_number: b.bill_number,
+          date: b.date || b.bill_date || '',
+          due_date: b.due_date || '',
+          total: parseFloat(b.total || b.balance || '0'),
+          balance: parseFloat(b.balance || b.total || '0'),
+          status: b.status || 'open',
+          vendor_name: b.vendor_name || '',
+        })),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ── Fetch bank accounts from Zoho Books ──
+    if (action === 'fetch-bank-accounts') {
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const bankUrl = new URL(`${apiDomain}/books/v3/bankaccounts`);
+      bankUrl.searchParams.set('organization_id', orgId);
+
+      const bankRes = await fetch(bankUrl.toString(), {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const bankData = await bankRes.json();
+
+      if (bankData.code !== undefined && bankData.code !== 0) {
+        return new Response(JSON.stringify({ error: bankData.message || 'Failed to fetch bank accounts' }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const accounts = (bankData.bankaccounts || []) as Record<string, any>[];
+      return new Response(JSON.stringify({
+        count: accounts.length,
+        bank_accounts: accounts.map((a) => ({
+          account_id: a.account_id,
+          account_name: a.account_name,
+          account_number: a.account_number || '',
+          bank_name: a.bank_name || '',
+          currency_code: a.currency_code || 'INR',
+          is_active: a.is_active ?? true,
+        })),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ── Create a vendor payment in Zoho Books (ATH or BTH) ──
+    if (action === 'create-vendor-payment') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const body = await req.json().catch(() => ({}));
+      const {
+        vendor_id,
+        vendor_name,
+        amount,
+        payment_date,
+        payment_type,
+        reference_number,
+        notes,
+        bill_id,
+        bank_account_name,
+      } = body as {
+        vendor_id: string;
+        vendor_name: string;
+        amount: number;
+        payment_date: string;
+        payment_type: 'ATH' | 'BTH';
+        reference_number: string;
+        notes?: string;
+        bill_id?: string;
+        bank_account_name: string;
+      };
+
+      if (!vendor_id || !amount || !payment_date || !payment_type) {
+        return new Response(JSON.stringify({ error: 'Missing required fields: vendor_id, amount, payment_date, payment_type' }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (payment_type === 'BTH' && !bill_id) {
+        return new Response(JSON.stringify({ error: 'BTH payments require a bill_id to link the payment to a bill' }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Resolve bank account ID by name
+      const bankName = bank_account_name || 'HDFC Bank CA';
+      const bankUrl = new URL(`${apiDomain}/books/v3/bankaccounts`);
+      bankUrl.searchParams.set('organization_id', orgId);
+
+      const bankRes = await fetch(bankUrl.toString(), {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const bankData = await bankRes.json();
+
+      if (bankData.code !== undefined && bankData.code !== 0) {
+        return new Response(JSON.stringify({ error: `Failed to fetch bank accounts: ${bankData.message}` }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const bankAccounts = (bankData.bankaccounts || []) as Record<string, any>[];
+      const bankNameLower = bankName.toLowerCase().trim();
+      const bankAccount = bankAccounts.find(
+        (a) => (a.account_name || '').toLowerCase().trim() === bankNameLower,
+      );
+
+      if (!bankAccount) {
+        return new Response(JSON.stringify({
+          error: `Could not find bank account "${bankName}" in Zoho Books. Available: ${bankAccounts.map((a) => a.account_name).join(', ')}`,
+        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const accountId = bankAccount.account_id as string;
+
+      // Build payment payload
+      const paymentPayload: Record<string, any> = {
+        vendor_id,
+        payment_mode: 'bank_transfer',
+        amount,
+        date: payment_date,
+        account_id: accountId,
+        reference_number,
+        description: payment_type === 'ATH'
+          ? `Advance Payment (ATH)${notes ? ' — ' + notes : ''}`
+          : `Post-Delivery Payment (BTH)${notes ? ' — ' + notes : ''}`,
+      };
+
+      // BTH: link to specific bill
+      if (payment_type === 'BTH' && bill_id) {
+        paymentPayload.bills = [{ bill_id, amount_applied: amount }];
+      }
+
+      const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
+      payUrl.searchParams.set('organization_id', orgId);
+
+      const payRes = await fetch(payUrl.toString(), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `JSONString=${encodeURIComponent(JSON.stringify(paymentPayload))}`,
+      });
+      const payData = await payRes.json();
+
+      if (payData.code === 0 && payData.payment) {
+        return new Response(JSON.stringify({
+          success: true,
+          zoho_payment_id: payData.payment.payment_id,
+          zoho_payment_number: payData.payment.payment_number || '',
+          reference_number,
+          amount,
+          vendor_name,
+          payment_type,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      console.error('[Zoho] Vendor payment failed:', JSON.stringify(payData));
+      return new Response(JSON.stringify({
+        success: false,
+        error: payData.message || 'Failed to create vendor payment in Zoho Books',
+        zoho_error: payData,
+      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
