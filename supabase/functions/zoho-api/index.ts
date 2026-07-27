@@ -1369,26 +1369,10 @@ Deno.serve(async (req: Request) => {
           thc_deduction_delay, thc_deduction_damage, thc_tds_amount,
           thc_net_payable_amount, thc_advance_amount, thc_balance_amount,
           zoho_books_id, zoho_sync_status,
+          lr_number,
           vendor_master:thc_vendor (vendor_code, vendor_name, zoho_vendor_id)
         `)
         .in('thc_id', thcIds);
-
-      // Batch-fetch booking_lr data to get manual_lr_no for each THC
-      const thcNumbers = (thcRecords || [])
-        .map((r: any) => r.thc_number)
-        .filter(Boolean);
-      const lrMap = new Map<string, string>();
-      if (thcNumbers.length > 0) {
-        const { data: bookings } = await supabase
-          .from('booking_lr')
-          .select('thc_no, manual_lr_no')
-          .in('thc_no', thcNumbers);
-        for (const bk of (bookings || []) as any[]) {
-          if (bk.thc_no && bk.manual_lr_no) {
-            lrMap.set(bk.thc_no, bk.manual_lr_no);
-          }
-        }
-      }
 
       if (thcError) throw thcError;
 
@@ -1447,7 +1431,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Use the customer-provided LR number as the Zoho Bill Number
-        const lrNumber = thc.thc_number ? lrMap.get(thc.thc_number) : null;
+        const lrNumber = thc.lr_number || null;
         if (!lrNumber) {
           result.errors++;
           result.details.push({
