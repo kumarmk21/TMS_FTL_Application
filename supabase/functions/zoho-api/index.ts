@@ -1373,6 +1373,23 @@ Deno.serve(async (req: Request) => {
         `)
         .in('thc_id', thcIds);
 
+      // Batch-fetch booking_lr data to get manual_lr_no for each THC
+      const thcNumbers = (thcRecords || [])
+        .map((r: any) => r.thc_number)
+        .filter(Boolean);
+      const lrMap = new Map<string, string>();
+      if (thcNumbers.length > 0) {
+        const { data: bookings } = await supabase
+          .from('booking_lr')
+          .select('thc_no, manual_lr_no')
+          .in('thc_no', thcNumbers);
+        for (const bk of (bookings || []) as any[]) {
+          if (bk.thc_no && bk.manual_lr_no) {
+            lrMap.set(bk.thc_no, bk.manual_lr_no);
+          }
+        }
+      }
+
       if (thcError) throw thcError;
 
       // Build vendor lookup
@@ -1425,6 +1442,21 @@ Deno.serve(async (req: Request) => {
             amount,
             status: 'skipped',
             detail: `Vendor "${vendor?.vendor_name || thc.thc_vendor}" is not linked to any Zoho contact. Run Vendor Sync first.`,
+          });
+          continue;
+        }
+
+        // Use the customer-provided LR number as the Zoho Bill Number
+        const lrNumber = thc.thc_number ? lrMap.get(thc.thc_number) : null;
+        if (!lrNumber) {
+          result.errors++;
+          result.details.push({
+            thc_id: thc.thc_id,
+            thc_number: thc.thc_number || '',
+            vendor_name: vendor.vendor_name || '',
+            amount,
+            status: 'error',
+            detail: 'No LR Number found for this THC. Push blocked — please enter the customer LR number in the LR Entry before pushing to Zoho Books.',
           });
           continue;
         }
@@ -1531,7 +1563,7 @@ Deno.serve(async (req: Request) => {
 
         const billPayload: Record<string, any> = {
           vendor_id: vendor.zoho_vendor_id,
-          bill_number: thc.thc_id_number || thc.thc_number || '',
+          bill_number: lrNumber,
           date: billDate,
           is_inclusive_tax: false,
           line_items: lineItems,
