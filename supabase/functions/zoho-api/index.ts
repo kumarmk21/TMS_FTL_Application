@@ -1905,11 +1905,12 @@ Deno.serve(async (req: Request) => {
       });
       const payData = await payRes.json();
 
-      if (payData.code === 0 && payData.payment) {
+      const vpayment = payData.vendorpayment || payData.payment;
+      if (payData.code === 0 && vpayment) {
         return new Response(JSON.stringify({
           success: true,
-          zoho_payment_id: payData.payment.payment_id,
-          zoho_payment_number: payData.payment.payment_number || '',
+          zoho_payment_id: vpayment.payment_id,
+          zoho_payment_number: vpayment.payment_number || '',
           reference_number,
           amount,
           vendor_name,
@@ -2032,12 +2033,12 @@ Deno.serve(async (req: Request) => {
       });
       const payData = await payRes.json();
 
-      if (payData.code === 0 && payData.payment) {
-        // Write the Zoho payment info back to thc_details
+      const athPayment = payData.vendorpayment || payData.payment;
+      if (payData.code === 0 && athPayment) {
         await supabase
           .from('thc_details')
           .update({
-            zoho_books_id: payData.payment.payment_id,
+            zoho_books_id: athPayment.payment_id,
             zoho_sync_status: 'synced',
             zoho_synced_at: new Date().toISOString(),
           } as any)
@@ -2045,8 +2046,8 @@ Deno.serve(async (req: Request) => {
 
         return new Response(JSON.stringify({
           success: true,
-          zoho_payment_id: payData.payment.payment_id,
-          zoho_payment_number: payData.payment.payment_number || '',
+          zoho_payment_id: athPayment.payment_id,
+          zoho_payment_number: athPayment.payment_number || '',
           thc_id: thcId,
           thc_number: refNumber,
           vendor_name: vendor.vendor_name,
