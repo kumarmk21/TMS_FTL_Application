@@ -2008,7 +2008,41 @@ Deno.serve(async (req: Request) => {
         ? new Date((thc as any).ath_date).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0];
 
+      const lrNumber = (thc as any).lr_number || (thc as any).thc_number || '';
       const refNumber = (thc as any).thc_id_number || (thc as any).thc_number || thcId;
+
+      if (!lrNumber) {
+        return new Response(JSON.stringify({
+          error: 'No LR number found on this THC record — cannot link payment to a bill.',
+        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Search Zoho Books for the purchase bill by bill_number (= LR number)
+      const billSearchUrl = new URL(`${apiDomain}/books/v3/bills`);
+      billSearchUrl.searchParams.set('organization_id', orgId);
+      billSearchUrl.searchParams.set('vendor_id', vendor.zoho_vendor_id);
+      billSearchUrl.searchParams.set('bill_number', lrNumber);
+
+      const billSearchRes = await fetch(billSearchUrl.toString(), {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const billSearchData = await billSearchRes.json();
+
+      if (billSearchData.code !== undefined && billSearchData.code !== 0) {
+        return new Response(JSON.stringify({
+          error: `Failed to search for bill in Zoho Books: ${billSearchData.message}`,
+        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const zohoBills = (billSearchData.bills || []) as Record<string, any>[];
+      if (zohoBills.length === 0) {
+        return new Response(JSON.stringify({
+          error: `No purchase bill found in Zoho Books for LR number "${lrNumber}". Push the bill (via Push Purchases) first, then push the ATH payment.`,
+        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const zohoBill = zohoBills[0];
+      const zohoBillId = zohoBill.bill_id;
 
       const paymentPayload: Record<string, any> = {
         vendor_id: vendor.zoho_vendor_id,
@@ -2018,6 +2052,7 @@ Deno.serve(async (req: Request) => {
         paid_through_account_id: bankAccount.account_id,
         reference_number: refNumber,
         description: `Advance Payment (ATH) — ${refNumber}`,
+        bills: [{ bill_id: zohoBillId, amount_applied: advanceAmount }],
       };
 
       const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
@@ -2038,8 +2073,8 @@ Deno.serve(async (req: Request) => {
         await supabase
           .from('thc_details')
           .update({
-            zoho_books_id: athPayment.payment_id,
-            zoho_sync_status: 'synced',
+            zoho_ath_payment_id: athPayment.payment_id,
+            zoho_ath_sync_status: 'synced',
             zoho_synced_at: new Date().toISOString(),
           } as any)
           .eq('thc_id', thcId);
@@ -2048,6 +2083,7 @@ Deno.serve(async (req: Request) => {
           success: true,
           zoho_payment_id: athPayment.payment_id,
           zoho_payment_number: athPayment.payment_number || '',
+          zoho_bill_id: zohoBillId,
           thc_id: thcId,
           thc_number: refNumber,
           vendor_name: vendor.vendor_name,
@@ -2058,7 +2094,7 @@ Deno.serve(async (req: Request) => {
       // Mark as failed in DB so UI can reflect it
       await supabase
         .from('thc_details')
-        .update({ zoho_sync_status: 'failed' } as any)
+        .update({ zoho_ath_sync_status: 'failed' } as any)
         .eq('thc_id', thcId);
 
       console.error('[Zoho] ATH payment push failed:', JSON.stringify(payData));

@@ -157,7 +157,8 @@ interface AthRecord {
   ven_act_branch: string | null;
   ath_date: string | null;
   thc_date: string | null;
-  zoho_sync_status: string | null;
+  zoho_ath_sync_status: string | null;
+  zoho_ath_payment_id: string | null;
   zoho_books_id: string | null;
 }
 
@@ -351,7 +352,7 @@ export default function ZohoBooksIntegration() {
           vehicle_type, vehicle_number, thc_vendor,
           thc_amount, thc_advance_amount, thc_net_payable_amount,
           ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank, ven_act_branch,
-          ath_date, thc_date, zoho_sync_status, zoho_books_id
+          ath_date, thc_date, zoho_ath_sync_status, zoho_ath_payment_id, zoho_books_id
         `)
         .eq('thc_status_fin', athUploadedStatusId)
         .not('ath_date', 'is', null)
@@ -2356,12 +2357,12 @@ export default function ZohoBooksIntegration() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {record.zoho_sync_status === 'synced' ? (
+                          {record.zoho_ath_sync_status === 'synced' ? (
                             <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full">
                               <CheckCircle className="w-3 h-3" />
                               Pushed
                             </span>
-                          ) : record.zoho_sync_status === 'failed' ? (
+                          ) : record.zoho_ath_sync_status === 'failed' ? (
                             <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
                               <AlertCircle className="w-3 h-3" />
                               Failed
