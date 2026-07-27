@@ -122,6 +122,7 @@ interface PendingTHC {
   thc_id: string;
   thc_number: string;
   thc_id_number: string;
+  lr_number: string | null;
   thc_date: string;
   vendor_name: string;
   thc_gross_amount: number;
@@ -746,7 +747,7 @@ export default function ZohoBooksIntegration() {
       const { data, error } = await supabase
         .from('thc_details')
         .select(`
-          thc_id, thc_number, thc_id_number, thc_date, thc_vendor,
+          thc_id, thc_number, thc_id_number, lr_number, thc_date, thc_vendor,
           thc_gross_amount, zoho_sync_status,
           vendor_master:thc_vendor (vendor_name)
         `)
@@ -761,6 +762,7 @@ export default function ZohoBooksIntegration() {
         thc_id: t.thc_id,
         thc_number: t.thc_number || '',
         thc_id_number: t.thc_id_number || '',
+        lr_number: t.lr_number || null,
         thc_date: t.thc_date || '',
         vendor_name: t.vendor_master?.vendor_name || t.thc_vendor || '',
         thc_gross_amount: parseFloat(t.thc_gross_amount || '0'),
@@ -1962,6 +1964,7 @@ export default function ZohoBooksIntegration() {
                           />
                         </th>
                         <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">THC No.</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">LR No.</th>
                         <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">THC ID</th>
                         <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
                         <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Vendor</th>
@@ -1982,6 +1985,7 @@ export default function ZohoBooksIntegration() {
                               />
                             </td>
                             <td className="px-4 py-2 text-gray-700 font-mono text-xs">{t.thc_number || '-'}</td>
+                            <td className="px-4 py-2 text-gray-700 font-mono text-xs">{t.lr_number || '-'}</td>
                             <td className="px-4 py-2 text-gray-600 font-mono text-xs">{t.thc_id_number || '-'}</td>
                             <td className="px-4 py-2 text-gray-600 text-xs">{formatDateShort(t.thc_date)}</td>
                             <td className="px-4 py-2 text-gray-900">{t.vendor_name || '-'}</td>
