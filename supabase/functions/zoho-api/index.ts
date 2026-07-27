@@ -1948,6 +1948,7 @@ Deno.serve(async (req: Request) => {
           thc_id, thc_id_number, thc_number, thc_vendor,
           thc_advance_amount, ath_date,
           ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank,
+          lr_number, zoho_books_id, zoho_sync_status,
           vendor_master:thc_vendor (vendor_code, vendor_name, zoho_vendor_id)
         `)
         .eq('thc_id', thcId)
@@ -2010,39 +2011,45 @@ Deno.serve(async (req: Request) => {
 
       const lrNumber = (thc as any).lr_number || (thc as any).thc_number || '';
       const refNumber = (thc as any).thc_id_number || (thc as any).thc_number || thcId;
+      const storedBillId = (thc as any).zoho_books_id || null;
+      const billSyncStatus = (thc as any).zoho_sync_status || 'not_synced';
 
-      if (!lrNumber) {
-        return new Response(JSON.stringify({
-          error: 'No LR number found on this THC record — cannot link payment to a bill.',
-        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Use the stored Zoho bill ID from the purchases push if available
+      let zohoBillId: string | null = storedBillId;
+
+      if (!zohoBillId) {
+        if (!lrNumber) {
+          return new Response(JSON.stringify({
+            error: 'No LR number found on this THC record — cannot link payment to a bill.',
+          }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Fall back to searching Zoho Books for the purchase bill by bill_number (= LR number)
+        const billSearchUrl = new URL(`${apiDomain}/books/v3/bills`);
+        billSearchUrl.searchParams.set('organization_id', orgId);
+        billSearchUrl.searchParams.set('vendor_id', vendor.zoho_vendor_id);
+        billSearchUrl.searchParams.set('bill_number', lrNumber);
+
+        const billSearchRes = await fetch(billSearchUrl.toString(), {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        const billSearchData = await billSearchRes.json();
+
+        if (billSearchData.code !== undefined && billSearchData.code !== 0) {
+          return new Response(JSON.stringify({
+            error: `Failed to search for bill in Zoho Books: ${billSearchData.message}`,
+          }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        const zohoBills = (billSearchData.bills || []) as Record<string, any>[];
+        if (zohoBills.length === 0) {
+          return new Response(JSON.stringify({
+            error: `No purchase bill found in Zoho Books for LR number "${lrNumber}". Push the bill (via Push Purchases) first, then push the ATH payment.`,
+          }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        zohoBillId = zohoBills[0].bill_id;
       }
-
-      // Search Zoho Books for the purchase bill by bill_number (= LR number)
-      const billSearchUrl = new URL(`${apiDomain}/books/v3/bills`);
-      billSearchUrl.searchParams.set('organization_id', orgId);
-      billSearchUrl.searchParams.set('vendor_id', vendor.zoho_vendor_id);
-      billSearchUrl.searchParams.set('bill_number', lrNumber);
-
-      const billSearchRes = await fetch(billSearchUrl.toString(), {
-        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-      });
-      const billSearchData = await billSearchRes.json();
-
-      if (billSearchData.code !== undefined && billSearchData.code !== 0) {
-        return new Response(JSON.stringify({
-          error: `Failed to search for bill in Zoho Books: ${billSearchData.message}`,
-        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      const zohoBills = (billSearchData.bills || []) as Record<string, any>[];
-      if (zohoBills.length === 0) {
-        return new Response(JSON.stringify({
-          error: `No purchase bill found in Zoho Books for LR number "${lrNumber}". Push the bill (via Push Purchases) first, then push the ATH payment.`,
-        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      const zohoBill = zohoBills[0];
-      const zohoBillId = zohoBill.bill_id;
 
       const paymentPayload: Record<string, any> = {
         vendor_id: vendor.zoho_vendor_id,
