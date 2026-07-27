@@ -1877,10 +1877,10 @@ Deno.serve(async (req: Request) => {
       // Build payment payload
       const paymentPayload: Record<string, any> = {
         vendor_id,
-        payment_mode: 'bank_transfer',
+        payment_mode: 'banktransfer',
         amount,
         date: payment_date,
-        account_id: accountId,
+        paid_through_account_id: accountId,
         reference_number,
         description: payment_type === 'ATH'
           ? `Advance Payment (ATH)${notes ? ' — ' + notes : ''}`
@@ -2011,10 +2011,10 @@ Deno.serve(async (req: Request) => {
 
       const paymentPayload: Record<string, any> = {
         vendor_id: vendor.zoho_vendor_id,
-        payment_mode: 'bank_transfer',
+        payment_mode: 'banktransfer',
         amount: advanceAmount,
         date: paymentDate,
-        account_id: bankAccount.account_id,
+        paid_through_account_id: bankAccount.account_id,
         reference_number: refNumber,
         description: `Advance Payment (ATH) — ${refNumber}`,
       };
