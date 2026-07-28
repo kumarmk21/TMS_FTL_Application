@@ -1445,19 +1445,39 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        // Skip already-synced THCs
+        // If we have a stored Zoho bill ID, verify it still exists before skipping
         if (thc.zoho_books_id) {
-          result.skipped++;
-          result.details.push({
-            thc_id: thc.thc_id,
-            thc_number: thc.thc_number || '',
-            vendor_name: vendor.vendor_name || '',
-            amount,
-            zoho_bill_id: thc.zoho_books_id,
-            status: 'skipped',
-            detail: 'Already synced to Zoho Books.',
-          });
-          continue;
+          let billStillExists = false;
+          try {
+            const verifyUrl = new URL(`${apiDomain}/books/v3/bills/${thc.zoho_books_id}`);
+            verifyUrl.searchParams.set('organization_id', orgId);
+            const verifyRes = await fetch(verifyUrl.toString(), {
+              headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+            });
+            const verifyData = await verifyRes.json();
+            billStillExists = verifyData.code === 0 && !!verifyData.bill;
+          } catch (_) { /* if check fails, treat as not existing and retry push */ }
+
+          if (billStillExists) {
+            result.skipped++;
+            result.details.push({
+              thc_id: thc.thc_id,
+              thc_number: thc.thc_number || '',
+              vendor_name: vendor.vendor_name || '',
+              amount,
+              zoho_bill_id: thc.zoho_books_id,
+              status: 'skipped',
+              detail: 'Already synced to Zoho Books.',
+            });
+            continue;
+          }
+
+          // Stale ID — bill was deleted in Zoho. Clear it so we can re-create.
+          await supabase
+            .from('thc_details')
+            .update({ zoho_books_id: null, zoho_sync_status: 'not_synced' })
+            .eq('thc_id', thc.thc_id);
+          thc.zoho_books_id = null;
         }
 
         // Build line items from THC charges
