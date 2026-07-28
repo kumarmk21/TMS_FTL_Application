@@ -126,6 +126,8 @@ interface PendingTHC {
   thc_date: string;
   vendor_name: string;
   thc_gross_amount: number;
+  zoho_sync_status?: string;
+  zoho_books_id?: string | null;
 }
 
 interface PendingInvoice {
@@ -229,6 +231,7 @@ export default function ZohoBooksIntegration() {
   const [pendingTHCs, setPendingTHCs] = useState<PendingTHC[]>([]);
   const [loadingPendingTHCs, setLoadingPendingTHCs] = useState(false);
   const [selectedTHCIds, setSelectedTHCIds] = useState<Set<string>>(new Set());
+  const [thcFilter, setThcFilter] = useState<'pending' | 'pushed' | 'failed' | 'all'>('pending');
   const [vendorSyncFilter, setVendorSyncFilter] = useState<'all' | 'linked' | 'pushed' | 'error'>('all');
   const [purchasePushFilter, setPurchasePushFilter] = useState<'all' | 'pushed' | 'skipped' | 'error'>('all');
 
@@ -387,7 +390,7 @@ export default function ZohoBooksIntegration() {
         .select(`
           thc_id, thc_id_number, lr_number, origin, destination,
           vehicle_type, vehicle_number, thc_vendor,
-          thc_amount, thc_advance_amount, thc_net_payable_amount,
+          thc_amount, thc_advance_amount, thc_balance_amount,
           ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank, ven_act_branch,
           ath_date, thc_date, zoho_ath_sync_status, zoho_ath_payment_id, zoho_books_id
         `)
@@ -912,18 +915,28 @@ export default function ZohoBooksIntegration() {
     }
   }, [apiUrl]);
 
-  const fetchPendingTHCs = useCallback(async () => {
+  const fetchPendingTHCs = useCallback(async (filter?: 'pending' | 'pushed' | 'failed' | 'all') => {
+    const activeFilter = filter || thcFilter;
     setLoadingPendingTHCs(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('thc_details')
         .select(`
           thc_id, thc_number, thc_id_number, lr_number, thc_date, thc_vendor,
-          thc_gross_amount, zoho_sync_status,
+          thc_gross_amount, zoho_sync_status, zoho_books_id,
           vendor_master:thc_vendor (vendor_name)
         `)
-        .not('thc_id_number', 'is', null)
-        .in('zoho_sync_status', ['not_synced', 'failed'])
+        .not('thc_id_number', 'is', null);
+
+      if (activeFilter === 'pending') {
+        query = query.in('zoho_sync_status', ['not_synced', 'failed']);
+      } else if (activeFilter === 'pushed') {
+        query = query.eq('zoho_sync_status', 'synced');
+      } else if (activeFilter === 'failed') {
+        query = query.eq('zoho_sync_status', 'failed');
+      }
+
+      const { data, error } = await query
         .order('thc_date', { ascending: false })
         .limit(500);
 
@@ -937,6 +950,8 @@ export default function ZohoBooksIntegration() {
         thc_date: t.thc_date || '',
         vendor_name: t.vendor_master?.vendor_name || t.thc_vendor || '',
         thc_gross_amount: parseFloat(t.thc_gross_amount || '0'),
+        zoho_sync_status: t.zoho_sync_status || 'not_synced',
+        zoho_books_id: t.zoho_books_id || null,
       }));
 
       setPendingTHCs(thcs);
@@ -946,7 +961,7 @@ export default function ZohoBooksIntegration() {
     } finally {
       setLoadingPendingTHCs(false);
     }
-  }, []);
+  }, [thcFilter]);
 
   const handleSyncVendors = async () => {
     setVendorSyncing(true);
@@ -2074,22 +2089,34 @@ export default function ZohoBooksIntegration() {
 
             {purchaseStats && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-                <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <button
+                  onClick={() => { setThcFilter('all'); fetchPendingTHCs('all'); }}
+                  className={`p-3 rounded-lg text-center transition-all border-2 ${thcFilter === 'all' ? 'bg-gray-100 border-gray-900 ring-2 ring-gray-900/10' : 'bg-gray-50 border-transparent hover:bg-gray-100 hover:border-gray-300'}`}
+                >
                   <p className="text-2xl font-bold text-gray-900">{purchaseStats.thc.total}</p>
                   <p className="text-xs text-gray-500 mt-0.5">Total THCs</p>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg text-center">
+                </button>
+                <button
+                  onClick={() => { setThcFilter('pushed'); fetchPendingTHCs('pushed'); }}
+                  className={`p-3 rounded-lg text-center transition-all border-2 ${thcFilter === 'pushed' ? 'bg-green-100 border-green-700 ring-2 ring-green-700/10' : 'bg-green-50 border-transparent hover:bg-green-100 hover:border-green-300'}`}
+                >
                   <p className="text-2xl font-bold text-green-700">{purchaseStats.thc.synced}</p>
                   <p className="text-xs text-green-600 mt-0.5">Pushed to Zoho</p>
-                </div>
-                <div className="p-3 bg-amber-50 rounded-lg text-center">
+                </button>
+                <button
+                  onClick={() => { setThcFilter('pending'); fetchPendingTHCs('pending'); }}
+                  className={`p-3 rounded-lg text-center transition-all border-2 ${thcFilter === 'pending' ? 'bg-amber-100 border-amber-700 ring-2 ring-amber-700/10' : 'bg-amber-50 border-transparent hover:bg-amber-100 hover:border-amber-300'}`}
+                >
                   <p className="text-2xl font-bold text-amber-700">{purchaseStats.thc.pending}</p>
                   <p className="text-xs text-amber-600 mt-0.5">Pending</p>
-                </div>
-                <div className="p-3 bg-red-50 rounded-lg text-center">
+                </button>
+                <button
+                  onClick={() => { setThcFilter('failed'); fetchPendingTHCs('failed'); }}
+                  className={`p-3 rounded-lg text-center transition-all border-2 ${thcFilter === 'failed' ? 'bg-red-100 border-red-700 ring-2 ring-red-700/10' : 'bg-red-50 border-transparent hover:bg-red-100 hover:border-red-300'}`}
+                >
                   <p className="text-2xl font-bold text-red-700">{purchaseStats.thc.failed}</p>
                   <p className="text-xs text-red-600 mt-0.5">Failed</p>
-                </div>
+                </button>
               </div>
             )}
 
@@ -2098,7 +2125,7 @@ export default function ZohoBooksIntegration() {
               <div className="flex items-center gap-3">
                 <FileText className="w-4 h-4 text-emerald-600" />
                 <p className="text-sm font-medium text-emerald-900">
-                  <strong>{pendingTHCs.length}</strong> pending THCs ready to push
+                  <strong>{pendingTHCs.length}</strong> {thcFilter === 'all' ? 'total' : thcFilter} THCs{thcFilter === 'pushed' ? ' pushed to Zoho' : thcFilter === 'pending' ? ' pending push' : thcFilter === 'failed' ? ' with errors' : ' loaded'}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -2108,7 +2135,7 @@ export default function ZohoBooksIntegration() {
                   </span>
                 )}
                 <button
-                  onClick={fetchPendingTHCs}
+                  onClick={() => fetchPendingTHCs()}
                   disabled={loadingPendingTHCs}
                   className="flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-900 font-medium"
                 >
@@ -2122,11 +2149,11 @@ export default function ZohoBooksIntegration() {
             {loadingPendingTHCs ? (
               <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
                 <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
-                <span className="ml-3 text-gray-500 text-sm">Loading pending THCs...</span>
+                <span className="ml-3 text-gray-500 text-sm">Loading THCs...</span>
               </div>
             ) : pendingTHCs.length === 0 ? (
               <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
-                <p className="text-gray-400 text-sm">No pending THCs to push. All caught up!</p>
+                <p className="text-gray-400 text-sm">No THCs in this category.</p>
               </div>
             ) : (
               <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
@@ -2148,11 +2175,13 @@ export default function ZohoBooksIntegration() {
                         <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
                         <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Vendor</th>
                         <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {pendingTHCs.map((t) => {
                         const isSelected = selectedTHCIds.has(t.thc_id);
+                        const status = t.zoho_sync_status || 'not_synced';
                         return (
                           <tr key={t.thc_id} className={`hover:bg-gray-50 ${isSelected ? 'bg-emerald-50/50' : ''}`}>
                             <td className="px-4 py-2">
@@ -2169,6 +2198,15 @@ export default function ZohoBooksIntegration() {
                             <td className="px-4 py-2 text-gray-600 text-xs">{formatDateShort(t.thc_date)}</td>
                             <td className="px-4 py-2 text-gray-900">{t.vendor_name || '-'}</td>
                             <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatCurrency(t.thc_gross_amount)}</td>
+                            <td className="px-4 py-2">
+                              {status === 'synced' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Pushed</span>
+                              ) : status === 'failed' ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Failed</span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Pending</span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
@@ -2194,7 +2232,7 @@ export default function ZohoBooksIntegration() {
                 className="flex items-center gap-2 px-5 py-2.5 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {pushingPurchases ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                {pushingPurchases ? 'Processing...' : `Push All ${pendingTHCs.length} Pending`}
+                {pushingPurchases ? 'Processing...' : `Push All ${pendingTHCs.length} ${thcFilter === 'all' ? 'Loaded' : thcFilter === 'pushed' ? 'Pushed' : thcFilter === 'failed' ? 'Failed' : 'Pending'}`}
               </button>
               {selectedTHCIds.size > 0 && (
                 <button
