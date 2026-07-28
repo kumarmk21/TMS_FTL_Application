@@ -243,7 +243,7 @@ export default function ZohoBooksIntegration() {
   const [submittingAth, setSubmittingAth] = useState<string | null>(null);
 
   // BTH Payment tab state
-  const bthPaidStatusId = 'bf2031e0-d304-40c9-a9ea-a6c4945c059f';
+  const bthFinStatusId = '144fb692-3956-4b0d-a47f-25ea08479f5f';
   const [bthRecords, setBthRecords] = useState<BthRecord[]>([]);
   const [loadingBth, setLoadingBth] = useState(false);
   const [bthError, setBthError] = useState('');
@@ -523,7 +523,7 @@ export default function ZohoBooksIntegration() {
           thc_balance_payment_date, thc_balance_pmt_utr_details, thc_date,
           zoho_ath_sync_status, zoho_bth_sync_status, zoho_bth_payment_id, zoho_books_id
         `)
-        .eq('thc_status_fin', bthPaidStatusId)
+        .eq('thc_status_fin', bthFinStatusId)
         .not('thc_balance_payment_date', 'is', null)
         .order('thc_balance_payment_date', { ascending: false })
         .limit(500);
@@ -550,7 +550,7 @@ export default function ZohoBooksIntegration() {
     } finally {
       setLoadingBth(false);
     }
-  }, [bthPaidStatusId]);
+  }, [bthFinStatusId]);
 
   useEffect(() => {
     if (status?.connected && view === 'main' && activeTab === 'bth-payment') {
@@ -565,7 +565,7 @@ export default function ZohoBooksIntegration() {
         .channel('bth-payment-changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'thc_details', filter: `thc_status_fin=eq.${bthPaidStatusId}` },
+          { event: '*', schema: 'public', table: 'thc_details', filter: `thc_status_fin=eq.${bthFinStatusId}` },
           () => fetchBthRecords()
         )
         .subscribe();
@@ -575,7 +575,7 @@ export default function ZohoBooksIntegration() {
         bthChannelRef.current = null;
       };
     }
-  }, [view, activeTab, status?.connected, bthPaidStatusId, fetchBthRecords]);
+  }, [view, activeTab, status?.connected, bthFinStatusId, fetchBthRecords]);
 
   const startEditBth = (record: BthRecord) => {
     setEditingBth(record.thc_id);
@@ -2679,7 +2679,7 @@ export default function ZohoBooksIntegration() {
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
               <Wallet className="w-12 h-12 text-gray-300 mb-3" />
               <p className="text-gray-500 font-medium">No BTH payment records found</p>
-              <p className="text-sm text-gray-400 mt-1">Records with status "ATH Paid" and a balance payment date will appear here.</p>
+              <p className="text-sm text-gray-400 mt-1">Records with status "Financially Close" and a balance payment date will appear here.</p>
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
