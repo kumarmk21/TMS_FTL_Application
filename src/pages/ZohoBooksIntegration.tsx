@@ -162,6 +162,33 @@ interface AthRecord {
   zoho_books_id: string | null;
 }
 
+interface BthRecord {
+  thc_id: string;
+  thc_id_number: string;
+  lr_number: string | null;
+  origin: string | null;
+  destination: string | null;
+  vehicle_type: string | null;
+  vehicle_number: string | null;
+  thc_vendor: string;
+  vendor_name: string;
+  thc_amount: number | null;
+  thc_advance_amount: number | null;
+  thc_net_payable_amount: number | null;
+  ven_act_name: string | null;
+  ven_act_number: string | null;
+  ven_act_ifsc: string | null;
+  ven_act_bank: string | null;
+  ven_act_branch: string | null;
+  thc_balance_payment_date: string | null;
+  thc_balance_pmt_utr_details: string | null;
+  thc_date: string | null;
+  zoho_ath_sync_status: string | null;
+  zoho_bth_sync_status: string | null;
+  zoho_bth_payment_id: string | null;
+  zoho_books_id: string | null;
+}
+
 export default function ZohoBooksIntegration() {
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -191,7 +218,7 @@ export default function ZohoBooksIntegration() {
   const [showGstWarning, setShowGstWarning] = useState(false);
   const [pendingPushAction, setPendingPushAction] = useState<(() => void) | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'invoices' | 'purchases' | 'ath-payment'>('invoices');
+  const [activeTab, setActiveTab] = useState<'invoices' | 'purchases' | 'ath-payment' | 'bth-payment'>('invoices');
   const [view, setView] = useState<'main' | 'payment-info'>('main');
   const [paymentInfoPage, setPaymentInfoPage] = useState<'dashboard' | 'history' | 'settings'>('dashboard');
   const [vendorSyncing, setVendorSyncing] = useState(false);
@@ -214,6 +241,16 @@ export default function ZohoBooksIntegration() {
   const [editForm, setEditForm] = useState({ ven_act_name: '', ven_act_number: '', ven_act_ifsc: '', ven_act_bank: '', ven_act_branch: '', thc_advance_amount: 0 });
   const [viewingAth, setViewingAth] = useState<AthRecord | null>(null);
   const [submittingAth, setSubmittingAth] = useState<string | null>(null);
+
+  // BTH Payment tab state
+  const bthPaidStatusId = 'bf2031e0-d304-40c9-a9ea-a6c4945c059f';
+  const [bthRecords, setBthRecords] = useState<BthRecord[]>([]);
+  const [loadingBth, setLoadingBth] = useState(false);
+  const [bthError, setBthError] = useState('');
+  const [editingBth, setEditingBth] = useState<string | null>(null);
+  const [bthEditForm, setBthEditForm] = useState({ ven_act_name: '', ven_act_number: '', ven_act_ifsc: '', ven_act_bank: '', ven_act_branch: '', thc_net_payable_amount: 0, thc_balance_pmt_utr_details: '' });
+  const [viewingBth, setViewingBth] = useState<BthRecord | null>(null);
+  const [submittingBth, setSubmittingBth] = useState<string | null>(null);
 
   const oauthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-oauth`;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api`;
@@ -470,6 +507,139 @@ export default function ZohoBooksIntegration() {
   const athTotalAmount = useMemo(() => {
     return athRecords.reduce((sum, r) => sum + (r.thc_advance_amount || 0), 0);
   }, [athRecords]);
+
+  // ── BTH Payment tab: fetch, real-time subscription, actions ──
+  const fetchBthRecords = useCallback(async () => {
+    setLoadingBth(true);
+    setBthError('');
+    try {
+      const { data, error } = await supabase
+        .from('thc_details')
+        .select(`
+          thc_id, thc_id_number, lr_number, origin, destination,
+          vehicle_type, vehicle_number, thc_vendor,
+          thc_amount, thc_advance_amount, thc_net_payable_amount,
+          ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank, ven_act_branch,
+          thc_balance_payment_date, thc_balance_pmt_utr_details, thc_date,
+          zoho_ath_sync_status, zoho_bth_sync_status, zoho_bth_payment_id, zoho_books_id
+        `)
+        .eq('thc_status_fin', bthPaidStatusId)
+        .not('thc_balance_payment_date', 'is', null)
+        .order('thc_balance_payment_date', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+
+      const vendorIds = [...new Set((data || []).map((r: any) => r.thc_vendor).filter(Boolean))];
+      const vendorMap = new Map<string, string>();
+      if (vendorIds.length > 0) {
+        const { data: vendorData } = await supabase
+          .from('vendor_master')
+          .select('id, vendor_name')
+          .in('id', vendorIds);
+        (vendorData || []).forEach((v: any) => vendorMap.set(v.id, v.vendor_name));
+      }
+
+      const enriched: BthRecord[] = (data || []).map((r: any) => ({
+        ...r,
+        vendor_name: vendorMap.get(r.thc_vendor) || 'Unknown',
+      }));
+      setBthRecords(enriched);
+    } catch (err: any) {
+      setBthError(err.message || 'Failed to fetch BTH payment records');
+    } finally {
+      setLoadingBth(false);
+    }
+  }, [bthPaidStatusId]);
+
+  useEffect(() => {
+    if (status?.connected && view === 'main' && activeTab === 'bth-payment') {
+      fetchBthRecords();
+    }
+  }, [status?.connected, view, activeTab, fetchBthRecords]);
+
+  const bthChannelRef = useRef<any>(null);
+  useEffect(() => {
+    if (view === 'main' && activeTab === 'bth-payment' && status?.connected) {
+      const channel = supabase
+        .channel('bth-payment-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'thc_details', filter: `thc_status_fin=eq.${bthPaidStatusId}` },
+          () => fetchBthRecords()
+        )
+        .subscribe();
+      bthChannelRef.current = channel;
+      return () => {
+        supabase.removeChannel(channel);
+        bthChannelRef.current = null;
+      };
+    }
+  }, [view, activeTab, status?.connected, bthPaidStatusId, fetchBthRecords]);
+
+  const startEditBth = (record: BthRecord) => {
+    setEditingBth(record.thc_id);
+    setBthEditForm({
+      ven_act_name: record.ven_act_name || '',
+      ven_act_number: record.ven_act_number || '',
+      ven_act_ifsc: record.ven_act_ifsc || '',
+      ven_act_bank: record.ven_act_bank || '',
+      ven_act_branch: record.ven_act_branch || '',
+      thc_net_payable_amount: record.thc_net_payable_amount || 0,
+      thc_balance_pmt_utr_details: record.thc_balance_pmt_utr_details || '',
+    });
+  };
+
+  const saveEditBth = async () => {
+    if (!editingBth) return;
+    try {
+      const { error } = await supabase
+        .from('thc_details')
+        .update({
+          ven_act_name: bthEditForm.ven_act_name,
+          ven_act_number: bthEditForm.ven_act_number,
+          ven_act_ifsc: bthEditForm.ven_act_ifsc,
+          ven_act_bank: bthEditForm.ven_act_bank,
+          ven_act_branch: bthEditForm.ven_act_branch,
+          thc_net_payable_amount: bthEditForm.thc_net_payable_amount,
+          thc_balance_pmt_utr_details: bthEditForm.thc_balance_pmt_utr_details,
+        } as any)
+        .eq('thc_id', editingBth);
+      if (error) throw error;
+      setEditingBth(null);
+      await fetchBthRecords();
+    } catch (err: any) {
+      setBthError(err.message || 'Failed to save changes');
+    }
+  };
+
+  const submitBthPayment = async (record: BthRecord) => {
+    setSubmittingBth(record.thc_id);
+    setBthError('');
+    try {
+      const res = await fetch(`${apiUrl}?action=push-bth-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ thc_id: record.thc_id }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Push failed (${res.status})`);
+      setSuccess(`BTH payment submitted for ${record.thc_id_number}.`);
+      setTimeout(() => setSuccess(''), 5000);
+      await fetchBthRecords();
+    } catch (err: any) {
+      setBthError(err.message || 'Failed to submit BTH payment');
+    } finally {
+      setSubmittingBth(null);
+    }
+  };
+
+  const bthTotalAmount = useMemo(() => {
+    return bthRecords.reduce((sum, r) => sum + (r.thc_net_payable_amount || 0), 0);
+  }, [bthRecords]);
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -1322,6 +1492,14 @@ export default function ZohoBooksIntegration() {
               }`}
             >
               ATH Payment
+            </button>
+            <button
+              onClick={() => setActiveTab('bth-payment')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'bth-payment' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              BTH Payment
             </button>
           </div>
           <button
@@ -2451,6 +2629,295 @@ export default function ZohoBooksIntegration() {
                 </div>
                 <div className="flex justify-end gap-3 p-4 bg-gray-50 border-t border-gray-200">
                   <button onClick={() => setViewingAth(null)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── BTH Payment Tab ── */}
+      {status?.connected && view === 'main' && activeTab === 'bth-payment' && (
+        <div className="space-y-4">
+          {/* Summary bar */}
+          <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Total Records</p>
+                <p className="text-xl font-bold text-gray-900">{bthRecords.length}</p>
+              </div>
+              <div className="h-8 w-px bg-gray-200" />
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Total Net Payable</p>
+                <p className="text-xl font-bold text-gray-900">₹{bthTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+            <button
+              onClick={fetchBthRecords}
+              disabled={loadingBth}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingBth ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+
+          {bthError && (
+            <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p className="text-sm font-medium">{bthError}</p>
+            </div>
+          )}
+
+          {loadingBth && bthRecords.length === 0 ? (
+            <div className="flex items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+            </div>
+          ) : bthRecords.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
+              <Wallet className="w-12 h-12 text-gray-300 mb-3" />
+              <p className="text-gray-500 font-medium">No BTH payment records found</p>
+              <p className="text-sm text-gray-400 mt-1">Records with status "ATH Paid" and a balance payment date will appear here.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">THC No</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">LR No</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Vendor</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Vehicle</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Route</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Net Payable</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Balance Pmt Date</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Bank Account</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-700">ATH Status</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-700">BTH Status</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {bthRecords.map((record) => (
+                      <tr key={record.thc_id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-gray-900">{record.thc_id_number}</td>
+                        <td className="px-4 py-3 text-gray-600">{record.lr_number || '-'}</td>
+                        <td className="px-4 py-3 text-gray-600">{record.vendor_name}</td>
+                        <td className="px-4 py-3 text-gray-600">{record.vehicle_number || '-'}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {record.origin || '-'} → {record.destination || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium text-gray-900">
+                          ₹{(record.thc_net_payable_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {record.thc_balance_payment_date ? new Date(record.thc_balance_payment_date).toLocaleDateString('en-GB') : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {editingBth === record.thc_id ? (
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                value={bthEditForm.ven_act_name}
+                                onChange={(e) => setBthEditForm({ ...bthEditForm, ven_act_name: e.target.value })}
+                                placeholder="Account Name"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={bthEditForm.ven_act_number}
+                                onChange={(e) => setBthEditForm({ ...bthEditForm, ven_act_number: e.target.value })}
+                                placeholder="Account No"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={bthEditForm.ven_act_ifsc}
+                                onChange={(e) => setBthEditForm({ ...bthEditForm, ven_act_ifsc: e.target.value })}
+                                placeholder="IFSC"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={bthEditForm.ven_act_bank}
+                                onChange={(e) => setBthEditForm({ ...bthEditForm, ven_act_bank: e.target.value })}
+                                placeholder="Bank"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={bthEditForm.ven_act_branch}
+                                onChange={(e) => setBthEditForm({ ...bthEditForm, ven_act_branch: e.target.value })}
+                                placeholder="Branch"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="number"
+                                value={bthEditForm.thc_net_payable_amount}
+                                onChange={(e) => setBthEditForm({ ...bthEditForm, thc_net_payable_amount: parseFloat(e.target.value) || 0 })}
+                                placeholder="Net Payable Amount"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <input
+                                type="text"
+                                value={bthEditForm.thc_balance_pmt_utr_details}
+                                onChange={(e) => setBthEditForm({ ...bthEditForm, thc_balance_pmt_utr_details: e.target.value })}
+                                placeholder="UTR Details"
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
+                              />
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={saveEditBth}
+                                  className="px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => setEditingBth(null)}
+                                  className="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs">
+                              <div>{record.ven_act_name || '-'}</div>
+                              <div className="text-gray-400">{record.ven_act_number || ''}</div>
+                              <div className="text-gray-400">{record.ven_act_bank || ''} {record.ven_act_ifsc || ''}</div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {record.zoho_ath_sync_status === 'synced' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full">
+                              <CheckCircle className="w-3 h-3" />
+                              Pushed
+                            </span>
+                          ) : record.zoho_ath_sync_status === 'failed' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
+                              <AlertCircle className="w-3 h-3" />
+                              Failed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-full">
+                              <Clock className="w-3 h-3" />
+                              Not Pushed
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {record.zoho_bth_sync_status === 'synced' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full">
+                              <CheckCircle className="w-3 h-3" />
+                              Pushed
+                            </span>
+                          ) : record.zoho_bth_sync_status === 'failed' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
+                              <AlertCircle className="w-3 h-3" />
+                              Failed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-full">
+                              <Clock className="w-3 h-3" />
+                              Not Pushed
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => setViewingBth(record)}
+                              className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="View"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            {editingBth !== record.thc_id && (
+                              <button
+                                onClick={() => startEditBth(record)}
+                                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Edit"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => submitBthPayment(record)}
+                              disabled={submittingBth === record.thc_id || record.zoho_ath_sync_status !== 'synced'}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                              title={record.zoho_ath_sync_status !== 'synced' ? 'ATH must be pushed first' : 'Submit BTH Payment to Zoho'}
+                            >
+                              {submittingBth === record.thc_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* View modal */}
+          {viewingBth && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                  <h2 className="text-lg font-bold text-gray-900">BTH Payment Details</h2>
+                  <button onClick={() => setViewingBth(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><p className="text-xs text-gray-500 uppercase">THC Number</p><p className="font-medium text-gray-900">{viewingBth.thc_id_number}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">LR Number</p><p className="font-medium text-gray-900">{viewingBth.lr_number || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Vendor</p><p className="font-medium text-gray-900">{viewingBth.vendor_name}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Vehicle</p><p className="font-medium text-gray-900">{viewingBth.vehicle_number || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Origin</p><p className="font-medium text-gray-900">{viewingBth.origin || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Destination</p><p className="font-medium text-gray-900">{viewingBth.destination || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Vehicle Type</p><p className="font-medium text-gray-900">{viewingBth.vehicle_type || '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Balance Pmt Date</p><p className="font-medium text-gray-900">{viewingBth.thc_balance_payment_date ? new Date(viewingBth.thc_balance_payment_date).toLocaleDateString('en-GB') : '-'}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">THC Amount</p><p className="font-medium text-gray-900">₹{(viewingBth.thc_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Advance Amount</p><p className="font-medium text-gray-900">₹{(viewingBth.thc_advance_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Net Payable</p><p className="font-medium text-gray-900">₹{(viewingBth.thc_net_payable_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">UTR Details</p><p className="font-medium text-gray-900">{viewingBth.thc_balance_pmt_utr_details || '-'}</p></div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-4">
+                    <p className="text-xs text-gray-500 uppercase mb-2">Bank Account Details</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><p className="text-xs text-gray-400">Account Name</p><p className="font-medium text-gray-900">{viewingBth.ven_act_name || '-'}</p></div>
+                      <div><p className="text-xs text-gray-400">Account Number</p><p className="font-medium text-gray-900">{viewingBth.ven_act_number || '-'}</p></div>
+                      <div><p className="text-xs text-gray-400">IFSC Code</p><p className="font-medium text-gray-900">{viewingBth.ven_act_ifsc || '-'}</p></div>
+                      <div><p className="text-xs text-gray-400">Bank</p><p className="font-medium text-gray-900">{viewingBth.ven_act_bank || '-'}</p></div>
+                      <div><p className="text-xs text-gray-400">Branch</p><p className="font-medium text-gray-900">{viewingBth.ven_act_branch || '-'}</p></div>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 pt-4">
+                    <p className="text-xs text-gray-500 uppercase mb-2">Zoho Sync Status</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-gray-400">ATH Payment</p>
+                        <p className="font-medium text-gray-900">{viewingBth.zoho_ath_sync_status || 'not_synced'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">BTH Payment</p>
+                        <p className="font-medium text-gray-900">{viewingBth.zoho_bth_sync_status || 'not_synced'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 p-4 bg-gray-50 border-t border-gray-200">
+                  <button onClick={() => setViewingBth(null)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                     Close
                   </button>
                 </div>

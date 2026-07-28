@@ -2111,6 +2111,201 @@ Deno.serve(async (req: Request) => {
       }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── Push a single BTH (balance) payment to Zoho Books ──
+    if (action === 'push-bth-payment') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const body = await req.json().catch(() => ({}));
+      const thcId = (body as { thc_id?: string }).thc_id;
+
+      if (!thcId) {
+        return new Response(JSON.stringify({ error: 'Missing thc_id' }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Fetch the THC record
+      const { data: thc, error: thcError } = await supabase
+        .from('thc_details')
+        .select(`
+          thc_id, thc_id_number, thc_number, thc_vendor,
+          thc_net_payable_amount, thc_balance_payment_date,
+          thc_balance_pmt_utr_details,
+          ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank,
+          lr_number, zoho_books_id, zoho_sync_status,
+          zoho_ath_sync_status, zoho_ath_payment_id,
+          vendor_master:thc_vendor (vendor_code, vendor_name, zoho_vendor_id)
+        `)
+        .eq('thc_id', thcId)
+        .maybeSingle();
+
+      if (thcError) throw thcError;
+      if (!thc) {
+        return new Response(JSON.stringify({ error: `THC record ${thcId} not found` }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const vendor = (thc as any).vendor_master;
+      if (!vendor?.zoho_vendor_id) {
+        return new Response(JSON.stringify({
+          error: `Vendor "${vendor?.vendor_name || 'Unknown'}" is not linked to Zoho Books. Run Vendor Sync first.`,
+        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Require ATH to be synced first
+      const athStatus = (thc as any).zoho_ath_sync_status || 'not_synced';
+      if (athStatus !== 'synced') {
+        return new Response(JSON.stringify({
+          error: `ATH payment has not been pushed to Zoho Books yet (status: ${athStatus}). Push the ATH payment first, then push the BTH payment.`,
+        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const netPayable = parseFloat((thc as any).thc_net_payable_amount || '0');
+      if (netPayable <= 0) {
+        return new Response(JSON.stringify({ error: 'Net payable amount is zero — nothing to pay.' }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Resolve bank account from Zoho
+      const bankUrl = new URL(`${apiDomain}/books/v3/bankaccounts`);
+      bankUrl.searchParams.set('organization_id', orgId);
+      const bankRes = await fetch(bankUrl.toString(), {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const bankData = await bankRes.json();
+
+      if (bankData.code !== undefined && bankData.code !== 0) {
+        return new Response(JSON.stringify({ error: `Failed to fetch bank accounts: ${bankData.message}` }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const bankAccounts = (bankData.bankaccounts || []) as Record<string, any>[];
+      const bankAccount = bankAccounts.find(
+        (a) => (a.account_name || '').toLowerCase().includes('hdfc')
+      ) || bankAccounts[0];
+
+      if (!bankAccount) {
+        return new Response(JSON.stringify({ error: 'No bank accounts found in Zoho Books.' }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const paymentDate = (thc as any).thc_balance_payment_date
+        ? new Date((thc as any).thc_balance_payment_date).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+
+      const lrNumber = (thc as any).lr_number || (thc as any).thc_number || '';
+      const refNumber = (thc as any).thc_id_number || (thc as any).thc_number || thcId;
+      const storedBillId = (thc as any).zoho_books_id || null;
+
+      // Use the stored Zoho bill ID from the purchases push if available
+      let zohoBillId: string | null = storedBillId;
+
+      if (!zohoBillId) {
+        if (!lrNumber) {
+          return new Response(JSON.stringify({
+            error: 'No LR number found on this THC record — cannot link payment to a bill.',
+          }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Fall back to searching Zoho Books for the purchase bill by bill_number (= LR number)
+        const billSearchUrl = new URL(`${apiDomain}/books/v3/bills`);
+        billSearchUrl.searchParams.set('organization_id', orgId);
+        billSearchUrl.searchParams.set('vendor_id', vendor.zoho_vendor_id);
+        billSearchUrl.searchParams.set('bill_number', lrNumber);
+
+        const billSearchRes = await fetch(billSearchUrl.toString(), {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        const billSearchData = await billSearchRes.json();
+
+        if (billSearchData.code !== undefined && billSearchData.code !== 0) {
+          return new Response(JSON.stringify({
+            error: `Failed to search for bill in Zoho Books: ${billSearchData.message}`,
+          }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        const zohoBills = (billSearchData.bills || []) as Record<string, any>[];
+        if (zohoBills.length === 0) {
+          return new Response(JSON.stringify({
+            error: `No purchase bill found in Zoho Books for LR number "${lrNumber}". Push the bill (via Push Purchases) first, then push the BTH payment.`,
+          }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        zohoBillId = zohoBills[0].bill_id;
+      }
+
+      const utrDetails = (thc as any).thc_balance_pmt_utr_details || '';
+
+      const paymentPayload: Record<string, any> = {
+        vendor_id: vendor.zoho_vendor_id,
+        payment_mode: 'banktransfer',
+        amount: netPayable,
+        date: paymentDate,
+        paid_through_account_id: bankAccount.account_id,
+        reference_number: utrDetails || refNumber,
+        description: `Balance Payment (BTH) — ${refNumber}`,
+        bills: [{ bill_id: zohoBillId, amount_applied: netPayable }],
+      };
+
+      const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
+      payUrl.searchParams.set('organization_id', orgId);
+
+      const payRes = await fetch(payUrl.toString(), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `JSONString=${encodeURIComponent(JSON.stringify(paymentPayload))}`,
+      });
+      const payData = await payRes.json();
+
+      const bthPayment = payData.vendorpayment || payData.payment;
+      if (payData.code === 0 && bthPayment) {
+        await supabase
+          .from('thc_details')
+          .update({
+            zoho_bth_payment_id: bthPayment.payment_id,
+            zoho_bth_sync_status: 'synced',
+            zoho_synced_at: new Date().toISOString(),
+          } as any)
+          .eq('thc_id', thcId);
+
+        return new Response(JSON.stringify({
+          success: true,
+          zoho_payment_id: bthPayment.payment_id,
+          zoho_payment_number: bthPayment.payment_number || '',
+          zoho_bill_id: zohoBillId,
+          thc_id: thcId,
+          thc_number: refNumber,
+          vendor_name: vendor.vendor_name,
+          amount: netPayable,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Mark as failed in DB so UI can reflect it
+      await supabase
+        .from('thc_details')
+        .update({ zoho_bth_sync_status: 'failed' } as any)
+        .eq('thc_id', thcId);
+
+      console.error('[Zoho] BTH payment push failed:', JSON.stringify(payData));
+      return new Response(JSON.stringify({
+        error: payData.message || 'Failed to create BTH payment in Zoho Books',
+        zoho_error: payData,
+      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
