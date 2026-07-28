@@ -2131,7 +2131,7 @@ Deno.serve(async (req: Request) => {
         .from('thc_details')
         .select(`
           thc_id, thc_id_number, thc_number, thc_vendor,
-          thc_net_payable_amount, thc_balance_payment_date,
+          thc_balance_amount, thc_balance_payment_date,
           thc_balance_pmt_utr_details,
           ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank,
           lr_number, zoho_books_id, zoho_sync_status,
@@ -2164,9 +2164,9 @@ Deno.serve(async (req: Request) => {
         }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const netPayable = parseFloat((thc as any).thc_net_payable_amount || '0');
-      if (netPayable <= 0) {
-        return new Response(JSON.stringify({ error: 'Net payable amount is zero — nothing to pay.' }), {
+      const balanceAmount = parseFloat((thc as any).thc_balance_amount || '0');
+      if (balanceAmount <= 0) {
+        return new Response(JSON.stringify({ error: 'Balance amount is zero — nothing to pay.' }), {
           status: 422,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -2249,12 +2249,12 @@ Deno.serve(async (req: Request) => {
       const paymentPayload: Record<string, any> = {
         vendor_id: vendor.zoho_vendor_id,
         payment_mode: 'banktransfer',
-        amount: netPayable,
+        amount: balanceAmount,
         date: paymentDate,
         paid_through_account_id: bankAccount.account_id,
         reference_number: utrDetails || refNumber,
         description: `Balance Payment (BTH) — ${refNumber}`,
-        bills: [{ bill_id: zohoBillId, amount_applied: netPayable }],
+        bills: [{ bill_id: zohoBillId, amount_applied: balanceAmount }],
       };
 
       const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
@@ -2289,7 +2289,7 @@ Deno.serve(async (req: Request) => {
           thc_id: thcId,
           thc_number: refNumber,
           vendor_name: vendor.vendor_name,
-          amount: netPayable,
+          amount: balanceAmount,
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 

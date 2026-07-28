@@ -174,7 +174,7 @@ interface BthRecord {
   vendor_name: string;
   thc_amount: number | null;
   thc_advance_amount: number | null;
-  thc_net_payable_amount: number | null;
+  thc_balance_amount: number | null;
   ven_act_name: string | null;
   ven_act_number: string | null;
   ven_act_ifsc: string | null;
@@ -248,7 +248,7 @@ export default function ZohoBooksIntegration() {
   const [loadingBth, setLoadingBth] = useState(false);
   const [bthError, setBthError] = useState('');
   const [editingBth, setEditingBth] = useState<string | null>(null);
-  const [bthEditForm, setBthEditForm] = useState({ ven_act_name: '', ven_act_number: '', ven_act_ifsc: '', ven_act_bank: '', ven_act_branch: '', thc_net_payable_amount: 0, thc_balance_pmt_utr_details: '' });
+  const [bthEditForm, setBthEditForm] = useState({ ven_act_name: '', ven_act_number: '', ven_act_ifsc: '', ven_act_bank: '', ven_act_branch: '', thc_balance_amount: 0, thc_balance_pmt_utr_details: '' });
   const [viewingBth, setViewingBth] = useState<BthRecord | null>(null);
   const [submittingBth, setSubmittingBth] = useState<string | null>(null);
 
@@ -518,7 +518,7 @@ export default function ZohoBooksIntegration() {
         .select(`
           thc_id, thc_id_number, lr_number, origin, destination,
           vehicle_type, vehicle_number, thc_vendor,
-          thc_amount, thc_advance_amount, thc_net_payable_amount,
+          thc_amount, thc_advance_amount, thc_balance_amount,
           ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank, ven_act_branch,
           thc_balance_payment_date, thc_balance_pmt_utr_details, thc_date,
           zoho_ath_sync_status, zoho_bth_sync_status, zoho_bth_payment_id, zoho_books_id
@@ -585,7 +585,7 @@ export default function ZohoBooksIntegration() {
       ven_act_ifsc: record.ven_act_ifsc || '',
       ven_act_bank: record.ven_act_bank || '',
       ven_act_branch: record.ven_act_branch || '',
-      thc_net_payable_amount: record.thc_net_payable_amount || 0,
+      thc_balance_amount: record.thc_balance_amount || 0,
       thc_balance_pmt_utr_details: record.thc_balance_pmt_utr_details || '',
     });
   };
@@ -601,7 +601,7 @@ export default function ZohoBooksIntegration() {
           ven_act_ifsc: bthEditForm.ven_act_ifsc,
           ven_act_bank: bthEditForm.ven_act_bank,
           ven_act_branch: bthEditForm.ven_act_branch,
-          thc_net_payable_amount: bthEditForm.thc_net_payable_amount,
+          thc_balance_amount: bthEditForm.thc_balance_amount,
           thc_balance_pmt_utr_details: bthEditForm.thc_balance_pmt_utr_details,
         } as any)
         .eq('thc_id', editingBth);
@@ -638,7 +638,7 @@ export default function ZohoBooksIntegration() {
   };
 
   const bthTotalAmount = useMemo(() => {
-    return bthRecords.reduce((sum, r) => sum + (r.thc_net_payable_amount || 0), 0);
+    return bthRecords.reduce((sum, r) => sum + (r.thc_balance_amount || 0), 0);
   }, [bthRecords]);
 
   const handleConnect = async () => {
@@ -2650,7 +2650,7 @@ export default function ZohoBooksIntegration() {
               </div>
               <div className="h-8 w-px bg-gray-200" />
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Total Net Payable</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wide">Total Balance Payable</p>
                 <p className="text-xl font-bold text-gray-900">₹{bthTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
@@ -2692,7 +2692,7 @@ export default function ZohoBooksIntegration() {
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Vendor</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Vehicle</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Route</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Net Payable</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-700">Balance Amount</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Balance Pmt Date</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Bank Account</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">ATH Status</th>
@@ -2711,7 +2711,7 @@ export default function ZohoBooksIntegration() {
                           {record.origin || '-'} → {record.destination || '-'}
                         </td>
                         <td className="px-4 py-3 text-right font-medium text-gray-900">
-                          ₹{(record.thc_net_payable_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ₹{(record.thc_balance_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {record.thc_balance_payment_date ? new Date(record.thc_balance_payment_date).toLocaleDateString('en-GB') : '-'}
@@ -2756,9 +2756,9 @@ export default function ZohoBooksIntegration() {
                               />
                               <input
                                 type="number"
-                                value={bthEditForm.thc_net_payable_amount}
-                                onChange={(e) => setBthEditForm({ ...bthEditForm, thc_net_payable_amount: parseFloat(e.target.value) || 0 })}
-                                placeholder="Net Payable Amount"
+                                value={bthEditForm.thc_balance_amount}
+                                onChange={(e) => setBthEditForm({ ...bthEditForm, thc_balance_amount: parseFloat(e.target.value) || 0 })}
+                                placeholder="Balance Amount"
                                 className="w-full px-2 py-1 text-xs border border-gray-300 rounded"
                               />
                               <input
@@ -2889,7 +2889,7 @@ export default function ZohoBooksIntegration() {
                     <div><p className="text-xs text-gray-500 uppercase">Balance Pmt Date</p><p className="font-medium text-gray-900">{viewingBth.thc_balance_payment_date ? new Date(viewingBth.thc_balance_payment_date).toLocaleDateString('en-GB') : '-'}</p></div>
                     <div><p className="text-xs text-gray-500 uppercase">THC Amount</p><p className="font-medium text-gray-900">₹{(viewingBth.thc_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
                     <div><p className="text-xs text-gray-500 uppercase">Advance Amount</p><p className="font-medium text-gray-900">₹{(viewingBth.thc_advance_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
-                    <div><p className="text-xs text-gray-500 uppercase">Net Payable</p><p className="font-medium text-gray-900">₹{(viewingBth.thc_net_payable_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Balance Amount</p><p className="font-medium text-gray-900">₹{(viewingBth.thc_balance_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
                     <div><p className="text-xs text-gray-500 uppercase">UTR Details</p><p className="font-medium text-gray-900">{viewingBth.thc_balance_pmt_utr_details || '-'}</p></div>
                   </div>
                   <div className="border-t border-gray-200 pt-4">
