@@ -1608,21 +1608,92 @@ Deno.serve(async (req: Request) => {
           console.error('[Zoho] Bill push failed:', JSON.stringify(createData));
           const zohoMsg = createData.message || 'unknown error';
 
-          // Mark as failed in the database
-          await supabase
-            .from('thc_details')
-            .update({ zoho_sync_status: 'failed' })
-            .eq('thc_id', thc.thc_id);
+          // Zoho error code 36026 = "A bill already exists with this bill number"
+          // Also catch common duplicate-related message text as a safety net
+          const isDuplicate =
+            createData.code === 36026 ||
+            (typeof zohoMsg === 'string' && (
+              zohoMsg.toLowerCase().includes('already exists') ||
+              zohoMsg.toLowerCase().includes('duplicate') ||
+              zohoMsg.toLowerCase().includes('bill number')
+            ));
 
-          result.errors++;
-          result.details.push({
-            thc_id: thc.thc_id,
-            thc_number: thc.thc_number || '',
-            vendor_name: vendor.vendor_name || '',
-            amount,
-            status: 'api-error',
-            detail: zohoMsg,
-          });
+          if (isDuplicate) {
+            // The bill is already in Zoho — search for it by bill_number (LR number)
+            // so we can link TMS to the existing Zoho bill and mark it synced.
+            let existingBillId: string | null = null;
+            let existingBillNumber: string | null = null;
+            try {
+              const searchUrl = new URL(`${apiDomain}/books/v3/bills`);
+              searchUrl.searchParams.set('organization_id', orgId);
+              searchUrl.searchParams.set('bill_number', lrNumber);
+              const searchRes = await fetch(searchUrl.toString(), {
+                headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+              });
+              const searchData = await searchRes.json();
+              const found = (searchData.bills || []) as Record<string, any>[];
+              if (found.length > 0) {
+                existingBillId = found[0].bill_id as string;
+                existingBillNumber = found[0].bill_number as string;
+              }
+            } catch (_) { /* best-effort */ }
+
+            if (existingBillId) {
+              // Link TMS record to the existing Zoho bill and mark it synced
+              await supabase
+                .from('thc_details')
+                .update({
+                  zoho_books_id: existingBillId,
+                  zoho_sync_status: 'synced',
+                  zoho_synced_at: new Date().toISOString(),
+                })
+                .eq('thc_id', thc.thc_id);
+
+              result.skipped++;
+              result.details.push({
+                thc_id: thc.thc_id,
+                thc_number: thc.thc_number || '',
+                vendor_name: vendor.vendor_name || '',
+                amount,
+                zoho_bill_id: existingBillId,
+                zoho_bill_number: existingBillNumber || lrNumber,
+                status: 'skipped',
+                detail: `Bill already exists in Zoho Books (bill number: ${lrNumber}). TMS has been linked to the existing bill and marked as Pushed.`,
+              });
+            } else {
+              // Could not find the existing bill — mark failed so user can investigate
+              await supabase
+                .from('thc_details')
+                .update({ zoho_sync_status: 'failed' })
+                .eq('thc_id', thc.thc_id);
+
+              result.errors++;
+              result.details.push({
+                thc_id: thc.thc_id,
+                thc_number: thc.thc_number || '',
+                vendor_name: vendor.vendor_name || '',
+                amount,
+                status: 'api-error',
+                detail: `Duplicate bill detected in Zoho but could not locate it by bill number "${lrNumber}". Please check Zoho manually.`,
+              });
+            }
+          } else {
+            // Genuine non-duplicate error — mark as failed so it can be retried
+            await supabase
+              .from('thc_details')
+              .update({ zoho_sync_status: 'failed' })
+              .eq('thc_id', thc.thc_id);
+
+            result.errors++;
+            result.details.push({
+              thc_id: thc.thc_id,
+              thc_number: thc.thc_number || '',
+              vendor_name: vendor.vendor_name || '',
+              amount,
+              status: 'api-error',
+              detail: zohoMsg,
+            });
+          }
         }
       }
 
