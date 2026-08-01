@@ -45,6 +45,13 @@ interface GenerateBillModalProps {
   onBillGenerated: () => void;
 }
 
+interface CompanyGSTNumber {
+  id: string;
+  gst_number: string;
+  label: string | null;
+  custom_fields: { label: string; value: string }[];
+}
+
 export default function GenerateBillModal({
   isOpen,
   onClose,
@@ -56,6 +63,8 @@ export default function GenerateBillModal({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [customerGSTOptions, setCustomerGSTOptions] = useState<CustomerGST[]>([]);
   const [sacCodes, setSacCodes] = useState<SACCode[]>([]);
+  const [companyGSTNumbers, setCompanyGSTNumbers] = useState<CompanyGSTNumber[]>([]);
+  const [selectedCompanyGSTId, setSelectedCompanyGSTId] = useState('');
   const [formData, setFormData] = useState({
     bill_generation_branch: '',
     bill_number: '',
@@ -73,6 +82,7 @@ export default function GenerateBillModal({
     if (isOpen) {
       fetchCompanies();
       fetchSACCodes();
+      fetchCompanyGSTNumbers();
       generateBillNumber();
       if (selectedLRs.length > 0) {
         fetchCustomerDetails();
@@ -119,6 +129,21 @@ export default function GenerateBillModal({
       setSacCodes(data || []);
     } catch (error) {
       console.error('Error fetching SAC codes:', error);
+    }
+  };
+
+  const fetchCompanyGSTNumbers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('company_gst_numbers')
+        .select('id, gst_number, label, custom_fields')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setCompanyGSTNumbers((data || []) as CompanyGSTNumber[]);
+    } catch (error) {
+      console.error('Error fetching company GST numbers:', error);
     }
   };
 
@@ -252,10 +277,17 @@ export default function GenerateBillModal({
       return;
     }
 
+    if (!selectedCompanyGSTId) {
+      alert('Please select a Company GST Number');
+      return;
+    }
+
     setLoading(true);
     try {
       const subTotal = calculateSubTotal();
       const billAmount = subTotal;
+
+      const selectedCompanyGST = companyGSTNumbers.find(g => g.id === selectedCompanyGSTId);
 
       const billRecord = {
         tran_id: selectedLRs[0].tran_id,
@@ -273,6 +305,7 @@ export default function GenerateBillModal({
         bill_amount: billAmount,
         sac_code: formData.sac_code || null,
         sac_description: formData.sac_description || null,
+        company_gst_number: selectedCompanyGST?.gst_number || null,
         lr_bill_status: 'Generated',
         bill_status: 'Active',
         created_by: user?.id,
@@ -451,6 +484,47 @@ export default function GenerateBillModal({
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Company GST Number <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                value={selectedCompanyGSTId}
+                onChange={(e) => setSelectedCompanyGSTId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">-- Select GST Number --</option>
+                {companyGSTNumbers.map((gst) => (
+                  <option key={gst.id} value={gst.id}>
+                    {gst.label ? `${gst.label} - ${gst.gst_number}` : gst.gst_number}
+                  </option>
+                ))}
+              </select>
+              {selectedCompanyGSTId && (() => {
+                const selected = companyGSTNumbers.find(g => g.id === selectedCompanyGSTId);
+                if (!selected) return null;
+                return (
+                  <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Reference Info</p>
+                    <div className="text-sm text-gray-700">
+                      <span className="font-medium">GST Number:</span> {selected.gst_number}
+                      {selected.label && <span className="ml-3"><span className="font-medium">Label:</span> {selected.label}</span>}
+                    </div>
+                    {selected.custom_fields && selected.custom_fields.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                        {selected.custom_fields.map((f, i) => (
+                          <span key={i} className="text-sm text-gray-600">
+                            <span className="font-medium">{f.label}:</span> {f.value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="md:col-span-2">

@@ -43,6 +43,7 @@ interface BillDetails {
   sac_code: string | null;
   sac_description: string | null;
   tran_id: string | null;
+  company_gst_number: string | null;
 }
 
 interface LRDetails {
@@ -275,6 +276,12 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                       <span className="font-semibold">GSTIN:</span>{' '}
                       {company?.gstin || '-'}
                     </p>
+                    {bill?.company_gst_number && (
+                      <p className="text-gray-700">
+                        <span className="font-semibold">Bill GSTIN:</span>{' '}
+                        {bill.company_gst_number}
+                      </p>
+                    )}
                     <p className="text-gray-700">
                       <span className="font-semibold">CIN:</span>{' '}
                       {company?.cin || '-'}

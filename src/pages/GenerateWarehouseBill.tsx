@@ -33,6 +33,13 @@ interface Company {
   gstin: string;
 }
 
+interface CompanyGSTNumber {
+  id: string;
+  gst_number: string;
+  label: string | null;
+  custom_fields: { label: string; value: string }[];
+}
+
 interface CustomerBranch {
   branch_id: string;
   branch_name: string;
@@ -56,6 +63,8 @@ export default function GenerateWarehouseBill() {
   const [customerGSTs, setCustomerGSTs] = useState<CustomerGST[]>([]);
   const [sacCodes, setSACCodes] = useState<SACCode[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [companyGSTNumbers, setCompanyGSTNumbers] = useState<CompanyGSTNumber[]>([]);
+  const [selectedCompanyGSTId, setSelectedCompanyGSTId] = useState('');
   const [customerBranches, setCustomerBranches] = useState<CustomerBranch[]>([]);
   const [customerRates, setCustomerRates] = useState<CustomerRate[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,15 +125,17 @@ export default function GenerateWarehouseBill() {
 
   const fetchMasterData = async () => {
     try {
-      const [customerGSTData, sacCodesData, companiesData] = await Promise.all([
+      const [customerGSTData, sacCodesData, companiesData, companyGSTData] = await Promise.all([
         supabase.from('customer_gst_master').select('*, state_master(state_name)').eq('is_active', true).order('customer_name'),
         supabase.from('sac_code_master').select('*').eq('is_active', true).order('sac_code'),
-        supabase.from('company_master').select('*').order('company_name')
+        supabase.from('company_master').select('*').order('company_name'),
+        supabase.from('company_gst_numbers').select('id, gst_number, label, custom_fields').order('created_at', { ascending: true })
       ]);
 
       if (customerGSTData.error) throw customerGSTData.error;
       if (sacCodesData.error) throw sacCodesData.error;
       if (companiesData.error) throw companiesData.error;
+      if (companyGSTData.error) throw companyGSTData.error;
 
       const gstData = customerGSTData.data || [];
       setAllCustomerGSTs(gstData);
@@ -142,6 +153,7 @@ export default function GenerateWarehouseBill() {
 
       setSACCodes(sacCodesData.data || []);
       setCompanies(companiesData.data || []);
+      setCompanyGSTNumbers((companyGSTData.data || []) as CompanyGSTNumber[]);
     } catch (error) {
       console.error('Error fetching master data:', error);
       alert('Error loading master data');
@@ -316,6 +328,11 @@ export default function GenerateWarehouseBill() {
       return;
     }
 
+    if (!selectedCompanyGSTId) {
+      alert('Please select a Company GST Number');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -330,6 +347,8 @@ export default function GenerateWarehouseBill() {
       }
 
       const billNumber = billNumberData;
+
+      const selectedCompanyGST = companyGSTNumbers.find(g => g.id === selectedCompanyGSTId);
 
       const { error: insertError } = await supabase
         .from('warehouse_bill')
@@ -366,6 +385,7 @@ export default function GenerateWarehouseBill() {
           bill_status: formData.bill_status,
           tds_applicable: formData.tds_applicable,
           tds_amount: formData.tds_amount,
+          company_gst_number: selectedCompanyGST?.gst_number || null,
           remarks: formData.remarks,
           created_by: user?.id
         }]);
@@ -425,6 +445,7 @@ export default function GenerateWarehouseBill() {
     setCustomerGSTs([]);
     setCustomerBranches([]);
     setCustomerRates([]);
+    setSelectedCompanyGSTId('');
   };
 
   return (
@@ -538,6 +559,47 @@ export default function GenerateWarehouseBill() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Company GST Number <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                value={selectedCompanyGSTId}
+                onChange={(e) => setSelectedCompanyGSTId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- Select GST Number --</option>
+                {companyGSTNumbers.map((gst) => (
+                  <option key={gst.id} value={gst.id}>
+                    {gst.label ? `${gst.label} - ${gst.gst_number}` : gst.gst_number}
+                  </option>
+                ))}
+              </select>
+              {selectedCompanyGSTId && (() => {
+                const selected = companyGSTNumbers.find(g => g.id === selectedCompanyGSTId);
+                if (!selected) return null;
+                return (
+                  <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Reference Info</p>
+                    <div className="text-sm text-gray-700">
+                      <span className="font-medium">GST Number:</span> {selected.gst_number}
+                      {selected.label && <span className="ml-3"><span className="font-medium">Label:</span> {selected.label}</span>}
+                    </div>
+                    {selected.custom_fields && selected.custom_fields.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                        {selected.custom_fields.map((f, i) => (
+                          <span key={i} className="text-sm text-gray-600">
+                            <span className="font-medium">{f.label}:</span> {f.value}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="md:col-span-2">

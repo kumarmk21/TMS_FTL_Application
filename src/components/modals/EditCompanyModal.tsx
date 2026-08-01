@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
-import { X, Upload, Building2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X, Upload, Building2, Plus, Pencil, Trash2, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { CompanyGSTModal } from './CompanyGSTModal';
+import type { CompanyGSTNumber } from '../../hooks/useCompanyGSTNumbers';
 
 interface Company {
   id: string;
@@ -46,6 +48,9 @@ export function EditCompanyModal({ company, onClose, onSuccess }: EditCompanyMod
   const [branches, setBranches] = useState<Branch[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
+  const [gstNumbers, setGstNumbers] = useState<CompanyGSTNumber[]>([]);
+  const [showGSTModal, setShowGSTModal] = useState(false);
+  const [editingGST, setEditingGST] = useState<CompanyGSTNumber | null>(null);
   const [formData, setFormData] = useState({
     company_name: company.company_name,
     company_tagline: company.company_tagline || '',
@@ -73,7 +78,38 @@ export function EditCompanyModal({ company, onClose, onSuccess }: EditCompanyMod
   useEffect(() => {
     fetchBranches();
     fetchCities();
+    fetchGSTNumbers();
   }, []);
+
+  const fetchGSTNumbers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('company_gst_numbers')
+        .select('*')
+        .eq('company_id', company.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setGstNumbers((data || []) as CompanyGSTNumber[]);
+    } catch (error) {
+      console.error('Error fetching GST numbers:', error);
+    }
+  }, [company.id]);
+
+  const handleDeleteGST = async (gstId: string) => {
+    if (!confirm('Are you sure you want to delete this GST number?')) return;
+    try {
+      const { error } = await supabase
+        .from('company_gst_numbers')
+        .delete()
+        .eq('id', gstId);
+      if (error) throw error;
+      alert('GST Number deleted successfully!');
+      fetchGSTNumbers();
+    } catch (error: any) {
+      console.error('Error deleting GST number:', error);
+      alert(error.message || 'Failed to delete GST number');
+    }
+  };
 
   useEffect(() => {
     if (cities.length > 0 && formData.city_id) {
@@ -632,6 +668,76 @@ export function EditCompanyModal({ company, onClose, onSuccess }: EditCompanyMod
             </div>
           </div>
 
+          {/* Additional GST Numbers Section */}
+          <div className="mt-6 pt-6 border-t">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-semibold text-gray-800">Additional GST Numbers</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setEditingGST(null); setShowGSTModal(true); }}
+                className="flex items-center gap-1 text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add GST Number
+              </button>
+            </div>
+
+            {gstNumbers.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">
+                No additional GST numbers added yet.
+              </p>
+            ) : (
+              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">GST Number</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Custom Fields</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {gstNumbers.map((gst) => (
+                      <tr key={gst.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm text-gray-900 font-medium whitespace-nowrap">{gst.gst_number}</td>
+                        <td className="px-4 py-2 text-sm text-gray-500 whitespace-nowrap">{gst.label || '-'}</td>
+                        <td className="px-4 py-2 text-sm text-gray-500">
+                          {gst.custom_fields && gst.custom_fields.length > 0
+                            ? gst.custom_fields.map((f) => `${f.label}: ${f.value}`).join(', ')
+                            : '-'}
+                        </td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => { setEditingGST(gst); setShowGSTModal(true); }}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="Edit"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteGST(gst.id)}
+                              className="text-red-600 hover:text-red-800"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
             <button
               type="button"
@@ -650,6 +756,15 @@ export function EditCompanyModal({ company, onClose, onSuccess }: EditCompanyMod
           </div>
         </form>
       </div>
+
+      {showGSTModal && (
+        <CompanyGSTModal
+          companyId={company.id}
+          existingEntry={editingGST}
+          onClose={() => { setShowGSTModal(false); setEditingGST(null); }}
+          onSuccess={() => { setShowGSTModal(false); setEditingGST(null); fetchGSTNumbers(); }}
+        />
+      )}
     </div>
   );
 }

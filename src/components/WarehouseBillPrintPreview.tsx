@@ -50,6 +50,7 @@ interface WarehouseBillDetails {
   credit_days: number | null;
   bill_due_date: string | null;
   remarks: string | null;
+  company_gst_number: string | null;
 }
 
 interface WarehouseBillPrintPreviewProps {
@@ -257,6 +258,12 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                       <span className="font-semibold">GSTIN:</span>{' '}
                       {company?.gstin || '-'}
                     </p>
+                    {bill?.company_gst_number && (
+                      <p className="text-gray-700">
+                        <span className="font-semibold">Bill GSTIN:</span>{' '}
+                        {bill.company_gst_number}
+                      </p>
+                    )}
                     <p className="text-gray-700">
                       <span className="font-semibold">CIN:</span>{' '}
                       {company?.cin || '-'}

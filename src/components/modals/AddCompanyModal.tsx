@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Upload, Building2 } from 'lucide-react';
+import { X, Upload, Building2, FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface AddCompanyModalProps {
@@ -546,7 +546,16 @@ export function AddCompanyModal({ onClose, onSuccess }: AddCompanyModalProps) {
             </div>
 
             <div className="md:col-span-2 mt-4 pt-4 border-t">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Bill Footer Text (Optional)</h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Bill Footer Text (Optional)</h3>
+            </div>
+
+            <div className="md:col-span-2 mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 text-blue-800">
+                <FileText className="w-5 h-5" />
+                <p className="text-sm">
+                  <strong>Additional GST Numbers:</strong> Save the company first, then use the Edit option to add and manage multiple GST numbers with custom fields.
+                </p>
+              </div>
             </div>
 
             <div className="md:col-span-2">
