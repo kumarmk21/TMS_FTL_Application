@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, Save } from 'lucide-react';
+import { X, Save, UserCog } from 'lucide-react';
+import { ChangeBillingPartyModal } from './ChangeBillingPartyModal';
 
 interface Branch {
   id: string;
@@ -45,7 +46,9 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [billingPartyCode, setBillingPartyCode] = useState('');
+  const [billingPartyName, setBillingPartyName] = useState('');
   const [lrBillNumber, setLrBillNumber] = useState('');
+  const [showChangePartyModal, setShowChangePartyModal] = useState(false);
 
   const [formData, setFormData] = useState({
     lr_bill_date: '',
@@ -129,6 +132,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
       if (billData.data) {
         const bill = billData.data;
         setBillingPartyCode(bill.billing_party_code || '');
+        setBillingPartyName(bill.billing_party_name || '');
         setLrBillNumber(bill.lr_bill_number || '');
         setFormData({
           lr_bill_date: bill.lr_bill_date || '',
@@ -251,8 +255,20 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <h3 className="text-sm font-semibold text-blue-900 mb-3">Editable Fields</h3>
-            <p className="text-xs text-blue-700">You can edit the following fields: Bill Date, Bill To State, SAC Code, and Bill Generation Branch</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-blue-900 mb-1">Editable Fields</h3>
+                <p className="text-xs text-blue-700">You can edit the following fields: Bill Date, Bill To State, SAC Code, and Bill Generation Branch</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowChangePartyModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+              >
+                <UserCog className="w-4 h-4" />
+                Change Billing Party
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -476,6 +492,25 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           </div>
         </form>
       </div>
+
+      {showChangePartyModal && (
+        <ChangeBillingPartyModal
+          billId={billId}
+          billNumber={lrBillNumber}
+          tranId={tranId}
+          currentBillingPartyCode={billingPartyCode}
+          currentBillingPartyName={billingPartyName}
+          currentBillToGstin={formData.bill_to_gstin}
+          currentBillToState={formData.bill_to_state}
+          currentBillToAddress={formData.bill_to_address}
+          onClose={() => setShowChangePartyModal(false)}
+          onSuccess={() => {
+            setShowChangePartyModal(false);
+            fetchData();
+            onSuccess();
+          }}
+        />
+      )}
     </div>
   );
 }
