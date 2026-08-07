@@ -27,6 +27,12 @@ interface CompanyDetails {
   bill_footer3: string | null;
 }
 
+interface GSTEntry {
+  gst_number: string;
+  label: string | null;
+  custom_fields: { label: string; value: string }[] | null;
+}
+
 interface BillDetails {
   bill_id: string;
   lr_bill_number: string;
@@ -71,6 +77,7 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
   const [bill, setBill] = useState<BillDetails | null>(null);
   const [lrDetails, setLrDetails] = useState<LRDetails | null>(null);
   const [podImageUrls, setPodImageUrls] = useState<string[]>([]);
+  const [gstEntry, setGstEntry] = useState<GSTEntry | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -93,6 +100,15 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
 
       setCompany(companyResult.data);
       setBill(billResult.data);
+
+      if (billResult.data?.company_gst_number) {
+        const { data: gstData } = await supabase
+          .from('company_gst_numbers')
+          .select('gst_number, label, custom_fields')
+          .eq('gst_number', billResult.data.company_gst_number)
+          .maybeSingle();
+        setGstEntry(gstData);
+      }
 
       if (billResult.data?.lr_bill_number || billResult.data?.tran_id) {
         let lrResult;
@@ -262,12 +278,14 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                   <div>
                     <p className="text-gray-700">
                       <span className="font-semibold">Address:</span>{' '}
-                      {company?.company_address || '-'}
+                      {gstEntry?.custom_fields?.find(f => f.label === 'ADDRESS')?.value || company?.company_address || '-'}
                     </p>
-                    <p className="text-gray-700">
-                      <span className="font-semibold">PIN Code:</span>{' '}
-                      {company?.pin_code || '-'}
-                    </p>
+                    {!gstEntry && (
+                      <p className="text-gray-700">
+                        <span className="font-semibold">PIN Code:</span>{' '}
+                        {company?.pin_code || '-'}
+                      </p>
+                    )}
                     <p className="text-gray-700">
                       <span className="font-semibold">Contact:</span>{' '}
                       {company?.contact_number || '-'}
