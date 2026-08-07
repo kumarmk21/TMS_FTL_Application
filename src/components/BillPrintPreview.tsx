@@ -284,14 +284,8 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
                   <div>
                     <p className="text-gray-700">
                       <span className="font-semibold">GSTIN:</span>{' '}
-                      {company?.gstin || '-'}
+                      {bill?.company_gst_number || company?.gstin || '-'}
                     </p>
-                    {bill?.company_gst_number && (
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Bill GSTIN:</span>{' '}
-                        {bill.company_gst_number}
-                      </p>
-                    )}
                     <p className="text-gray-700">
                       <span className="font-semibold">CIN:</span>{' '}
                       {company?.cin || '-'}
