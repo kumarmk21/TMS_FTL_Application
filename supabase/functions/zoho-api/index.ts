@@ -1500,6 +1500,51 @@ Deno.serve(async (req: Request) => {
           thc.zoho_books_id = null;
         }
 
+        // ── Proactive duplicate check: search Zoho for an existing bill with this LR number ──
+        // This prevents creating duplicate bills when a THC was previously pushed (or manually
+        // created in Zoho) but the TMS record was not linked.
+        let preExistingBillId: string | null = null;
+        let preExistingBillNumber: string | null = null;
+        try {
+          const preSearchUrl = new URL(`${apiDomain}/books/v3/bills`);
+          preSearchUrl.searchParams.set('organization_id', orgId);
+          preSearchUrl.searchParams.set('bill_number', lrNumber);
+          const preSearchRes = await fetch(preSearchUrl.toString(), {
+            headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+          });
+          const preSearchData = await preSearchRes.json();
+          const preFound = (preSearchData.bills || []) as Record<string, any>[];
+          if (preFound.length > 0) {
+            preExistingBillId = preFound[0].bill_id as string;
+            preExistingBillNumber = (preFound[0].bill_number as string) || lrNumber;
+          }
+        } catch (_) { /* best-effort; if search fails, fall through to create attempt */ }
+
+        if (preExistingBillId) {
+          // Bill already exists in Zoho — link TMS to it and mark as synced (Pushed to Zoho)
+          await supabase
+            .from('thc_details')
+            .update({
+              zoho_books_id: preExistingBillId,
+              zoho_sync_status: 'synced',
+              zoho_synced_at: new Date().toISOString(),
+            })
+            .eq('thc_id', thc.thc_id);
+
+          result.skipped++;
+          result.details.push({
+            thc_id: thc.thc_id,
+            thc_number: thc.thc_number || '',
+            vendor_name: vendor.vendor_name || '',
+            amount,
+            zoho_bill_id: preExistingBillId,
+            zoho_bill_number: preExistingBillNumber,
+            status: 'skipped',
+            detail: `Bill already exists in Zoho Books (bill number: ${lrNumber}). TMS has been linked to the existing bill and marked as Pushed.`,
+          });
+          continue;
+        }
+
         // Build line items from THC charges
         const lineItems: Record<string, any>[] = [];
         const grossAmount = parseFloat(thc.thc_gross_amount || thc.thc_amount || '0');
