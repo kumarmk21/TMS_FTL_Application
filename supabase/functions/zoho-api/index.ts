@@ -1016,7 +1016,7 @@ Deno.serve(async (req: Request) => {
         let lrQuery = supabase
           .from('lr_bill')
           .select('bill_id, tran_id, lr_bill_number, lr_bill_date, lr_bill_due_date, billing_party_code, billing_party_name, bill_to_gstin, bill_to_state, sub_total, bill_amount, sac_code, sac_description, bill_status, credit_days, zoho_invoice_id')
-          .eq('bill_status', 'Active')
+          .in('bill_status', ['Active', 'Regenerated'])
           .is('zoho_invoice_id', null)
           .order('lr_bill_date', { ascending: false })
           .limit(50);
@@ -1152,12 +1152,12 @@ Deno.serve(async (req: Request) => {
       const { count: lrTotal } = await supabase
         .from('lr_bill')
         .select('*', { count: 'exact', head: true })
-        .eq('bill_status', 'Active');
+        .in('bill_status', ['Active', 'Regenerated']);
 
       const { count: lrSynced } = await supabase
         .from('lr_bill')
         .select('*', { count: 'exact', head: true })
-        .eq('bill_status', 'Active')
+        .in('bill_status', ['Active', 'Regenerated'])
         .not('zoho_invoice_id', 'is', null);
 
       const { count: whTotal } = await supabase

@@ -306,7 +306,7 @@ export default function ZohoBooksIntegration() {
       const { data: lrBills, error: lrError } = await supabase
         .from('lr_bill')
         .select('bill_id, lr_bill_number, lr_bill_date, billing_party_name, bill_amount, sub_total')
-        .eq('bill_status', 'Active')
+        .in('bill_status', ['Active', 'Regenerated'])
         .is('zoho_invoice_id', null)
         .order('lr_bill_date', { ascending: false })
         .limit(500);
@@ -356,7 +356,7 @@ export default function ZohoBooksIntegration() {
       const { data: lrBills, error: lrError } = await supabase
         .from('lr_bill')
         .select('bill_id, lr_bill_number, lr_bill_date, billing_party_name, bill_amount, sub_total, zoho_invoice_id, zoho_invoice_number, zoho_synced_at')
-        .eq('bill_status', 'Active')
+        .in('bill_status', ['Active', 'Regenerated'])
         .not('zoho_invoice_id', 'is', null)
         .order('zoho_synced_at', { ascending: false })
         .limit(500);
