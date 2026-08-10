@@ -96,7 +96,10 @@ export default function GenerateCustomerBill() {
         throw error;
       }
 
-      setUnbilledLRs(data || []);
+      const filtered = (data || []).filter(
+        lr => lr.pay_basis !== 'FOC' || (lr.lr_total_amount || 0) > 0
+      );
+      setUnbilledLRs(filtered);
       setShowResults(true);
       setSelectedLRs(new Set());
     } catch (error: any) {
