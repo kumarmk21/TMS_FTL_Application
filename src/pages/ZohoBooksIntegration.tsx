@@ -139,6 +139,18 @@ interface PendingInvoice {
   amount: number;
 }
 
+interface ProcessedInvoice {
+  bill_id: string;
+  bill_number: string;
+  bill_type: 'LR' | 'WH';
+  bill_date: string;
+  customer_name: string;
+  amount: number;
+  zoho_invoice_id: string;
+  zoho_invoice_number: string | null;
+  zoho_synced_at: string | null;
+}
+
 interface AthRecord {
   thc_id: string;
   thc_id_number: string;
@@ -217,6 +229,9 @@ export default function ZohoBooksIntegration() {
   const [pendingInvoices, setPendingInvoices] = useState<PendingInvoice[]>([]);
   const [loadingPending, setLoadingPending] = useState(false);
   const [selectedBillIds, setSelectedBillIds] = useState<Set<string>>(new Set());
+  const [processedInvoices, setProcessedInvoices] = useState<ProcessedInvoice[]>([]);
+  const [loadingProcessed, setLoadingProcessed] = useState(false);
+  const [invoiceView, setInvoiceView] = useState<'pending' | 'processed'>('pending');
   const [showGstWarning, setShowGstWarning] = useState(false);
   const [pendingPushAction, setPendingPushAction] = useState<(() => void) | null>(null);
 
@@ -274,6 +289,7 @@ export default function ZohoBooksIntegration() {
         await fetchSyncStats();
         await fetchInvoiceStats();
         await fetchPendingInvoices();
+        await fetchProcessedInvoices();
         await fetchPurchaseStats();
         await fetchPendingTHCs();
       }
@@ -331,6 +347,62 @@ export default function ZohoBooksIntegration() {
       console.error('Failed to fetch pending invoices:', err);
     } finally {
       setLoadingPending(false);
+    }
+  }, []);
+
+  const fetchProcessedInvoices = useCallback(async () => {
+    setLoadingProcessed(true);
+    try {
+      const { data: lrBills, error: lrError } = await supabase
+        .from('lr_bill')
+        .select('bill_id, lr_bill_number, lr_bill_date, billing_party_name, bill_amount, sub_total, zoho_invoice_id, zoho_invoice_number, zoho_synced_at')
+        .eq('bill_status', 'Active')
+        .not('zoho_invoice_id', 'is', null)
+        .order('zoho_synced_at', { ascending: false })
+        .limit(500);
+
+      if (lrError) throw lrError;
+
+      const { data: whBills, error: whError } = await supabase
+        .from('warehouse_bill')
+        .select('bill_id, bill_number, bill_date, billing_party_name, total_amount, sub_total, zoho_invoice_id, zoho_invoice_number, zoho_synced_at')
+        .not('zoho_invoice_id', 'is', null)
+        .order('zoho_synced_at', { ascending: false })
+        .limit(500);
+
+      if (whError) throw whError;
+
+      const processed: ProcessedInvoice[] = [
+        ...(lrBills || []).map((b: any) => ({
+          bill_id: b.bill_id,
+          bill_number: b.lr_bill_number || '',
+          bill_type: 'LR' as const,
+          bill_date: b.lr_bill_date || '',
+          customer_name: b.billing_party_name || '',
+          amount: parseFloat(b.bill_amount || b.sub_total || '0'),
+          zoho_invoice_id: b.zoho_invoice_id,
+          zoho_invoice_number: b.zoho_invoice_number,
+          zoho_synced_at: b.zoho_synced_at,
+        })),
+        ...(whBills || []).map((b: any) => ({
+          bill_id: b.bill_id,
+          bill_number: b.bill_number || '',
+          bill_type: 'WH' as const,
+          bill_date: b.bill_date || '',
+          customer_name: b.billing_party_name || '',
+          amount: parseFloat(b.total_amount || b.sub_total || '0'),
+          zoho_invoice_id: b.zoho_invoice_id,
+          zoho_invoice_number: b.zoho_invoice_number,
+          zoho_synced_at: b.zoho_synced_at,
+        })),
+      ];
+
+      processed.sort((a, b) => (b.zoho_synced_at || '').localeCompare(a.zoho_synced_at || ''));
+      setProcessedInvoices(processed);
+    } catch (err) {
+      console.error('Failed to fetch processed invoices:', err);
+    } finally {
+      setLoadingProcessed(false);
     }
   }, []);
 
@@ -780,12 +852,13 @@ export default function ZohoBooksIntegration() {
       setTimeout(() => setSuccess(''), 8000);
       await fetchInvoiceStats();
       await fetchPendingInvoices();
+      await fetchProcessedInvoices();
     } catch (err: any) {
       setError(err.message || 'Failed to push invoices');
     } finally {
       setPushing(false);
     }
-  }, [apiUrl, billTypeFilter, dryRunOnly, fetchInvoiceStats, fetchPendingInvoices]);
+  }, [apiUrl, billTypeFilter, dryRunOnly, fetchInvoiceStats, fetchPendingInvoices, fetchProcessedInvoices]);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
@@ -1567,7 +1640,32 @@ export default function ZohoBooksIntegration() {
             </div>
           )}
 
+          {/* View Toggle: Pending vs Already Processed */}
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => setInvoiceView('pending')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                invoiceView === 'pending'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Pending ({pendingInvoices.length})
+            </button>
+            <button
+              onClick={() => { setInvoiceView('processed'); fetchProcessedInvoices(); }}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                invoiceView === 'processed'
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Already Processed ({processedInvoices.length})
+            </button>
+          </div>
+
           {/* Enhanced Filter Bar */}
+          {invoiceView === 'pending' && (
           <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50/50">
             <div className="flex items-center gap-2 mb-3">
               <Filter className="w-4 h-4 text-gray-600" />
@@ -1671,8 +1769,79 @@ export default function ZohoBooksIntegration() {
               </div>
             )}
           </div>
+          )}
+
+          {/* Processed Invoices Table */}
+          {invoiceView === 'processed' && (
+            <div>
+              <div className="flex items-center justify-between flex-wrap gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-4 h-4 text-blue-600" />
+                  <p className="text-sm font-medium text-blue-900">
+                    Showing <strong>{processedInvoices.length}</strong> already processed invoices
+                  </p>
+                </div>
+                <button
+                  onClick={fetchProcessedInvoices}
+                  disabled={loadingProcessed}
+                  className="flex items-center gap-1 text-xs text-blue-700 hover:text-blue-900 font-medium"
+                >
+                  {loadingProcessed ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  Refresh List
+                </button>
+              </div>
+
+              {loadingProcessed ? (
+                <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  <span className="ml-3 text-gray-500 text-sm">Loading processed invoices...</span>
+                </div>
+              ) : processedInvoices.length === 0 ? (
+                <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
+                  <p className="text-gray-400 text-sm">No processed invoices found.</p>
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="max-h-96 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-white border-b border-gray-200 z-10">
+                        <tr>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Bill No.</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Customer</th>
+                          <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Zoho Invoice No.</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Pushed At</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {processedInvoices.map((inv) => (
+                          <tr key={inv.bill_id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-gray-900 font-medium">{inv.bill_number}</td>
+                            <td className="px-4 py-2">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                inv.bill_type === 'LR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                              }`}>
+                                {inv.bill_type}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-gray-900">{inv.customer_name}</td>
+                            <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatCurrency(inv.amount)}</td>
+                            <td className="px-4 py-2 text-gray-500 font-mono text-xs">{inv.zoho_invoice_number || inv.zoho_invoice_id}</td>
+                            <td className="px-4 py-2 text-gray-500 text-xs">{inv.zoho_synced_at ? new Date(inv.zoho_synced_at).toLocaleString('en-IN') : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Reactive Summary Bar */}
+          {invoiceView === 'pending' && (
+          <>
           <div className="flex items-center justify-between flex-wrap gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200 mb-4">
             <div className="flex items-center gap-3">
               <FileText className="w-4 h-4 text-emerald-600" />
@@ -1826,6 +1995,8 @@ export default function ZohoBooksIntegration() {
               </li>
             </ul>
           </div>
+          </>
+          )}
 
           {/* Push Results */}
           {pushResult && (

@@ -983,7 +983,27 @@ Deno.serve(async (req: Request) => {
           return { status: 'customer-inactive', detail: zohoMsg };
         }
         if (msgLower.includes('duplicate') || msgLower.includes('already exists')) {
-          return { status: 'invoice-duplicate', detail: zohoMsg };
+          // The invoice already exists in Zoho — search for it by invoice_number
+          // so we can link TMS to the existing Zoho invoice and mark it as pushed.
+          try {
+            const searchUrl = new URL(`${apiDomain}/books/v3/invoices`);
+            searchUrl.searchParams.set('organization_id', orgId);
+            searchUrl.searchParams.set('invoice_number', billNumber);
+            const searchRes = await fetch(searchUrl.toString(), {
+              headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+            });
+            const searchData = await searchRes.json();
+            const found = (searchData.invoices || []) as Record<string, any>[];
+            if (found.length > 0) {
+              return {
+                zoho_invoice_id: found[0].invoice_id as string,
+                zoho_invoice_number: found[0].invoice_number as string,
+                status: 'pushed',
+                detail: `Invoice already existed in Zoho (linked to existing invoice ${found[0].invoice_number}).${validationDetail ? ' ' + validationDetail : ''}`,
+              };
+            }
+          } catch (_) { /* best-effort */ }
+          return { status: 'invoice-duplicate', detail: `${zohoMsg} — could not auto-link. Please check Zoho manually.` };
         }
         if (msgLower.includes('auth') || msgLower.includes('token') || msgLower.includes('unauthorized')) {
           return { status: 'auth-error', detail: zohoMsg };
