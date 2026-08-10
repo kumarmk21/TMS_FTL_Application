@@ -123,7 +123,7 @@ export default function PartyWiseSalesReport() {
       let wbQuery = supabase
         .from('warehouse_bill')
         .select(
-          'bill_id, bill_number, bill_date, billing_party_code, billing_party_name, service_type, warehouse_charges, other_charges, sub_total, igst_amount, cgst_amount, sgst_amount, total_amount, gst_charge_type, bill_status'
+          'bill_id, bill_number, bill_date, billing_party_code, billing_party_name, service_type, warehouse_charges, other_charges, unloading_charges, sub_total, igst_amount, cgst_amount, sgst_amount, total_amount, gst_charge_type, bill_status'
         )
         .gte('bill_date', fromDate)
         .lte('bill_date', toDate)
@@ -190,7 +190,7 @@ export default function PartyWiseSalesReport() {
           no_of_pkgs: null,
           chrg_wt: null,
           freight_amount: Number(r.warehouse_charges || 0),
-          loading_unloading: 0,
+          loading_unloading: Number(r.unloading_charges || 0),
           detention: 0,
           other_charges: Number(r.other_charges || 0),
           subtotal: Number(r.sub_total || 0),

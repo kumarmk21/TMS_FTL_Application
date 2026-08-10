@@ -41,6 +41,7 @@ interface WarehouseBillDetails {
   sac_description: string | null;
   warehouse_charges: number;
   other_charges: number;
+  unloading_charges: number;
   sub_total: number;
   gst_percentage: number;
   igst_amount: number;
@@ -360,7 +361,7 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                       <tr>
                         <td className="border-b border-gray-300 p-2">1</td>
                         <td className="border-b border-gray-300 p-2">
-                          {bill.sac_description || 'Warehouse Charges'}
+                          {bill.sac_description || 'Warehousing Charges'}
                         </td>
                         <td className="border-b border-gray-300 p-2">{bill.sac_code}</td>
                         <td className="border-b border-gray-300 p-2 text-right">
@@ -373,10 +374,22 @@ export function WarehouseBillPrintPreview({ billId, onClose }: WarehouseBillPrin
                         <td className="border-b border-gray-300 p-2">
                           {bill.warehouse_charges > 0 ? 2 : 1}
                         </td>
-                        <td className="border-b border-gray-300 p-2">Other Charges</td>
+                        <td className="border-b border-gray-300 p-2">Loading Charges</td>
                         <td className="border-b border-gray-300 p-2">{bill.sac_code}</td>
                         <td className="border-b border-gray-300 p-2 text-right">
                           {formatCurrency(bill.other_charges)}
+                        </td>
+                      </tr>
+                    )}
+                    {bill && bill.unloading_charges > 0 && (
+                      <tr>
+                        <td className="border-b border-gray-300 p-2">
+                          {(bill.warehouse_charges > 0 ? 1 : 0) + (bill.other_charges > 0 ? 1 : 0) + 1}
+                        </td>
+                        <td className="border-b border-gray-300 p-2">Unloading Charges</td>
+                        <td className="border-b border-gray-300 p-2">{bill.sac_code}</td>
+                        <td className="border-b border-gray-300 p-2 text-right">
+                          {formatCurrency(bill.unloading_charges)}
                         </td>
                       </tr>
                     )}

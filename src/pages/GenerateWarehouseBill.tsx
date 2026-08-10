@@ -91,6 +91,7 @@ export default function GenerateWarehouseBill() {
     sac_description: '',
     warehouse_charges: 0,
     other_charges: 0,
+    unloading_charges: 0,
     sub_total: 0,
     gst_charge_type: 'IGST',
     gst_percentage: 18,
@@ -110,7 +111,7 @@ export default function GenerateWarehouseBill() {
 
   useEffect(() => {
     calculateAmounts();
-  }, [formData.warehouse_charges, formData.other_charges, formData.gst_percentage, formData.bill_to_state]);
+  }, [formData.warehouse_charges, formData.other_charges, formData.unloading_charges, formData.gst_percentage, formData.bill_to_state]);
 
   useEffect(() => {
     if (formData.bill_sub_date && formData.credit_days) {
@@ -271,7 +272,7 @@ export default function GenerateWarehouseBill() {
   };
 
   const calculateAmounts = () => {
-    const subTotal = (formData.warehouse_charges || 0) + (formData.other_charges || 0);
+    const subTotal = (formData.warehouse_charges || 0) + (formData.other_charges || 0) + (formData.unloading_charges || 0);
     const gstPercent = formData.gst_percentage || 0;
 
     const selectedCompany = companies.find(c => c.id === formData.bill_generation_branch);
@@ -323,8 +324,8 @@ export default function GenerateWarehouseBill() {
       return;
     }
 
-    if (formData.warehouse_charges <= 0 && formData.other_charges <= 0) {
-      alert('Please enter warehouse charges or other charges');
+    if (formData.warehouse_charges <= 0 && formData.other_charges <= 0 && formData.unloading_charges <= 0) {
+      alert('Please enter warehouse charges, loading charges, or unloading charges');
       return;
     }
 
@@ -375,6 +376,7 @@ export default function GenerateWarehouseBill() {
           sac_description: formData.sac_description,
           warehouse_charges: formData.warehouse_charges,
           other_charges: formData.other_charges,
+          unloading_charges: formData.unloading_charges,
           sub_total: formData.sub_total,
           gst_charge_type: formData.gst_charge_type || null,
           gst_percentage: formData.gst_percentage,
@@ -430,6 +432,7 @@ export default function GenerateWarehouseBill() {
       sac_description: '',
       warehouse_charges: 0,
       other_charges: 0,
+      unloading_charges: 0,
       sub_total: 0,
       gst_charge_type: 'IGST',
       gst_percentage: 18,
@@ -692,7 +695,7 @@ export default function GenerateWarehouseBill() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Warehouse Charges
+                Warehousing Charges
               </label>
               <input
                 type="number"
@@ -705,13 +708,26 @@ export default function GenerateWarehouseBill() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Other Charges
+                Loading Charges
               </label>
               <input
                 type="number"
                 step="0.01"
                 value={formData.other_charges}
                 onChange={(e) => setFormData({ ...formData, other_charges: parseFloat(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Unloading Charges
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.unloading_charges}
+                onChange={(e) => setFormData({ ...formData, unloading_charges: parseFloat(e.target.value) || 0 })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
