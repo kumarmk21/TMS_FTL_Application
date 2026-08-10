@@ -2,8 +2,369 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import html2pdf from 'html2pdf.js';
-import { Search, Calendar, X, Receipt, CreditCard as Edit2, XCircle, CheckCircle, Clock, Loader2, IndianRupee, FileText, Download, Mail, Eye, RefreshCw, Truck, Building2, AlertCircle, CreditCard, Filter, Layers } from 'lucide-react';
+import { Search, Calendar, X, Receipt, CreditCard as Edit2, XCircle, CheckCircle, Clock, Loader2, IndianRupee, FileText, Download, Mail, Eye, RefreshCw, Truck, Building2, AlertCircle, CreditCard, Filter, Layers, DownloadCloud } from 'lucide-react';
 import { CombinedPaymentModal } from '../components/modals/CombinedPaymentModal';
+
+// ─── Zoho Payment Sync Types ──────────────────────────────────────────────────
+
+interface SyncDetail {
+  zoho_payment_id?: string;
+  zoho_payment_number?: string;
+  zoho_invoice_id?: string;
+  bill_number?: string;
+  amount?: number;
+  bill_amount?: number;
+  date?: string;
+  status: 'imported' | 'updated' | 'skipped' | 'error' | 'deleted_in_zoho';
+  reason?: string;
+}
+
+interface SyncResult {
+  success: boolean;
+  total_zoho_payments: number;
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  details: SyncDetail[];
+}
+
+interface ZohoReceipt {
+  pr_id: string;
+  pr_number: string;
+  bill_id: string;
+  bill_type: string;
+  bill_number: string;
+  billing_party_name: string;
+  bill_amount: number;
+  payment_amount: number;
+  payment_date: string;
+  payment_mode: string;
+  reference_number: string | null;
+  zoho_payment_id: string;
+  zoho_payment_number: string;
+  zoho_invoice_id: string;
+  zoho_invoice_number: string | null;
+  zoho_bank_account_name: string | null;
+  zoho_synced_at: string;
+  sync_status: string;
+  is_cancelled: boolean;
+}
+
+// ─── ZohoSyncModal ────────────────────────────────────────────────────────────
+
+function ZohoSyncModal({
+  onClose,
+  onSync,
+  syncing,
+  syncResult,
+}: {
+  onClose: () => void;
+  onSync: (dateFrom: string, dateTo: string) => void;
+  syncing: boolean;
+  syncResult: SyncResult | null;
+}) {
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <DownloadCloud className="w-5 h-5 text-blue-600" /> Sync Zoho Payments
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">Pull customer payments from Zoho Books into TMS</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          {!syncResult && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <p className="text-sm text-blue-800 font-medium mb-1">How this works</p>
+                <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
+                  <li>Fetches all customer payments from Zoho Books for the selected date range</li>
+                  <li>Matches each payment to a TMS bill using the Zoho invoice ID</li>
+                  <li>Creates a payment receipt in TMS for each matched payment</li>
+                  <li>Updates existing receipts if the Zoho payment was edited</li>
+                  <li>Marks TMS receipts as "deleted in Zoho" if the Zoho payment was removed</li>
+                  <li>Overpayments (allocated amount exceeds bill amount) are blocked</li>
+                </ul>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">From Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={e => setDateFrom(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">To Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={e => setDateTo(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {syncResult && (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-black text-emerald-700">{syncResult.imported}</p>
+                  <p className="text-xs text-emerald-600 font-medium mt-0.5">Imported</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-black text-blue-700">{syncResult.updated}</p>
+                  <p className="text-xs text-blue-600 font-medium mt-0.5">Updated</p>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-black text-amber-700">{syncResult.skipped}</p>
+                  <p className="text-xs text-amber-600 font-medium mt-0.5">Skipped</p>
+                </div>
+                <div className="bg-red-50 border border-red-100 rounded-lg px-4 py-3 text-center">
+                  <p className="text-2xl font-black text-red-700">{syncResult.errors}</p>
+                  <p className="text-xs text-red-600 font-medium mt-0.5">Errors</p>
+                </div>
+              </div>
+
+              <div className="text-sm text-gray-600">
+                Found <strong>{syncResult.total_zoho_payments}</strong> payments in Zoho Books.
+              </div>
+
+              {/* Details */}
+              {syncResult.details.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="max-h-64 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 uppercase">Zoho Payment</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 uppercase">Bill No.</th>
+                          <th className="text-right px-3 py-2 font-medium text-gray-500 uppercase">Amount</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 uppercase">Status</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-500 uppercase">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {syncResult.details.map((d, i) => (
+                          <tr key={i} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 text-gray-700 font-mono">{d.zoho_payment_number || d.zoho_payment_id || '-'}</td>
+                            <td className="px-3 py-2 text-gray-700">{d.bill_number || '-'}</td>
+                            <td className="px-3 py-2 text-right text-gray-700">{d.amount != null ? fmt(d.amount) : '-'}</td>
+                            <td className="px-3 py-2">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                                d.status === 'imported' ? 'bg-emerald-100 text-emerald-700' :
+                                d.status === 'updated' ? 'bg-blue-100 text-blue-700' :
+                                d.status === 'error' || d.status === 'deleted_in_zoho' ? 'bg-red-100 text-red-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {d.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-gray-500 max-w-[200px] truncate" title={d.reason || ''}>{d.reason || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          {syncResult ? (
+            <button onClick={onClose} className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              Done
+            </button>
+          ) : (
+            <>
+              <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                onClick={() => onSync(dateFrom, dateTo)}
+                disabled={syncing || !dateFrom || !dateTo}
+                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <DownloadCloud className="w-4 h-4" />}
+                {syncing ? 'Syncing...' : 'Sync Now'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ReconciliationReport ─────────────────────────────────────────────────────
+
+function ReconciliationReport({
+  onClose,
+}: {
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [zohoReceipts, setZohoReceipts] = useState<ZohoReceipt[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api?action=zoho-payment-receipts`;
+    fetch(apiUrl, {
+      headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to load (${res.status})`);
+        return res.json();
+      })
+      .then(data => {
+        setZohoReceipts(data.receipts || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message || 'Failed to load reconciliation data');
+        setLoading(false);
+      });
+  }, []);
+
+  const totalZohoAmount = zohoReceipts.filter(r => !r.is_cancelled).reduce((sum, r) => sum + (r.payment_amount || 0), 0);
+  const totalImported = zohoReceipts.filter(r => r.sync_status === 'synced' && !r.is_cancelled).length;
+  const totalDeletedInZoho = zohoReceipts.filter(r => r.sync_status === 'deleted_in_zoho').length;
+  const totalCancelled = zohoReceipts.filter(r => r.is_cancelled).length;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" /> Zoho Payment Reconciliation
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">TMS receipts imported from Zoho Books vs manual entries</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+              <span className="ml-3 text-gray-500 text-sm">Loading reconciliation data...</span>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center py-12 text-red-600">
+              <AlertCircle className="w-5 h-5 mr-2" /> {error}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+                  <p className="text-xs text-blue-600 font-medium">Total Zoho Receipts</p>
+                  <p className="text-xl font-black text-blue-700 mt-1">{zohoReceipts.length}</p>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-4 py-3">
+                  <p className="text-xs text-emerald-600 font-medium">Active (Synced)</p>
+                  <p className="text-xl font-black text-emerald-700 mt-1">{totalImported}</p>
+                </div>
+                <div className="bg-red-50 border border-red-100 rounded-lg px-4 py-3">
+                  <p className="text-xs text-red-600 font-medium">Deleted in Zoho</p>
+                  <p className="text-xl font-black text-red-700 mt-1">{totalDeletedInZoho}</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+                  <p className="text-xs text-gray-600 font-medium">Total Amount</p>
+                  <p className="text-xl font-black text-gray-800 mt-1">{fmt(totalZohoAmount)}</p>
+                </div>
+              </div>
+
+              {/* Table */}
+              {zohoReceipts.length === 0 ? (
+                <div className="flex items-center justify-center py-12 text-gray-400">
+                  No Zoho-imported payment receipts found.
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="max-h-96 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">PR Number</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Bill No.</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Customer</th>
+                          <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase">Amount</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Zoho Payment No.</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Bank Account</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Synced At</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {zohoReceipts.map((r) => (
+                          <tr key={r.pr_id} className={`hover:bg-gray-50 ${r.is_cancelled ? 'opacity-50' : ''}`}>
+                            <td className="px-4 py-2 text-gray-900 font-medium">{r.pr_number}</td>
+                            <td className="px-4 py-2 text-gray-700">{r.bill_number}</td>
+                            <td className="px-4 py-2 text-gray-700 max-w-[150px] truncate" title={r.billing_party_name}>{r.billing_party_name}</td>
+                            <td className="px-4 py-2 text-right text-gray-700 font-medium">{fmt(r.payment_amount)}</td>
+                            <td className="px-4 py-2 text-gray-500 font-mono text-xs">{r.zoho_payment_number || r.zoho_payment_id}</td>
+                            <td className="px-4 py-2 text-gray-500 text-xs">{r.zoho_bank_account_name || '-'}</td>
+                            <td className="px-4 py-2 text-gray-500 text-xs">{r.zoho_synced_at ? new Date(r.zoho_synced_at).toLocaleString('en-IN') : '-'}</td>
+                            <td className="px-4 py-2">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                                r.is_cancelled ? 'bg-gray-100 text-gray-500' :
+                                r.sync_status === 'deleted_in_zoho' ? 'bg-red-100 text-red-700' :
+                                'bg-emerald-100 text-emerald-700'
+                              }`}>
+                                {r.is_cancelled ? 'Cancelled' : r.sync_status === 'deleted_in_zoho' ? 'Deleted in Zoho' : 'Synced'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <button onClick={onClose} className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -36,6 +397,10 @@ interface PaymentReceipt {
   is_cancelled: boolean;
   created_at: string;
   combined_payment_id?: string | null;
+  zoho_payment_id?: string | null;
+  zoho_payment_number?: string | null;
+  sync_source?: string | null;
+  sync_status?: string | null;
 }
 
 interface PRFormData {
@@ -464,6 +829,8 @@ function PaymentReceiptViewModal({
                 ['Bill Amount', fmt(pr.bill_amount)],
                 ['Payment Mode', pr.payment_mode],
                 ...(pr.reference_number ? [['Reference Number', pr.reference_number]] : []),
+                ...(pr.zoho_payment_number ? [['Zoho Payment No.', pr.zoho_payment_number]] : []),
+                ...(pr.zoho_payment_id && !pr.zoho_payment_number ? [['Zoho Payment ID', pr.zoho_payment_id]] : []),
               ].map(([label, value]) => (
                 <div key={label} className="flex items-baseline justify-between gap-4">
                   <span className="text-xs text-gray-500 font-medium flex-shrink-0">{label}</span>
@@ -636,6 +1003,10 @@ export function BillCollection() {
   const [viewBillData, setViewBillData] = useState<BillRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [combineModalOpen, setCombineModalOpen] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [reconOpen, setReconOpen] = useState(false);
 
   const handleReset = () => {
     setFromDate(firstOfMonthStr);
@@ -942,20 +1313,71 @@ export function BillCollection() {
   const pendingCount = bills.filter(b => !prMap[b.bill_id]).length;
   const collectedCount = bills.filter(b => !!prMap[b.bill_id]).length;
 
+  const handleSyncZohoPayments = async (dateFrom: string, dateTo: string) => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api?action=sync-payments`;
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ date_from: dateFrom, date_to: dateTo }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Sync failed (${res.status})`);
+      }
+      setSyncResult(data as SyncResult);
+      // Refresh the bill list to show newly imported payments
+      if (searched) {
+        await handleSearch();
+      }
+    } catch (err: any) {
+      setSyncResult({
+        success: false,
+        total_zoho_payments: 0,
+        imported: 0,
+        updated: 0,
+        skipped: 0,
+        errors: 1,
+        details: [{ status: 'error', reason: err.message || 'Sync failed' }],
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Bill Collection</h1>
           <p className="mt-1 text-sm text-gray-500">Track and manage payment collection for Transportation and Warehouse bills</p>
         </div>
-        <button
-          onClick={() => setCombineModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex-shrink-0"
-        >
-          <Layers className="w-4 h-4" /> Combined Payment
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setReconOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            <FileText className="w-4 h-4" /> Reconciliation
+          </button>
+          <button
+            onClick={() => { setSyncResult(null); setSyncModalOpen(true); }}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <DownloadCloud className="w-4 h-4" /> Sync Zoho Payments
+          </button>
+          <button
+            onClick={() => setCombineModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors shadow-sm"
+          >
+            <Layers className="w-4 h-4" /> Combined Payment
+          </button>
+        </div>
       </div>
 
       {/* Search Panel */}
@@ -1198,6 +1620,11 @@ export function BillCollection() {
                                   <Layers className="w-2.5 h-2.5" />COMB
                                 </span>
                               )}
+                              {pr.zoho_payment_id && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-bold" title={`Zoho Payment: ${pr.zoho_payment_number || pr.zoho_payment_id}`}>
+                                  <DownloadCloud className="w-2.5 h-2.5" />ZOHO
+                                </span>
+                              )}
                             </div>
                           ) : (
                             <span className="text-gray-400 text-sm">-</span>
@@ -1319,6 +1746,19 @@ export function BillCollection() {
           onClose={() => setCombineModalOpen(false)}
           onSuccess={() => { if (searched) handleSearch(); }}
         />
+      )}
+
+      {syncModalOpen && (
+        <ZohoSyncModal
+          onClose={() => setSyncModalOpen(false)}
+          onSync={handleSyncZohoPayments}
+          syncing={syncing}
+          syncResult={syncResult}
+        />
+      )}
+
+      {reconOpen && (
+        <ReconciliationReport onClose={() => setReconOpen(false)} />
       )}
     </div>
   );

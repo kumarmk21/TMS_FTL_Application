@@ -2417,6 +2417,335 @@ Deno.serve(async (req: Request) => {
       }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── Sync customer payments FROM Zoho Books into TMS payment_receipts ──
+    if (action === 'sync-payments') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const body = await req.json().catch(() => ({}));
+      const dateFrom: string | undefined = body.date_from;
+      const dateTo: string | undefined = body.date_to;
+
+      // 1. Fetch all customer payments from Zoho (paginated)
+      let allPayments: Record<string, any>[] = [];
+      let page = 1;
+      const MAX_PAGES = 10;
+
+      while (page <= MAX_PAGES) {
+        const payUrl = new URL(`${apiDomain}/books/v3/customerpayments`);
+        payUrl.searchParams.set('organization_id', orgId);
+        payUrl.searchParams.set('page', String(page));
+        payUrl.searchParams.set('per_page', '200');
+        if (dateFrom) payUrl.searchParams.set('date', dateFrom);
+        if (dateFrom && dateTo) {
+          payUrl.searchParams.set('date_start', dateFrom);
+          payUrl.searchParams.set('date_end', dateTo);
+        }
+        const payRes = await fetch(payUrl.toString(), {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        const payData = await payRes.json();
+
+        if (payData.code !== undefined && payData.code !== 0) {
+          return new Response(JSON.stringify({
+            error: payData.message || 'Failed to fetch customer payments from Zoho',
+          }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        const pagePayments = (payData.customerpayments || []) as Record<string, any>[];
+        allPayments = allPayments.concat(pagePayments);
+
+        const hasMore = payData.page_context && payData.page_context.has_more_page;
+        if (!hasMore || pagePayments.length === 0) break;
+        page++;
+      }
+
+      // 2. Build a map of TMS bills by zoho_invoice_id for matching
+      const { data: lrBills } = await supabase
+        .from('lr_bill')
+        .select('bill_id, lr_bill_number, lr_bill_date, billing_party_name, billing_party_code, bill_amount, zoho_invoice_id')
+        .not('zoho_invoice_id', 'is', null);
+
+      const { data: whBills } = await supabase
+        .from('warehouse_bill')
+        .select('bill_id, bill_number, bill_date, billing_party_name, billing_party_code, total_amount, zoho_invoice_id')
+        .not('zoho_invoice_id', 'is', null);
+
+      const billByZohoId = new Map<string, { bill_id: string; bill_type: 'lr' | 'warehouse'; bill_number: string; bill_date: string; billing_party_name: string; billing_party_code: string; bill_amount: number }>();
+
+      for (const b of (lrBills || [])) {
+        if (b.zoho_invoice_id) {
+          billByZohoId.set(b.zoho_invoice_id, {
+            bill_id: b.bill_id, bill_type: 'lr', bill_number: b.lr_bill_number || '',
+            bill_date: b.lr_bill_date || '', billing_party_name: b.billing_party_name || '',
+            billing_party_code: b.billing_party_code || '', bill_amount: parseFloat(b.bill_amount || '0'),
+          });
+        }
+      }
+      for (const b of (whBills || [])) {
+        if (b.zoho_invoice_id) {
+          billByZohoId.set(b.zoho_invoice_id, {
+            bill_id: b.bill_id, bill_type: 'warehouse', bill_number: b.bill_number || '',
+            bill_date: b.bill_date || '', billing_party_name: b.billing_party_name || '',
+            billing_party_code: b.billing_party_code || '', bill_amount: parseFloat(b.total_amount || '0'),
+          });
+        }
+      }
+
+      // 3. Fetch existing zoho-linked payment receipts to avoid duplicates
+      const { data: existingPRs } = await supabase
+        .from('payment_receipts')
+        .select('pr_id, zoho_payment_id, bill_id, is_cancelled')
+        .not('zoho_payment_id', 'is', null);
+
+      const prByZohoPaymentId = new Map<string, { pr_id: string; bill_id: string; is_cancelled: boolean }>();
+      for (const pr of (existingPRs || [])) {
+        if (pr.zoho_payment_id) {
+          prByZohoPaymentId.set(pr.zoho_payment_id, { pr_id: pr.pr_id, bill_id: pr.bill_id, is_cancelled: pr.is_cancelled });
+        }
+      }
+
+      // 4. Process each Zoho payment
+      const details: any[] = [];
+      let totalImported = 0;
+      let totalUpdated = 0;
+      let totalSkipped = 0;
+      let totalErrors = 0;
+
+      for (const zp of allPayments) {
+        const zohoPaymentId = zp.payment_id as string;
+        const zohoPaymentNumber = zp.payment_number || zp.payment_id;
+        const paymentDate = zp.date as string;
+        const paymentAmount = parseFloat(zp.amount || '0');
+        const paymentMode = (zp.payment_mode || 'bank_transfer') as string;
+        const referenceNumber = (zp.reference_number || null) as string | null;
+        const bankAccountId = (zp.bank_account_id || null) as string | null;
+        const bankAccountName = (zp.bank_account_name || null) as string | null;
+
+        // Each Zoho customer payment can be applied to multiple invoices
+        const invoices = (zp.invoices || []) as Record<string, any>[];
+        if (invoices.length === 0 && !prByZohoPaymentId.has(zohoPaymentId)) {
+          // No invoice allocations — skip (can't match to a TMS bill)
+          details.push({
+            zoho_payment_id: zohoPaymentId,
+            zoho_payment_number: zohoPaymentNumber,
+            amount: paymentAmount,
+            date: paymentDate,
+            status: 'skipped',
+            reason: 'No invoice allocations in Zoho payment',
+          });
+          totalSkipped++;
+          continue;
+        }
+
+        // Process each invoice allocation
+        for (const invAlloc of invoices) {
+          const zohoInvoiceId = invAlloc.invoice_id as string;
+          const allocatedAmount = parseFloat(invAlloc.applied_amount || invAlloc.amount || '0');
+
+          const matchedBill = billByZohoId.get(zohoInvoiceId);
+          if (!matchedBill) {
+            details.push({
+              zoho_payment_id: zohoPaymentId,
+              zoho_payment_number: zohoPaymentNumber,
+              zoho_invoice_id: zohoInvoiceId,
+              amount: allocatedAmount,
+              date: paymentDate,
+              status: 'skipped',
+              reason: 'No matching TMS bill for this Zoho invoice',
+            });
+            totalSkipped++;
+            continue;
+          }
+
+          // Block overpayments — allocated amount must not exceed bill amount
+          if (allocatedAmount > matchedBill.bill_amount + 0.01) {
+            details.push({
+              zoho_payment_id: zohoPaymentId,
+              zoho_payment_number: zohoPaymentNumber,
+              zoho_invoice_id: zohoInvoiceId,
+              bill_number: matchedBill.bill_number,
+              amount: allocatedAmount,
+              bill_amount: matchedBill.bill_amount,
+              date: paymentDate,
+              status: 'error',
+              reason: 'Overpayment: allocated amount exceeds bill amount',
+            });
+            totalErrors++;
+            continue;
+          }
+
+          // Check if we already have a receipt for this zoho_payment_id + bill_id
+          const existingKey = `${zohoPaymentId}_${matchedBill.bill_id}`;
+          const existing = prByZohoPaymentId.get(zohoPaymentId);
+
+          if (existing && existing.bill_id === matchedBill.bill_id) {
+            // Update existing receipt
+            const { error: updateErr } = await supabase
+              .from('payment_receipts')
+              .update({
+                payment_amount: allocatedAmount,
+                payment_date: paymentDate,
+                payment_mode: 'Bank Transfer',
+                reference_number: referenceNumber,
+                zoho_payment_number: zohoPaymentNumber,
+                zoho_invoice_id: zohoInvoiceId,
+                zoho_invoice_number: billByZohoId.get(zohoInvoiceId)?.bill_number || null,
+                zoho_bank_account_id: bankAccountId,
+                zoho_bank_account_name: bankAccountName,
+                zoho_synced_at: new Date().toISOString(),
+                sync_source: 'zoho',
+                sync_status: 'synced',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('pr_id', existing.pr_id);
+
+            if (updateErr) {
+              details.push({ zoho_payment_id: zohoPaymentId, bill_number: matchedBill.bill_number, status: 'error', reason: updateErr.message });
+              totalErrors++;
+            } else {
+              details.push({ zoho_payment_id: zohoPaymentId, zoho_payment_number: zohoPaymentNumber, bill_number: matchedBill.bill_number, amount: allocatedAmount, date: paymentDate, status: 'updated' });
+              totalUpdated++;
+            }
+          } else {
+            // Create new receipt
+            const prNumber = `PR-${Date.now().toString().slice(-8)}-${Math.floor(Math.random() * 1000)}`;
+            const { error: insertErr } = await supabase
+              .from('payment_receipts')
+              .insert({
+                pr_number: prNumber,
+                bill_id: matchedBill.bill_id,
+                bill_type: matchedBill.bill_type,
+                bill_number: matchedBill.bill_number,
+                billing_party_code: matchedBill.billing_party_code,
+                billing_party_name: matchedBill.billing_party_name,
+                bill_amount: matchedBill.bill_amount,
+                payment_amount: allocatedAmount,
+                payment_date: paymentDate,
+                payment_mode: 'Bank Transfer',
+                reference_number: referenceNumber,
+                is_cancelled: false,
+                zoho_payment_id: zohoPaymentId,
+                zoho_payment_number: zohoPaymentNumber,
+                zoho_invoice_id: zohoInvoiceId,
+                zoho_invoice_number: billByZohoId.get(zohoInvoiceId)?.bill_number || null,
+                zoho_bank_account_id: bankAccountId,
+                zoho_bank_account_name: bankAccountName,
+                zoho_synced_at: new Date().toISOString(),
+                sync_source: 'zoho',
+                sync_status: 'synced',
+              });
+
+            if (insertErr) {
+              details.push({ zoho_payment_id: zohoPaymentId, bill_number: matchedBill.bill_number, status: 'error', reason: insertErr.message });
+              totalErrors++;
+            } else {
+              // Update the bill status to Paid
+              if (matchedBill.bill_type === 'lr') {
+                await supabase
+                  .from('lr_bill')
+                  .update({ lr_bill_status: 'Paid', lr_bill_mr_date: paymentDate })
+                  .eq('bill_id', matchedBill.bill_id);
+              } else {
+                await supabase
+                  .from('warehouse_bill')
+                  .update({ bill_status: 'Paid', mr_date: paymentDate })
+                  .eq('bill_id', matchedBill.bill_id);
+              }
+
+              prByZohoPaymentId.set(zohoPaymentId, { pr_id: 'new', bill_id: matchedBill.bill_id, is_cancelled: false });
+              details.push({ zoho_payment_id: zohoPaymentId, zoho_payment_number: zohoPaymentNumber, bill_number: matchedBill.bill_number, amount: allocatedAmount, date: paymentDate, status: 'imported' });
+              totalImported++;
+            }
+          }
+        }
+      }
+
+      // 5. Check for Zoho payments that were deleted/edited — mark TMS receipts
+      const allZohoPaymentIds = new Set(allPayments.map(p => p.payment_id));
+      for (const [zohoPayId, existing] of prByZohoPaymentId) {
+        if (!allZohoPaymentIds.has(zohoPayId)) {
+          // This Zoho payment no longer exists — mark it
+          await supabase
+            .from('payment_receipts')
+            .update({ sync_status: 'deleted_in_zoho', updated_at: new Date().toISOString() })
+            .eq('pr_id', existing.pr_id)
+            .eq('zoho_payment_id', zohoPayId);
+
+          details.push({
+            zoho_payment_id: zohoPayId,
+            status: 'deleted_in_zoho',
+            reason: 'Payment was deleted or removed in Zoho',
+          });
+        }
+      }
+
+      // 6. Log the sync
+      await supabase.from('zoho_payment_sync_log').insert({
+        total_zoho_payments: allPayments.length,
+        total_imported: totalImported,
+        total_updated: totalUpdated,
+        total_skipped: totalSkipped,
+        total_errors: totalErrors,
+        details: JSON.stringify(details),
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        total_zoho_payments: allPayments.length,
+        imported: totalImported,
+        updated: totalUpdated,
+        skipped: totalSkipped,
+        errors: totalErrors,
+        details: details.slice(0, 100),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ── Fetch payment sync log for reconciliation report ──
+    if (action === 'payment-sync-log') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { data: logs, error } = await supabase
+        .from('zoho_payment_sync_log')
+        .select('*')
+        .order('sync_date', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      return new Response(JSON.stringify({
+        logs: (logs || []).map((l: any) => ({
+          log_id: l.log_id,
+          sync_date: l.sync_date,
+          total_zoho_payments: l.total_zoho_payments,
+          total_imported: l.total_imported,
+          total_updated: l.total_updated,
+          total_skipped: l.total_skipped,
+          total_errors: l.total_errors,
+          details: typeof l.details === 'string' ? JSON.parse(l.details) : l.details,
+        })),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ── Fetch Zoho-imported payment receipts for reconciliation ──
+    if (action === 'zoho-payment-receipts') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { data: receipts, error } = await supabase
+        .from('payment_receipts')
+        .select('pr_id, pr_number, bill_id, bill_type, bill_number, billing_party_name, bill_amount, payment_amount, payment_date, payment_mode, reference_number, zoho_payment_id, zoho_payment_number, zoho_invoice_id, zoho_invoice_number, zoho_bank_account_name, zoho_synced_at, sync_status, is_cancelled')
+        .not('zoho_payment_id', 'is', null)
+        .order('zoho_synced_at', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+
+      return new Response(JSON.stringify({
+        count: (receipts || []).length,
+        receipts: receipts || [],
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
