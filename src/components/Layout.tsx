@@ -63,6 +63,7 @@ import ATHPaidReport from '../pages/ATHPaidReport';
 import BillPaymentReport from '../pages/BillPaymentReport';
 import PartyWiseSalesReport from '../pages/PartyWiseSalesReport';
 import APReport from '../pages/APReport';
+import UnbilledReport from '../pages/UnbilledReport';
 import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
 import DownloadBTHBankFile from '../pages/DownloadBTHBankFile';
@@ -185,6 +186,7 @@ const menuItems: MenuItem[] = [
       { id: 'ath-paid-report', label: 'ATH Paid Report' },
       { id: 'party-wise-sales', label: 'Party Wise Sales' },
       { id: 'bill-payment-report', label: 'Bill Payment Report' },
+      { id: 'unbilled-report', label: 'Unbilled Report' },
     ],
   },
 ];
@@ -317,6 +319,8 @@ export function Layout() {
         return <PartyWiseSalesReport />;
       case 'ap-report':
         return <APReport />;
+      case 'unbilled-report':
+        return <UnbilledReport />;
       case 'ar-report':
         return <APReport />;
       case 'lr-life-cycle':
