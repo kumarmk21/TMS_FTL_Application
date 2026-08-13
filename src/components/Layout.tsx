@@ -64,6 +64,7 @@ import BillPaymentReport from '../pages/BillPaymentReport';
 import PartyWiseSalesReport from '../pages/PartyWiseSalesReport';
 import APReport from '../pages/APReport';
 import UnbilledReport from '../pages/UnbilledReport';
+import LRPendingFinEditReport from '../pages/LRPendingFinEditReport';
 import AdminExpenses from '../pages/AdminExpenses';
 import AdminPaymentBankFile from '../pages/AdminPaymentBankFile';
 import DownloadBTHBankFile from '../pages/DownloadBTHBankFile';
@@ -187,6 +188,7 @@ const menuItems: MenuItem[] = [
       { id: 'party-wise-sales', label: 'Party Wise Sales' },
       { id: 'bill-payment-report', label: 'Bill Payment Report' },
       { id: 'unbilled-report', label: 'Unbilled Report' },
+      { id: 'lr-pending-fin-edit', label: 'LR Pending for Fin Edit' },
     ],
   },
 ];
@@ -321,6 +323,8 @@ export function Layout() {
         return <APReport />;
       case 'unbilled-report':
         return <UnbilledReport />;
+      case 'lr-pending-fin-edit':
+        return <LRPendingFinEditReport />;
       case 'ar-report':
         return <APReport />;
       case 'lr-life-cycle':
