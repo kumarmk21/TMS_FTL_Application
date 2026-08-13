@@ -10,8 +10,8 @@ interface LRPendingFinEdit {
   lr_date: string;
   from_city: string;
   to_city: string;
-  consignor_name: string;
-  consignee_name: string;
+  consignor: string;
+  consignee: string;
   billing_party_name: string;
   vehicle_number: string;
   pay_basis: string;
@@ -36,7 +36,7 @@ export default function LRPendingFinEditReport() {
       setLoading(true);
       let query = supabase
         .from('booking_lr')
-        .select('tran_id, manual_lr_no, lr_date, from_city, to_city, consignor_name, consignee_name, billing_party_name, vehicle_number, pay_basis, freight_amount, lr_total_amount, lr_financial_status, bill_no')
+        .select('tran_id, manual_lr_no, lr_date, from_city, to_city, consignor, consignee, billing_party_name, vehicle_number, pay_basis, freight_amount, lr_total_amount, lr_financial_status, bill_no')
         .eq('pay_basis', 'TBB')
         .or('freight_amount.is.null,freight_amount.eq.0')
         .order('lr_date', { ascending: false });
@@ -75,8 +75,8 @@ export default function LRPendingFinEditReport() {
           : '',
         'Origin': item.from_city || '',
         'Destination': item.to_city || '',
-        'Consignor': item.consignor_name || '',
-        'Consignee': item.consignee_name || '',
+        'Consignor': item.consignor || '',
+        'Consignee': item.consignee || '',
         'Billing Party': item.billing_party_name || '',
         'Vehicle Number': item.vehicle_number || '',
         'Pay Basis': item.pay_basis || '',
@@ -202,8 +202,8 @@ export default function LRPendingFinEditReport() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.from_city || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.to_city || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{item.consignor_name || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{item.consignee_name || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{item.consignor || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{item.consignee || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.billing_party_name || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.vehicle_number || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.pay_basis || '-'}</td>
