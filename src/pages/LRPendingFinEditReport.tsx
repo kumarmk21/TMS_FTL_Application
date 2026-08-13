@@ -10,8 +10,6 @@ interface LRPendingFinEdit {
   lr_date: string;
   from_city: string;
   to_city: string;
-  consignor: string;
-  consignee: string;
   billing_party_name: string;
   vehicle_number: string;
   pay_basis: string;
@@ -36,7 +34,7 @@ export default function LRPendingFinEditReport() {
       setLoading(true);
       let query = supabase
         .from('booking_lr')
-        .select('tran_id, manual_lr_no, lr_date, from_city, to_city, consignor, consignee, billing_party_name, vehicle_number, pay_basis, freight_amount, lr_total_amount, lr_financial_status, bill_no')
+        .select('tran_id, manual_lr_no, lr_date, from_city, to_city, billing_party_name, vehicle_number, pay_basis, freight_amount, lr_total_amount, lr_financial_status, bill_no')
         .eq('pay_basis', 'TBB')
         .or('freight_amount.is.null,freight_amount.eq.0')
         .order('lr_date', { ascending: false });
@@ -75,8 +73,6 @@ export default function LRPendingFinEditReport() {
           : '',
         'Origin': item.from_city || '',
         'Destination': item.to_city || '',
-        'Consignor': item.consignor || '',
-        'Consignee': item.consignee || '',
         'Billing Party': item.billing_party_name || '',
         'Vehicle Number': item.vehicle_number || '',
         'Pay Basis': item.pay_basis || '',
@@ -92,8 +88,6 @@ export default function LRPendingFinEditReport() {
         'LR Date': '',
         'Origin': '',
         'Destination': '',
-        'Consignor': '',
-        'Consignee': '',
         'Billing Party': '',
         'Vehicle Number': '',
         'Pay Basis': 'TOTAL',
@@ -106,7 +100,7 @@ export default function LRPendingFinEditReport() {
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       worksheet['!cols'] = [
         { wch: 8 }, { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 15 },
-        { wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 10 },
+        { wch: 25 }, { wch: 15 }, { wch: 10 },
         { wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 15 },
       ];
       const workbook = XLSX.utils.book_new();
@@ -174,8 +168,6 @@ export default function LRPendingFinEditReport() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">LR Date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Origin</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Destination</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Consignor</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Consignee</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Billing Party</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Vehicle Number</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Pay Basis</th>
@@ -188,7 +180,7 @@ export default function LRPendingFinEditReport() {
             <tbody className="divide-y divide-gray-200">
               {data.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
                     No LRs pending for financial edit
                   </td>
                 </tr>
@@ -202,8 +194,6 @@ export default function LRPendingFinEditReport() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.from_city || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.to_city || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{item.consignor || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{item.consignee || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.billing_party_name || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.vehicle_number || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{item.pay_basis || '-'}</td>
@@ -222,7 +212,7 @@ export default function LRPendingFinEditReport() {
             {data.length > 0 && (
               <tfoot className="bg-gray-50 border-t-2 border-gray-300">
                 <tr>
-                  <td colSpan={10} className="px-4 py-3 text-sm font-bold text-gray-900 text-right">Total</td>
+                  <td colSpan={8} className="px-4 py-3 text-sm font-bold text-gray-900 text-right">Total</td>
                   <td className="px-4 py-3 text-sm font-bold text-gray-900 text-right">
                     ₹{totals.freight.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
                   </td>
