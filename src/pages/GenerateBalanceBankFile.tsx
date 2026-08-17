@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, Download, Loader2, CheckCircle, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface THCRecord {
@@ -22,6 +22,7 @@ interface THCRecord {
   thc_net_payable_amount: number | null;
   thc_advance_amount: number | null;
   bth_due_date: string | null;
+  zoho_ath_sync_status: string | null;
   thc_loading_charges: number | null;
   thc_unloading_charges: number | null;
   thc_detention_charges: number | null;
@@ -59,6 +60,7 @@ export default function GenerateBalanceBankFile() {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [uploadMessage, setUploadMessage] = useState('');
   const [chargeEdits, setChargeEdits] = useState<Record<string, ChargeEdit>>({});
+  const [markingAth, setMarkingAth] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAccountNames();
@@ -126,7 +128,8 @@ export default function GenerateBalanceBankFile() {
           thc_deduction_damage,
           thc_munshiyana_amount,
           thc_pod_delay_deduction,
-          thc_tds_amount
+          thc_tds_amount,
+          zoho_ath_sync_status
         `)
         .eq('ven_act_name', selectedAccount)
         .gt('thc_balance_amount', 0)
@@ -197,6 +200,26 @@ export default function GenerateBalanceBankFile() {
       setRecords([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const markAthPushed = async (thcId: string) => {
+    setMarkingAth(thcId);
+    try {
+      const { error } = await supabase
+        .from('thc_details')
+        .update({
+          zoho_ath_sync_status: 'synced',
+          zoho_synced_at: new Date().toISOString(),
+        } as any)
+        .eq('thc_id', thcId);
+      if (error) throw error;
+      setRecords(prev => prev.map(r => r.thc_id === thcId ? { ...r, zoho_ath_sync_status: 'synced' } : r));
+    } catch (error: any) {
+      console.error('Error marking ATH as pushed:', error);
+      alert(`Failed to mark ATH as pushed: ${error.message}`);
+    } finally {
+      setMarkingAth(null);
     }
   };
 
@@ -586,6 +609,9 @@ export default function GenerateBalanceBankFile() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Branch
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                  ATH Status
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Due Days
                 </th>
@@ -594,20 +620,20 @@ export default function GenerateBalanceBankFile() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={27} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={28} className="px-4 py-12 text-center text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                     Loading records...
                   </td>
                 </tr>
               ) : !selectedAccount ? (
                 <tr>
-                  <td colSpan={27} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={28} className="px-4 py-12 text-center text-gray-500">
                     Please select a vendor account name
                   </td>
                 </tr>
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={27} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={28} className="px-4 py-12 text-center text-gray-500">
                     No records found with pending balance payments
                   </td>
                 </tr>
@@ -699,6 +725,27 @@ export default function GenerateBalanceBankFile() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                       {record.bth_due_date || '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      {record.zoho_ath_sync_status === 'synced' ? (
+                        <span className="inline-flex items-center gap-1 text-green-700">
+                          <CheckCircle2 className="w-4 h-4" />
+                          ATH Pushed
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => markAthPushed(record.thc_id)}
+                          disabled={markingAth === record.thc_id}
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {markingAth === record.thc_id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <XCircle className="w-3 h-3" />
+                          )}
+                          {markingAth === record.thc_id ? 'Marking...' : 'Mark ATH Pushed'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
