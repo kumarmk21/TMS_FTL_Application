@@ -2267,6 +2267,118 @@ Deno.serve(async (req: Request) => {
       }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // ── Verify a single ATH payment against Zoho Books ──
+    if (action === 'verify-ath-payment') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const body = await req.json().catch(() => ({}));
+      const thcId = (body as { thc_id?: string }).thc_id;
+
+      if (!thcId) {
+        return new Response(JSON.stringify({ error: 'Missing thc_id' }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: thc, error: thcError } = await supabase
+        .from('thc_details')
+        .select(`
+          thc_id, thc_id_number, lr_number, thc_vendor,
+          thc_advance_amount, ath_date,
+          zoho_books_id, zoho_sync_status,
+          zoho_ath_sync_status, zoho_ath_payment_id,
+          vendor_master:thc_vendor (vendor_code, vendor_name, zoho_vendor_id)
+        `)
+        .eq('thc_id', thcId)
+        .maybeSingle();
+
+      if (thcError) throw thcError;
+      if (!thc) {
+        return new Response(JSON.stringify({ error: `THC record ${thcId} not found` }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const vendor = (thc as any).vendor_master;
+      if (!vendor?.zoho_vendor_id) {
+        return new Response(JSON.stringify({
+          error: `Vendor "${vendor?.vendor_name || 'Unknown'}" is not linked to Zoho Books.`,
+        }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const lrNumber = (thc as any).lr_number || '';
+      const refNumber = (thc as any).thc_id_number || '';
+      const advanceAmount = parseFloat((thc as any).thc_advance_amount || '0');
+      const storedBillId = (thc as any).zoho_books_id || null;
+
+      // Search Zoho vendor payments for this vendor, filtering by reference number or amount
+      const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
+      payUrl.searchParams.set('organization_id', orgId);
+      payUrl.searchParams.set('vendor_id', vendor.zoho_vendor_id);
+
+      const payRes = await fetch(payUrl.toString(), {
+        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+      });
+      const payData = await payRes.json();
+
+      if (payData.code !== undefined && payData.code !== 0) {
+        return new Response(JSON.stringify({
+          error: `Failed to fetch vendor payments from Zoho: ${payData.message}`,
+        }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const zohoPayments = (payData.vendorpayments || payData.payments || []) as Record<string, any>[];
+
+      // Match by reference_number (thc_id_number) or description containing LR number
+      const matchedPayment = zohoPayments.find((p) => {
+        const ref = (p.reference_number || '').toLowerCase();
+        const desc = (p.description || '').toLowerCase();
+        const lr = lrNumber.toLowerCase();
+        const refNum = refNumber.toLowerCase();
+        return ref === refNum || (lr && desc.includes(lr)) || (refNum && desc.includes(refNum));
+      }) || zohoPayments.find((p) => {
+        const amt = parseFloat(p.amount || '0');
+        return amt > 0 && Math.abs(amt - advanceAmount) < 0.01;
+      });
+
+      if (matchedPayment) {
+        await supabase
+          .from('thc_details')
+          .update({
+            zoho_ath_payment_id: matchedPayment.payment_id,
+            zoho_ath_sync_status: 'synced',
+            zoho_synced_at: new Date().toISOString(),
+          } as any)
+          .eq('thc_id', thcId);
+
+        return new Response(JSON.stringify({
+          success: true,
+          verified: true,
+          zoho_payment_id: matchedPayment.payment_id,
+          zoho_payment_number: matchedPayment.payment_number || '',
+          amount: matchedPayment.amount,
+          date: matchedPayment.date,
+          reference_number: matchedPayment.reference_number || '',
+          thc_id: thcId,
+          thc_number: refNumber,
+          vendor_name: vendor.vendor_name,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        verified: false,
+        message: 'No matching ATH payment found in Zoho Books for this vendor. You can still mark it as pushed manually.',
+        thc_id: thcId,
+        thc_number: refNumber,
+        vendor_name: vendor.vendor_name,
+        searched_payments: zohoPayments.length,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // ── Push a single BTH (balance) payment to Zoho Books ──
     if (action === 'push-bth-payment') {
       const supabase = createClient(supabaseUrl, supabaseKey);

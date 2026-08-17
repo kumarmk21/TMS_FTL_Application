@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X, Wallet, ArrowLeft, Pencil, CreditCard, History, Settings, Clock } from 'lucide-react';
+import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X, Wallet, ArrowLeft, Pencil, CreditCard, History, Settings, Clock, SearchCheck, CheckSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import VendorPaymentsDashboard from './VendorPaymentsDashboard';
 import VendorPaymentHistory from './VendorPaymentHistory';
@@ -269,6 +269,8 @@ export default function ZohoBooksIntegration() {
   const [bthEditForm, setBthEditForm] = useState({ ven_act_name: '', ven_act_number: '', ven_act_ifsc: '', ven_act_bank: '', ven_act_branch: '', thc_balance_amount: 0, thc_balance_pmt_utr_details: '' });
   const [viewingBth, setViewingBth] = useState<BthRecord | null>(null);
   const [submittingBth, setSubmittingBth] = useState<string | null>(null);
+  const [markingAthBth, setMarkingAthBth] = useState<string | null>(null);
+  const [verifyingAthBth, setVerifyingAthBth] = useState<string | null>(null);
 
   const oauthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-oauth`;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api`;
@@ -709,6 +711,56 @@ export default function ZohoBooksIntegration() {
       setBthError(err.message || 'Failed to submit BTH payment');
     } finally {
       setSubmittingBth(null);
+    }
+  };
+
+  const markAthPushedInBth = async (record: BthRecord) => {
+    setMarkingAthBth(record.thc_id);
+    setBthError('');
+    try {
+      const { error } = await supabase
+        .from('thc_details')
+        .update({
+          zoho_ath_sync_status: 'synced',
+          zoho_synced_at: new Date().toISOString(),
+        } as any)
+        .eq('thc_id', record.thc_id);
+      if (error) throw error;
+      setBthRecords(prev => prev.map(r => r.thc_id === record.thc_id ? { ...r, zoho_ath_sync_status: 'synced' } : r));
+      setSuccess(`ATH marked as pushed for ${record.thc_id_number}.`);
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err: any) {
+      setBthError(err.message || 'Failed to mark ATH as pushed');
+    } finally {
+      setMarkingAthBth(null);
+    }
+  };
+
+  const verifyAthInZoho = async (record: BthRecord) => {
+    setVerifyingAthBth(record.thc_id);
+    setBthError('');
+    try {
+      const res = await fetch(`${apiUrl}?action=verify-ath-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ thc_id: record.thc_id }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Verify failed (${res.status})`);
+      if (data.verified) {
+        setBthRecords(prev => prev.map(r => r.thc_id === record.thc_id ? { ...r, zoho_ath_sync_status: 'synced' } : r));
+        setSuccess(`ATH payment verified in Zoho Books for ${record.thc_id_number} (Payment #: ${data.zoho_payment_number || data.zoho_payment_id}).`);
+        setTimeout(() => setSuccess(''), 6000);
+      } else {
+        setBthError(data.message || 'No matching ATH payment found in Zoho Books. You can mark it as pushed manually.');
+      }
+    } catch (err: any) {
+      setBthError(err.message || 'Failed to verify ATH payment in Zoho');
+    } finally {
+      setVerifyingAthBth(null);
     }
   };
 
@@ -3053,6 +3105,34 @@ export default function ZohoBooksIntegration() {
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
+                            )}
+                            {record.zoho_ath_sync_status !== 'synced' && (
+                              <>
+                                <button
+                                  onClick={() => verifyAthInZoho(record)}
+                                  disabled={verifyingAthBth === record.thc_id}
+                                  className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50"
+                                  title="Verify ATH payment in Zoho Books"
+                                >
+                                  {verifyingAthBth === record.thc_id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <SearchCheck className="w-4 h-4" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => markAthPushedInBth(record)}
+                                  disabled={markingAthBth === record.thc_id}
+                                  className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50"
+                                  title="Mark ATH as pushed (manual)"
+                                >
+                                  {markingAthBth === record.thc_id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <CheckSquare className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </>
                             )}
                             <button
                               onClick={() => submitBthPayment(record)}
