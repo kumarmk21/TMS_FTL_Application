@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X, Wallet, ArrowLeft, Pencil, CreditCard, History, Settings, Clock, SearchCheck, CheckSquare } from 'lucide-react';
+import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X, Wallet, ArrowLeft, Pencil, CreditCard, History, Settings, Clock, SearchCheck, CheckSquare, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import VendorPaymentsDashboard from './VendorPaymentsDashboard';
 import VendorPaymentHistory from './VendorPaymentHistory';
@@ -173,6 +173,7 @@ interface AthRecord {
   thc_date: string | null;
   zoho_ath_sync_status: string | null;
   zoho_ath_payment_id: string | null;
+  zoho_ath_error: string | null;
   zoho_books_id: string | null;
 }
 
@@ -198,7 +199,9 @@ interface BthRecord {
   thc_balance_pmt_utr_details: string | null;
   thc_date: string | null;
   zoho_ath_sync_status: string | null;
+  zoho_ath_error: string | null;
   zoho_bth_sync_status: string | null;
+  zoho_bth_error: string | null;
   zoho_bth_payment_id: string | null;
   zoho_books_id: string | null;
 }
@@ -271,6 +274,7 @@ export default function ZohoBooksIntegration() {
   const [submittingBth, setSubmittingBth] = useState<string | null>(null);
   const [markingAthBth, setMarkingAthBth] = useState<string | null>(null);
   const [verifyingAthBth, setVerifyingAthBth] = useState<string | null>(null);
+  const [retryingAthBth, setRetryingAthBth] = useState<string | null>(null);
 
   const oauthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-oauth`;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api`;
@@ -466,7 +470,7 @@ export default function ZohoBooksIntegration() {
           vehicle_type, vehicle_number, thc_vendor,
           thc_amount, thc_advance_amount, thc_balance_amount,
           ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank, ven_act_branch,
-          ath_date, thc_date, zoho_ath_sync_status, zoho_ath_payment_id, zoho_books_id
+          ath_date, thc_date, zoho_ath_sync_status, zoho_ath_payment_id, zoho_ath_error, zoho_books_id
         `)
         .eq('thc_status_fin', athUploadedStatusId)
         .not('ath_date', 'is', null)
@@ -598,7 +602,7 @@ export default function ZohoBooksIntegration() {
           thc_amount, thc_advance_amount, thc_balance_amount,
           ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank, ven_act_branch,
           thc_balance_payment_date, thc_balance_pmt_utr_details, thc_date,
-          zoho_ath_sync_status, zoho_bth_sync_status, zoho_bth_payment_id, zoho_books_id
+          zoho_ath_sync_status, zoho_ath_error, zoho_bth_sync_status, zoho_bth_error, zoho_bth_payment_id, zoho_books_id
         `)
         .eq('thc_status_fin', bthFinStatusId)
         .not('thc_balance_payment_date', 'is', null)
@@ -761,6 +765,31 @@ export default function ZohoBooksIntegration() {
       setBthError(err.message || 'Failed to verify ATH payment in Zoho');
     } finally {
       setVerifyingAthBth(null);
+    }
+  };
+
+  const retryAthPush = async (record: BthRecord) => {
+    setRetryingAthBth(record.thc_id);
+    setBthError('');
+    try {
+      const res = await fetch(`${apiUrl}?action=push-ath-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ thc_id: record.thc_id }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `ATH push failed (${res.status})`);
+      setBthRecords(prev => prev.map(r => r.thc_id === record.thc_id ? { ...r, zoho_ath_sync_status: 'synced', zoho_ath_error: null } : r));
+      setSuccess(`ATH payment pushed to Zoho for ${record.thc_id_number}.`);
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err: any) {
+      setBthError(err.message || 'Failed to push ATH payment');
+      await fetchBthRecords();
+    } finally {
+      setRetryingAthBth(null);
     }
   };
 
@@ -2802,10 +2831,17 @@ export default function ZohoBooksIntegration() {
                               Pushed
                             </span>
                           ) : record.zoho_ath_sync_status === 'failed' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
-                              <AlertCircle className="w-3 h-3" />
-                              Failed
-                            </span>
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
+                                <AlertCircle className="w-3 h-3" />
+                                Failed
+                              </span>
+                              {record.zoho_ath_error && (
+                                <span className="text-xs text-red-600 max-w-xs" title={record.zoho_ath_error}>
+                                  {record.zoho_ath_error.length > 60 ? record.zoho_ath_error.slice(0, 60) + '...' : record.zoho_ath_error}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-full">
                               <Clock className="w-3 h-3" />
@@ -2835,7 +2871,7 @@ export default function ZohoBooksIntegration() {
                               onClick={() => submitAthPayment(record)}
                               disabled={submittingAth === record.thc_id}
                               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
-                              title="Submit Payment to Zoho"
+                              title={record.zoho_ath_sync_status === 'failed' ? 'Retry ATH Payment push to Zoho' : 'Submit Payment to Zoho'}
                             >
                               {submittingAth === record.thc_id ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -3059,10 +3095,17 @@ export default function ZohoBooksIntegration() {
                               Pushed
                             </span>
                           ) : record.zoho_ath_sync_status === 'failed' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
-                              <AlertCircle className="w-3 h-3" />
-                              Failed
-                            </span>
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
+                                <AlertCircle className="w-3 h-3" />
+                                Failed
+                              </span>
+                              {record.zoho_ath_error && (
+                                <span className="text-xs text-red-600 max-w-xs" title={record.zoho_ath_error}>
+                                  {record.zoho_ath_error.length > 60 ? record.zoho_ath_error.slice(0, 60) + '...' : record.zoho_ath_error}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-full">
                               <Clock className="w-3 h-3" />
@@ -3077,10 +3120,17 @@ export default function ZohoBooksIntegration() {
                               Pushed
                             </span>
                           ) : record.zoho_bth_sync_status === 'failed' ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
-                              <AlertCircle className="w-3 h-3" />
-                              Failed
-                            </span>
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full">
+                                <AlertCircle className="w-3 h-3" />
+                                Failed
+                              </span>
+                              {record.zoho_bth_error && (
+                                <span className="text-xs text-red-600 max-w-xs" title={record.zoho_bth_error}>
+                                  {record.zoho_bth_error.length > 60 ? record.zoho_bth_error.slice(0, 60) + '...' : record.zoho_bth_error}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-full">
                               <Clock className="w-3 h-3" />
@@ -3108,6 +3158,20 @@ export default function ZohoBooksIntegration() {
                             )}
                             {record.zoho_ath_sync_status !== 'synced' && (
                               <>
+                                {record.zoho_ath_sync_status === 'failed' && (
+                                  <button
+                                    onClick={() => retryAthPush(record)}
+                                    disabled={retryingAthBth === record.thc_id}
+                                    className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                    title="Retry ATH push to Zoho"
+                                  >
+                                    {retryingAthBth === record.thc_id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <RotateCcw className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => verifyAthInZoho(record)}
                                   disabled={verifyingAthBth === record.thc_id}

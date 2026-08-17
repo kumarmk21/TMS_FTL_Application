@@ -2254,15 +2254,17 @@ Deno.serve(async (req: Request) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Mark as failed in DB so UI can reflect it
+      const errorMsg = payData.message || 'Failed to create ATH payment in Zoho Books';
+
+      // Mark as failed in DB with error message so UI can reflect it
       await supabase
         .from('thc_details')
-        .update({ zoho_ath_sync_status: 'failed' } as any)
+        .update({ zoho_ath_sync_status: 'failed', zoho_ath_error: errorMsg } as any)
         .eq('thc_id', thcId);
 
       console.error('[Zoho] ATH payment push failed:', JSON.stringify(payData));
       return new Response(JSON.stringify({
-        error: payData.message || 'Failed to create ATH payment in Zoho Books',
+        error: errorMsg,
         zoho_error: payData,
       }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -2561,15 +2563,17 @@ Deno.serve(async (req: Request) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Mark as failed in DB so UI can reflect it
+      const bthErrorMsg = payData.message || 'Failed to create BTH payment in Zoho Books';
+
+      // Mark as failed in DB with error message so UI can reflect it
       await supabase
         .from('thc_details')
-        .update({ zoho_bth_sync_status: 'failed' } as any)
+        .update({ zoho_bth_sync_status: 'failed', zoho_bth_error: bthErrorMsg } as any)
         .eq('thc_id', thcId);
 
       console.error('[Zoho] BTH payment push failed:', JSON.stringify(payData));
       return new Response(JSON.stringify({
-        error: payData.message || 'Failed to create BTH payment in Zoho Books',
+        error: bthErrorMsg,
         zoho_error: payData,
       }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
