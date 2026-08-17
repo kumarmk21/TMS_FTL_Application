@@ -2207,7 +2207,22 @@ Deno.serve(async (req: Request) => {
         zohoBillId = zohoBills[0].bill_id;
       }
 
-      const paymentPayload: Record<string, any> = {
+      // Helper: search Zoho for a bill by vendor + bill_number (LR number)
+      const searchZohoBillByLr = async (lr: string): Promise<string | null> => {
+        const billSearchUrl = new URL(`${apiDomain}/books/v3/bills`);
+        billSearchUrl.searchParams.set('organization_id', orgId);
+        billSearchUrl.searchParams.set('vendor_id', vendor.zoho_vendor_id);
+        billSearchUrl.searchParams.set('bill_number', lr);
+        const billSearchRes = await fetch(billSearchUrl.toString(), {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        const billSearchData = await billSearchRes.json();
+        if (billSearchData.code !== undefined && billSearchData.code !== 0) return null;
+        const zohoBills = (billSearchData.bills || []) as Record<string, any>[];
+        return zohoBills.length > 0 ? zohoBills[0].bill_id : null;
+      };
+
+      const buildPaymentPayload = (billId: string) => ({
         vendor_id: vendor.zoho_vendor_id,
         payment_mode: 'banktransfer',
         amount: advanceAmount,
@@ -2215,21 +2230,41 @@ Deno.serve(async (req: Request) => {
         paid_through_account_id: bankAccount.account_id,
         reference_number: refNumber,
         description: `Advance Payment (ATH) — ${refNumber}`,
-        bills: [{ bill_id: zohoBillId, amount_applied: advanceAmount }],
+        bills: [{ bill_id: billId, amount_applied: advanceAmount }],
+      });
+
+      const postPayment = async (payload: Record<string, any>) => {
+        const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
+        payUrl.searchParams.set('organization_id', orgId);
+        const res = await fetch(payUrl.toString(), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${accessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `JSONString=${encodeURIComponent(JSON.stringify(payload))}`,
+        });
+        return await res.json();
       };
 
-      const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
-      payUrl.searchParams.set('organization_id', orgId);
+      let payData = await postPayment(buildPaymentPayload(zohoBillId!));
 
-      const payRes = await fetch(payUrl.toString(), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Zoho-oauthtoken ${accessToken}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `JSONString=${encodeURIComponent(JSON.stringify(paymentPayload))}`,
-      });
-      const payData = await payRes.json();
+      // If the stored bill ID is invalid, fall back to searching Zoho by LR number
+      if (payData.code !== 0 && lrNumber && storedBillId) {
+        const billNotExist = (payData.message || '').toLowerCase().includes('do not exist') ||
+          (payData.message || '').toLowerCase().includes('does not exist');
+        if (billNotExist) {
+          const freshBillId = await searchZohoBillByLr(lrNumber);
+          if (freshBillId && freshBillId !== zohoBillId) {
+            zohoBillId = freshBillId;
+            await supabase
+              .from('thc_details')
+              .update({ zoho_books_id: freshBillId } as any)
+              .eq('thc_id', thcId);
+            payData = await postPayment(buildPaymentPayload(freshBillId));
+          }
+        }
+      }
 
       const athPayment = payData.vendorpayment || payData.payment;
       if (payData.code === 0 && athPayment) {
@@ -2238,6 +2273,7 @@ Deno.serve(async (req: Request) => {
           .update({
             zoho_ath_payment_id: athPayment.payment_id,
             zoho_ath_sync_status: 'synced',
+            zoho_ath_error: null,
             zoho_synced_at: new Date().toISOString(),
           } as any)
           .eq('thc_id', thcId);
@@ -2516,7 +2552,22 @@ Deno.serve(async (req: Request) => {
 
       const utrDetails = (thc as any).thc_balance_pmt_utr_details || '';
 
-      const paymentPayload: Record<string, any> = {
+      // Helper: search Zoho for a bill by vendor + bill_number (LR number)
+      const searchZohoBillByLrBth = async (lr: string): Promise<string | null> => {
+        const billSearchUrl = new URL(`${apiDomain}/books/v3/bills`);
+        billSearchUrl.searchParams.set('organization_id', orgId);
+        billSearchUrl.searchParams.set('vendor_id', vendor.zoho_vendor_id);
+        billSearchUrl.searchParams.set('bill_number', lr);
+        const billSearchRes = await fetch(billSearchUrl.toString(), {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        const billSearchData = await billSearchRes.json();
+        if (billSearchData.code !== undefined && billSearchData.code !== 0) return null;
+        const zohoBills = (billSearchData.bills || []) as Record<string, any>[];
+        return zohoBills.length > 0 ? zohoBills[0].bill_id : null;
+      };
+
+      const buildBthPaymentPayload = (billId: string) => ({
         vendor_id: vendor.zoho_vendor_id,
         payment_mode: 'banktransfer',
         amount: balanceAmount,
@@ -2524,21 +2575,41 @@ Deno.serve(async (req: Request) => {
         paid_through_account_id: bankAccount.account_id,
         reference_number: utrDetails || refNumber,
         description: `Balance Payment (BTH) — ${refNumber}`,
-        bills: [{ bill_id: zohoBillId, amount_applied: balanceAmount }],
+        bills: [{ bill_id: billId, amount_applied: balanceAmount }],
+      });
+
+      const postBthPayment = async (payload: Record<string, any>) => {
+        const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
+        payUrl.searchParams.set('organization_id', orgId);
+        const res = await fetch(payUrl.toString(), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Zoho-oauthtoken ${accessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: `JSONString=${encodeURIComponent(JSON.stringify(payload))}`,
+        });
+        return await res.json();
       };
 
-      const payUrl = new URL(`${apiDomain}/books/v3/vendorpayments`);
-      payUrl.searchParams.set('organization_id', orgId);
+      let payData = await postBthPayment(buildBthPaymentPayload(zohoBillId!));
 
-      const payRes = await fetch(payUrl.toString(), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Zoho-oauthtoken ${accessToken}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `JSONString=${encodeURIComponent(JSON.stringify(paymentPayload))}`,
-      });
-      const payData = await payRes.json();
+      // If the stored bill ID is invalid, fall back to searching Zoho by LR number
+      if (payData.code !== 0 && lrNumber && storedBillId) {
+        const billNotExist = (payData.message || '').toLowerCase().includes('do not exist') ||
+          (payData.message || '').toLowerCase().includes('does not exist');
+        if (billNotExist) {
+          const freshBillId = await searchZohoBillByLrBth(lrNumber);
+          if (freshBillId && freshBillId !== zohoBillId) {
+            zohoBillId = freshBillId;
+            await supabase
+              .from('thc_details')
+              .update({ zoho_books_id: freshBillId } as any)
+              .eq('thc_id', thcId);
+            payData = await postBthPayment(buildBthPaymentPayload(freshBillId));
+          }
+        }
+      }
 
       const bthPayment = payData.vendorpayment || payData.payment;
       if (payData.code === 0 && bthPayment) {
@@ -2547,6 +2618,7 @@ Deno.serve(async (req: Request) => {
           .update({
             zoho_bth_payment_id: bthPayment.payment_id,
             zoho_bth_sync_status: 'synced',
+            zoho_bth_error: null,
             zoho_synced_at: new Date().toISOString(),
           } as any)
           .eq('thc_id', thcId);
