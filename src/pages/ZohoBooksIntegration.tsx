@@ -254,7 +254,6 @@ export default function ZohoBooksIntegration() {
   const [purchasePushFilter, setPurchasePushFilter] = useState<'all' | 'pushed' | 'skipped' | 'error'>('all');
 
   // ATH Payment tab state
-  const athUploadedStatusId = 'cd7d2d24-ab28-4aab-ab01-11b8074580f1';
   const [athRecords, setAthRecords] = useState<AthRecord[]>([]);
   const [loadingAth, setLoadingAth] = useState(false);
   const [athError, setAthError] = useState('');
@@ -264,7 +263,6 @@ export default function ZohoBooksIntegration() {
   const [submittingAth, setSubmittingAth] = useState<string | null>(null);
 
   // BTH Payment tab state
-  const bthFinStatusId = '144fb692-3956-4b0d-a47f-25ea08479f5f';
   const [bthRecords, setBthRecords] = useState<BthRecord[]>([]);
   const [loadingBth, setLoadingBth] = useState(false);
   const [bthError, setBthError] = useState('');
@@ -472,7 +470,6 @@ export default function ZohoBooksIntegration() {
           ven_act_name, ven_act_number, ven_act_ifsc, ven_act_bank, ven_act_branch,
           ath_date, thc_date, zoho_ath_sync_status, zoho_ath_payment_id, zoho_ath_error, zoho_books_id
         `)
-        .eq('thc_status_fin', athUploadedStatusId)
         .not('ath_date', 'is', null)
         .order('ath_date', { ascending: false })
         .limit(500);
@@ -499,7 +496,7 @@ export default function ZohoBooksIntegration() {
     } finally {
       setLoadingAth(false);
     }
-  }, [athUploadedStatusId]);
+  }, []);
 
   useEffect(() => {
     if (status?.connected && view === 'main' && activeTab === 'ath-payment') {
@@ -515,7 +512,7 @@ export default function ZohoBooksIntegration() {
         .channel('ath-payment-changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'thc_details', filter: `thc_status_fin=eq.${athUploadedStatusId}` },
+          { event: '*', schema: 'public', table: 'thc_details' },
           () => fetchAthRecords()
         )
         .subscribe();
@@ -525,7 +522,7 @@ export default function ZohoBooksIntegration() {
         athChannelRef.current = null;
       };
     }
-  }, [view, activeTab, status?.connected, athUploadedStatusId, fetchAthRecords]);
+  }, [view, activeTab, status?.connected, fetchAthRecords]);
 
   const startEditAth = (record: AthRecord) => {
     setEditingAth(record.thc_id);
@@ -604,7 +601,6 @@ export default function ZohoBooksIntegration() {
           thc_balance_payment_date, thc_balance_pmt_utr_details, thc_date,
           zoho_ath_sync_status, zoho_ath_error, zoho_bth_sync_status, zoho_bth_error, zoho_bth_payment_id, zoho_books_id
         `)
-        .eq('thc_status_fin', bthFinStatusId)
         .not('thc_balance_payment_date', 'is', null)
         .order('thc_balance_payment_date', { ascending: false })
         .limit(500);
@@ -631,7 +627,7 @@ export default function ZohoBooksIntegration() {
     } finally {
       setLoadingBth(false);
     }
-  }, [bthFinStatusId]);
+  }, []);
 
   useEffect(() => {
     if (status?.connected && view === 'main' && activeTab === 'bth-payment') {
@@ -646,7 +642,7 @@ export default function ZohoBooksIntegration() {
         .channel('bth-payment-changes')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'thc_details', filter: `thc_status_fin=eq.${bthFinStatusId}` },
+          { event: '*', schema: 'public', table: 'thc_details' },
           () => fetchBthRecords()
         )
         .subscribe();
@@ -656,7 +652,7 @@ export default function ZohoBooksIntegration() {
         bthChannelRef.current = null;
       };
     }
-  }, [view, activeTab, status?.connected, bthFinStatusId, fetchBthRecords]);
+  }, [view, activeTab, status?.connected, fetchBthRecords]);
 
   const startEditBth = (record: BthRecord) => {
     setEditingBth(record.thc_id);
