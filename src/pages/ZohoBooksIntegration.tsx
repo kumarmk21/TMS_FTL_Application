@@ -576,7 +576,13 @@ export default function ZohoBooksIntegration() {
       setTimeout(() => setSuccess(''), 5000);
       await fetchAthRecords();
     } catch (err: any) {
-      setAthError(err.message || 'Failed to submit ATH payment');
+      const errMsg = err.message || 'Failed to submit ATH payment';
+      setAthError(errMsg);
+      await supabase
+        .from('thc_details')
+        .update({ zoho_ath_sync_status: 'failed', zoho_ath_error: errMsg } as any)
+        .eq('thc_id', record.thc_id);
+      await fetchAthRecords();
     } finally {
       setSubmittingAth(null);
     }
@@ -708,7 +714,13 @@ export default function ZohoBooksIntegration() {
       setTimeout(() => setSuccess(''), 5000);
       await fetchBthRecords();
     } catch (err: any) {
-      setBthError(err.message || 'Failed to submit BTH payment');
+      const errMsg = err.message || 'Failed to submit BTH payment';
+      setBthError(errMsg);
+      await supabase
+        .from('thc_details')
+        .update({ zoho_bth_sync_status: 'failed', zoho_bth_error: errMsg } as any)
+        .eq('thc_id', record.thc_id);
+      await fetchBthRecords();
     } finally {
       setSubmittingBth(null);
     }
