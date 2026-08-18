@@ -2149,17 +2149,6 @@ Deno.serve(async (req: Request) => {
       }
 
       const bankAccounts = (bankData.bankaccounts || []) as Record<string, any>[];
-      // Prefer "HDFC Bank CA" as default; fall back to first active account
-      const bankAccount = bankAccounts.find(
-        (a) => (a.account_name || '').toLowerCase().includes('hdfc')
-      ) || bankAccounts[0];
-
-      if (!bankAccount) {
-        return new Response(JSON.stringify({ error: 'No bank accounts found in Zoho Books.' }), {
-          status: 422,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
 
       const paymentDate = (thc as any).ath_date
         ? new Date((thc as any).ath_date).toISOString().split('T')[0]
@@ -2222,12 +2211,46 @@ Deno.serve(async (req: Request) => {
         return zohoBills.length > 0 ? zohoBills[0].bill_id : null;
       };
 
+      // Fetch the bill to get its location_id — needed for child vendor payments
+      let billLocationId: string | null = null;
+      try {
+        const billUrl = new URL(`${apiDomain}/books/v3/bills/${zohoBillId}`);
+        billUrl.searchParams.set('organization_id', orgId);
+        const billRes = await fetch(billUrl.toString(), {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        const billData = await billRes.json();
+        if (billData.code === 0 && billData.bill) {
+          billLocationId = billData.bill.location_id || null;
+        }
+      } catch (_) { /* best-effort */ }
+
+      // Select bank account matching the bill's location (critical for child vendors)
+      let bankAccount: Record<string, any> | undefined;
+      if (billLocationId) {
+        bankAccount = bankAccounts.find(
+          (a) => a.location_id === billLocationId && (a.account_name || '').toLowerCase().includes('hdfc')
+        ) || bankAccounts.find((a) => a.location_id === billLocationId);
+      }
+      if (!bankAccount) {
+        bankAccount = bankAccounts.find(
+          (a) => (a.account_name || '').toLowerCase().includes('hdfc')
+        ) || bankAccounts[0];
+      }
+
+      if (!bankAccount) {
+        return new Response(JSON.stringify({ error: 'No bank accounts found in Zoho Books.' }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const buildPaymentPayload = (billId: string) => ({
         vendor_id: vendor.zoho_vendor_id,
         payment_mode: 'banktransfer',
         amount: advanceAmount,
         date: paymentDate,
-        paid_through_account_id: bankAccount.account_id,
+        paid_through_account_id: bankAccount!.account_id,
         reference_number: refNumber,
         description: `Advance Payment (ATH) — ${(thc as any).thc_id_number || refNumber}`,
         bills: [{ bill_id: billId, amount_applied: advanceAmount }],
@@ -2494,16 +2517,6 @@ Deno.serve(async (req: Request) => {
       }
 
       const bankAccounts = (bankData.bankaccounts || []) as Record<string, any>[];
-      const bankAccount = bankAccounts.find(
-        (a) => (a.account_name || '').toLowerCase().includes('hdfc')
-      ) || bankAccounts[0];
-
-      if (!bankAccount) {
-        return new Response(JSON.stringify({ error: 'No bank accounts found in Zoho Books.' }), {
-          status: 422,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
 
       const paymentDate = (thc as any).thc_balance_payment_date
         ? new Date((thc as any).thc_balance_payment_date).toISOString().split('T')[0]
@@ -2552,6 +2565,40 @@ Deno.serve(async (req: Request) => {
 
       const utrDetails = (thc as any).thc_balance_pmt_utr_details || '';
 
+      // Fetch the bill to get its location_id — needed for child vendor payments
+      let billLocationId: string | null = null;
+      try {
+        const billUrl = new URL(`${apiDomain}/books/v3/bills/${zohoBillId}`);
+        billUrl.searchParams.set('organization_id', orgId);
+        const billRes = await fetch(billUrl.toString(), {
+          headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+        });
+        const billData = await billRes.json();
+        if (billData.code === 0 && billData.bill) {
+          billLocationId = billData.bill.location_id || null;
+        }
+      } catch (_) { /* best-effort */ }
+
+      // Select bank account matching the bill's location (critical for child vendors)
+      let bankAccount: Record<string, any> | undefined;
+      if (billLocationId) {
+        bankAccount = bankAccounts.find(
+          (a) => a.location_id === billLocationId && (a.account_name || '').toLowerCase().includes('hdfc')
+        ) || bankAccounts.find((a) => a.location_id === billLocationId);
+      }
+      if (!bankAccount) {
+        bankAccount = bankAccounts.find(
+          (a) => (a.account_name || '').toLowerCase().includes('hdfc')
+        ) || bankAccounts[0];
+      }
+
+      if (!bankAccount) {
+        return new Response(JSON.stringify({ error: 'No bank accounts found in Zoho Books.' }), {
+          status: 422,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       // Helper: search Zoho for a bill by vendor + bill_number (LR number)
       const searchZohoBillByLrBth = async (lr: string): Promise<string | null> => {
         const billSearchUrl = new URL(`${apiDomain}/books/v3/bills`);
@@ -2572,7 +2619,7 @@ Deno.serve(async (req: Request) => {
         payment_mode: 'banktransfer',
         amount: balanceAmount,
         date: paymentDate,
-        paid_through_account_id: bankAccount.account_id,
+        paid_through_account_id: bankAccount!.account_id,
         reference_number: utrDetails || refNumber,
         description: `Balance Payment (BTH) — ${(thc as any).thc_id_number || refNumber}`,
         bills: [{ bill_id: billId, amount_applied: balanceAmount }],
