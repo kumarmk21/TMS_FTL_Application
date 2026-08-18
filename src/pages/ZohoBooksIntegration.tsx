@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, Filter, AlertTriangle, X, Wallet, ArrowLeft, Pencil, CreditCard, History, Settings, Clock, SearchCheck, CheckSquare, RotateCcw } from 'lucide-react';
+import { BookOpen, Link2, Unlink, Loader2, CheckCircle, AlertCircle, RefreshCw, ExternalLink, Users, Upload, ArrowRight, FileText, Eye, Send, Wrench, Calendar, AlertTriangle, X, Wallet, ArrowLeft, Pencil, CreditCard, History, Settings, Clock, SearchCheck, CheckSquare, RotateCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import VendorPaymentsDashboard from './VendorPaymentsDashboard';
 import VendorPaymentHistory from './VendorPaymentHistory';
@@ -200,6 +200,7 @@ interface BthRecord {
   thc_date: string | null;
   zoho_ath_sync_status: string | null;
   zoho_ath_error: string | null;
+  zoho_ath_payment_id: string | null;
   zoho_bth_sync_status: string | null;
   zoho_bth_error: string | null;
   zoho_bth_payment_id: string | null;
@@ -224,7 +225,7 @@ export default function ZohoBooksIntegration() {
   const [pushResult, setPushResult] = useState<InvoicePushResult | null>(null);
   const [pushFilter, setPushFilter] = useState<'all' | 'pushed' | 'skipped' | 'error'>('all');
   const [billTypeFilter, setBillTypeFilter] = useState<'lr' | 'warehouse' | 'both'>('both');
-  const [dateRange, setDateRange] = useState<{ startDate: string | null; endDate: string | null }>({ startDate: null, endDate: null });
+  const [dateRange] = useState<{ startDate: string | null; endDate: string | null }>({ startDate: null, endDate: null });
   const [dryRunOnly, setDryRunOnly] = useState(false);
   const [fixingLinks, setFixingLinks] = useState(false);
   const [fixLinkResult, setFixLinkResult] = useState<FixLinkResult | null>(null);
@@ -234,7 +235,7 @@ export default function ZohoBooksIntegration() {
   const [selectedBillIds, setSelectedBillIds] = useState<Set<string>>(new Set());
   const [processedInvoices, setProcessedInvoices] = useState<ProcessedInvoice[]>([]);
   const [loadingProcessed, setLoadingProcessed] = useState(false);
-  const [invoiceView, setInvoiceView] = useState<'pending' | 'processed'>('pending');
+
   const [showGstWarning, setShowGstWarning] = useState(false);
   const [pendingPushAction, setPendingPushAction] = useState<(() => void) | null>(null);
 
@@ -249,7 +250,7 @@ export default function ZohoBooksIntegration() {
   const [pendingTHCs, setPendingTHCs] = useState<PendingTHC[]>([]);
   const [loadingPendingTHCs, setLoadingPendingTHCs] = useState(false);
   const [selectedTHCIds, setSelectedTHCIds] = useState<Set<string>>(new Set());
-  const [thcFilter, setThcFilter] = useState<'pending' | 'pushed' | 'failed' | 'all'>('pending');
+  const [thcFilter, setThcFilter] = useState<'pending' | 'pushed' | 'failed' | 'all'>('all');
   const [vendorSyncFilter, setVendorSyncFilter] = useState<'all' | 'linked' | 'pushed' | 'error'>('all');
   const [purchasePushFilter, setPurchasePushFilter] = useState<'all' | 'pushed' | 'skipped' | 'error'>('all');
 
@@ -273,6 +274,40 @@ export default function ZohoBooksIntegration() {
   const [markingAthBth, setMarkingAthBth] = useState<string | null>(null);
   const [verifyingAthBth, setVerifyingAthBth] = useState<string | null>(null);
   const [retryingAthBth, setRetryingAthBth] = useState<string | null>(null);
+
+  // Per-segment search + date filter state (independent per segment, default current month)
+  const monthStart = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
+  const monthEnd = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()).padStart(2, '0')}`; };
+
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [invoiceDateFilter, setInvoiceDateFilter] = useState<{ start: string; end: string }>({ start: monthStart(), end: monthEnd() });
+  const [invoiceSubTab, setInvoiceSubTab] = useState<'not_pushed' | 'pushed'>('not_pushed');
+
+  const [thcSearch, setThcSearch] = useState('');
+  const [thcDateFilter, setThcDateFilter] = useState<{ start: string; end: string }>({ start: monthStart(), end: monthEnd() });
+  const [thcSubTab, setThcSubTab] = useState<'not_pushed' | 'pushed'>('not_pushed');
+
+  const [athSearch, setAthSearch] = useState('');
+  const [athDateFilter, setAthDateFilter] = useState<{ start: string; end: string }>({ start: monthStart(), end: monthEnd() });
+  const [athSubTab, setAthSubTab] = useState<'not_pushed' | 'pushed'>('not_pushed');
+
+  const [bthSearch, setBthSearch] = useState('');
+  const [bthDateFilter, setBthDateFilter] = useState<{ start: string; end: string }>({ start: monthStart(), end: monthEnd() });
+  const [bthSubTab, setBthSubTab] = useState<'not_pushed' | 'pushed'>('not_pushed');
+
+  const matchesSearch = (query: string, fields: (string | null | undefined)[]): boolean => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase().trim();
+    return fields.some(f => (f || '').toLowerCase().includes(q));
+  };
+
+  const isInRange = (dateStr: string | null | undefined, start: string, end: string): boolean => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr).getTime();
+    const s = new Date(start).getTime();
+    const e = new Date(end).getTime() + 24 * 60 * 60 * 1000 - 1;
+    return d >= s && d <= e;
+  };
 
   const oauthUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-oauth`;
   const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api`;
@@ -588,9 +623,7 @@ export default function ZohoBooksIntegration() {
     }
   };
 
-  const athTotalAmount = useMemo(() => {
-    return athRecords.reduce((sum, r) => sum + (r.thc_advance_amount || 0), 0);
-  }, [athRecords]);
+
 
   // ── BTH Payment tab: fetch, real-time subscription, actions ──
   const fetchBthRecords = useCallback(async () => {
@@ -801,9 +834,7 @@ export default function ZohoBooksIntegration() {
     }
   };
 
-  const bthTotalAmount = useMemo(() => {
-    return bthRecords.reduce((sum, r) => sum + (r.thc_balance_amount || 0), 0);
-  }, [bthRecords]);
+
 
   const handleConnect = async () => {
     setConnecting(true);
@@ -1017,12 +1048,64 @@ export default function ZohoBooksIntegration() {
     });
   }, [pendingInvoices, billTypeFilter, dateRange]);
 
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (billTypeFilter !== 'both') count++;
-    if (dateRange.startDate || dateRange.endDate) count++;
-    return count;
-  }, [billTypeFilter, dateRange]);
+
+
+  // ── Per-segment filtered lists (independent search + date + pushed/not-pushed sub-tab) ──
+
+  // Sales Invoices: pushed = processedInvoices, not_pushed = pendingInvoices
+  const filteredProcessedInvoices = useMemo(() => {
+    return processedInvoices.filter(inv => {
+      if (!isInRange(inv.bill_date, invoiceDateFilter.start, invoiceDateFilter.end)) return false;
+      if (!matchesSearch(invoiceSearch, [inv.bill_number, inv.customer_name, inv.zoho_invoice_id, inv.zoho_invoice_number])) return false;
+      return true;
+    });
+  }, [processedInvoices, invoiceDateFilter, invoiceSearch]);
+
+  const filteredPendingInvoicesNew = useMemo(() => {
+    return pendingInvoices.filter(inv => {
+      if (billTypeFilter === 'lr' && inv.bill_type !== 'LR') return false;
+      if (billTypeFilter === 'warehouse' && inv.bill_type !== 'WH') return false;
+      if (!isInRange(inv.bill_date, invoiceDateFilter.start, invoiceDateFilter.end)) return false;
+      if (!matchesSearch(invoiceSearch, [inv.bill_number, inv.customer_name])) return false;
+      return true;
+    });
+  }, [pendingInvoices, billTypeFilter, invoiceDateFilter, invoiceSearch]);
+
+  // Purchase Bills (THC): pushed = synced, not_pushed = not_synced/failed
+  const filteredTHCsBySubTab = useMemo(() => {
+    return pendingTHCs.filter(t => {
+      const isPushed = t.zoho_sync_status === 'synced';
+      if (thcSubTab === 'pushed' && !isPushed) return false;
+      if (thcSubTab === 'not_pushed' && isPushed) return false;
+      if (!isInRange(t.thc_date, thcDateFilter.start, thcDateFilter.end)) return false;
+      if (!matchesSearch(thcSearch, [t.thc_number, t.thc_id_number, t.lr_number, t.vendor_name, t.zoho_books_id])) return false;
+      return true;
+    });
+  }, [pendingTHCs, thcSubTab, thcDateFilter, thcSearch]);
+
+  // ATH Payment: pushed = synced, not_pushed = not_synced/failed
+  const filteredAthBySubTab = useMemo(() => {
+    return athRecords.filter(r => {
+      const isPushed = r.zoho_ath_sync_status === 'synced';
+      if (athSubTab === 'pushed' && !isPushed) return false;
+      if (athSubTab === 'not_pushed' && isPushed) return false;
+      if (!isInRange(r.ath_date || r.thc_date, athDateFilter.start, athDateFilter.end)) return false;
+      if (!matchesSearch(athSearch, [r.thc_id_number, r.lr_number, r.vendor_name, r.vehicle_number, r.origin, r.destination, r.zoho_ath_payment_id, r.zoho_books_id])) return false;
+      return true;
+    });
+  }, [athRecords, athSubTab, athDateFilter, athSearch]);
+
+  // BTH Payment: pushed = synced, not_pushed = not_synced/failed
+  const filteredBthBySubTab = useMemo(() => {
+    return bthRecords.filter(r => {
+      const isPushed = r.zoho_bth_sync_status === 'synced';
+      if (bthSubTab === 'pushed' && !isPushed) return false;
+      if (bthSubTab === 'not_pushed' && isPushed) return false;
+      if (!isInRange(r.thc_balance_payment_date || r.thc_date, bthDateFilter.start, bthDateFilter.end)) return false;
+      if (!matchesSearch(bthSearch, [r.thc_id_number, r.lr_number, r.vendor_name, r.vehicle_number, r.origin, r.destination, r.zoho_bth_payment_id, r.zoho_books_id])) return false;
+      return true;
+    });
+  }, [bthRecords, bthSubTab, bthDateFilter, bthSearch]);
 
   // ── GST filing period check ──
   const isInFiledGstPeriod = (billDate: string): boolean => {
@@ -1059,9 +1142,7 @@ export default function ZohoBooksIntegration() {
     }
   };
 
-  const clearDateRange = () => {
-    setDateRange({ startDate: null, endDate: null });
-  };
+
 
   // ── Vendor & Purchase helpers ──
   const fetchPurchaseStats = useCallback(async () => {
@@ -1729,151 +1810,121 @@ export default function ZohoBooksIntegration() {
             </div>
           )}
 
-          {/* View Toggle: Pending vs Already Processed */}
+          {/* Sub-tabs: Not Pushed / Pushed */}
           <div className="flex items-center gap-2 mb-4">
             <button
-              onClick={() => setInvoiceView('pending')}
+              onClick={() => setInvoiceSubTab('not_pushed')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                invoiceView === 'pending'
-                  ? 'bg-emerald-600 text-white'
+                invoiceSubTab === 'not_pushed'
+                  ? 'bg-amber-600 text-white'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              Pending ({pendingInvoices.length})
+              Not Pushed ({pendingInvoices.length})
             </button>
             <button
-              onClick={() => { setInvoiceView('processed'); fetchProcessedInvoices(); }}
+              onClick={() => { setInvoiceSubTab('pushed'); fetchProcessedInvoices(); }}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                invoiceView === 'processed'
-                  ? 'bg-emerald-600 text-white'
+                invoiceSubTab === 'pushed'
+                  ? 'bg-green-600 text-white'
                   : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
               }`}
             >
-              Already Processed ({processedInvoices.length})
+              Pushed ({processedInvoices.length})
             </button>
           </div>
 
-          {/* Enhanced Filter Bar */}
-          {invoiceView === 'pending' && (
+          {/* Search + Date Filter Bar */}
           <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50/50">
-            <div className="flex items-center gap-2 mb-3">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <h4 className="text-sm font-semibold text-gray-700">Filters</h4>
-              {activeFilterCount > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
-                  Filters Active: {activeFilterCount}
-                </span>
-              )}
-              <button
-                onClick={() => {
-                  setBillTypeFilter('both');
-                  setDateRange({ startDate: null, endDate: null });
-                }}
-                className="ml-auto text-xs text-gray-500 hover:text-gray-700 font-medium flex items-center gap-1"
-              >
-                <X className="w-3 h-3" />
-                Clear All
-              </button>
-            </div>
-
             <div className="flex flex-wrap items-end gap-4">
-              {/* Bill Type Filter */}
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-600">Bill Type</label>
-                <select
-                  value={billTypeFilter}
-                  onChange={(e) => setBillTypeFilter(e.target.value as 'lr' | 'warehouse' | 'both')}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-                >
-                  <option value="both">Both (LR + Warehouse)</option>
-                  <option value="lr">LR Bills Only</option>
-                  <option value="warehouse">Warehouse Bills Only</option>
-                </select>
-              </div>
-
-              {/* Date Range Filter */}
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  Start Date
-                </label>
+              {/* Search */}
+              <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+                <label className="text-xs font-medium text-gray-600">Search</label>
                 <input
-                  type="date"
-                  value={dateRange.startDate || ''}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value || null }))}
+                  type="text"
+                  value={invoiceSearch}
+                  onChange={(e) => setInvoiceSearch(e.target.value)}
+                  placeholder="Bill no, customer, Zoho ID..."
                   className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                 />
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={dateRange.endDate || ''}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value || null }))}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
-                />
-              </div>
-
-              {/* Clear Dates Button */}
-              {(dateRange.startDate || dateRange.endDate) && (
-                <button
-                  onClick={clearDateRange}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Clear Dates
-                </button>
+              {/* Bill Type (only for Not Pushed) */}
+              {invoiceSubTab === 'not_pushed' && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-600">Bill Type</label>
+                  <select
+                    value={billTypeFilter}
+                    onChange={(e) => setBillTypeFilter(e.target.value as 'lr' | 'warehouse' | 'both')}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                  >
+                    <option value="both">Both (LR + WH)</option>
+                    <option value="lr">LR Bills Only</option>
+                    <option value="warehouse">Warehouse Bills Only</option>
+                  </select>
+                </div>
               )}
 
-              {/* Dry Run Toggle */}
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer ml-auto">
+              {/* From Date */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  From Date
+                </label>
                 <input
-                  type="checkbox"
-                  checked={dryRunOnly}
-                  onChange={(e) => setDryRunOnly(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  type="date"
+                  value={invoiceDateFilter.start}
+                  onChange={(e) => setInvoiceDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                 />
-                <span className="flex items-center gap-1">
-                  <Eye className="w-3.5 h-3.5" />
-                  Dry Run (preview only)
-                </span>
-              </label>
-            </div>
-
-            {/* Selected Date Range Display */}
-            {(dateRange.startDate || dateRange.endDate) && (
-              <div className="mt-3 flex items-center gap-2 text-xs text-gray-600">
-                <span className="font-medium">Date Range:</span>
-                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200">
-                  {dateRange.startDate ? formatDateShort(dateRange.startDate) : 'Any'}
-                </span>
-                <span className="text-gray-400">to</span>
-                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200">
-                  {dateRange.endDate ? formatDateShort(dateRange.endDate) : 'Any'}
-                </span>
               </div>
-            )}
-          </div>
-          )}
 
-          {/* Processed Invoices Table */}
-          {invoiceView === 'processed' && (
+              {/* To Date */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  value={invoiceDateFilter.end}
+                  onChange={(e) => setInvoiceDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* Dry Run (only for Not Pushed) */}
+              {invoiceSubTab === 'not_pushed' && (
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer ml-auto">
+                  <input
+                    type="checkbox"
+                    checked={dryRunOnly}
+                    onChange={(e) => setDryRunOnly(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="flex items-center gap-1">
+                    <Eye className="w-3.5 h-3.5" />
+                    Dry Run
+                  </span>
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* Pushed Invoices Table */}
+          {invoiceSubTab === 'pushed' && (
             <div>
-              <div className="flex items-center justify-between flex-wrap gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+              <div className="flex items-center justify-between flex-wrap gap-3 p-3 bg-green-50 rounded-lg border border-green-200 mb-4">
                 <div className="flex items-center gap-3">
-                  <CheckCircle className="w-4 h-4 text-blue-600" />
-                  <p className="text-sm font-medium text-blue-900">
-                    Showing <strong>{processedInvoices.length}</strong> already processed invoices
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <p className="text-sm font-medium text-green-900">
+                    Showing <strong>{filteredProcessedInvoices.length}</strong> of <strong>{processedInvoices.length}</strong> pushed invoices
                   </p>
                 </div>
                 <button
                   onClick={fetchProcessedInvoices}
                   disabled={loadingProcessed}
-                  className="flex items-center gap-1 text-xs text-blue-700 hover:text-blue-900 font-medium"
+                  className="flex items-center gap-1 text-xs text-green-700 hover:text-green-900 font-medium"
                 >
                   {loadingProcessed ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                   Refresh List
@@ -1882,12 +1933,12 @@ export default function ZohoBooksIntegration() {
 
               {loadingProcessed ? (
                 <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                  <span className="ml-3 text-gray-500 text-sm">Loading processed invoices...</span>
+                  <Loader2 className="w-5 h-5 animate-spin text-green-600" />
+                  <span className="ml-3 text-gray-500 text-sm">Loading pushed invoices...</span>
                 </div>
-              ) : processedInvoices.length === 0 ? (
+              ) : filteredProcessedInvoices.length === 0 ? (
                 <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
-                  <p className="text-gray-400 text-sm">No processed invoices found.</p>
+                  <p className="text-gray-400 text-sm">No pushed invoices match the current filters.</p>
                 </div>
               ) : (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -1897,6 +1948,7 @@ export default function ZohoBooksIntegration() {
                         <tr>
                           <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Bill No.</th>
                           <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
                           <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Customer</th>
                           <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
                           <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Zoho Invoice No.</th>
@@ -1904,7 +1956,7 @@ export default function ZohoBooksIntegration() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {processedInvoices.map((inv) => (
+                        {filteredProcessedInvoices.map((inv) => (
                           <tr key={inv.bill_id} className="hover:bg-gray-50">
                             <td className="px-4 py-2 text-gray-900 font-medium">{inv.bill_number}</td>
                             <td className="px-4 py-2">
@@ -1914,6 +1966,7 @@ export default function ZohoBooksIntegration() {
                                 {inv.bill_type}
                               </span>
                             </td>
+                            <td className="px-4 py-2 text-gray-600 text-xs">{formatDateShort(inv.bill_date)}</td>
                             <td className="px-4 py-2 text-gray-900">{inv.customer_name}</td>
                             <td className="px-4 py-2 text-right text-gray-700 font-medium">{formatCurrency(inv.amount)}</td>
                             <td className="px-4 py-2 text-gray-500 font-mono text-xs">{inv.zoho_invoice_number || inv.zoho_invoice_id}</td>
@@ -1928,26 +1981,26 @@ export default function ZohoBooksIntegration() {
             </div>
           )}
 
-          {/* Reactive Summary Bar */}
-          {invoiceView === 'pending' && (
+          {/* Not Pushed Summary Bar */}
+          {invoiceSubTab === 'not_pushed' && (
           <>
-          <div className="flex items-center justify-between flex-wrap gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200 mb-4">
+          <div className="flex items-center justify-between flex-wrap gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200 mb-4">
             <div className="flex items-center gap-3">
-              <FileText className="w-4 h-4 text-emerald-600" />
-              <p className="text-sm font-medium text-emerald-900">
-                Showing <strong>{filteredInvoices.length}</strong> of <strong>{pendingInvoices.length}</strong> pending invoices
+              <FileText className="w-4 h-4 text-amber-600" />
+              <p className="text-sm font-medium text-amber-900">
+                Showing <strong>{filteredPendingInvoicesNew.length}</strong> of <strong>{pendingInvoices.length}</strong> not-pushed invoices
               </p>
             </div>
             <div className="flex items-center gap-3">
               {selectedBillIds.size > 0 && (
-                <span className="text-sm text-emerald-700 font-medium">
+                <span className="text-sm text-amber-700 font-medium">
                   {selectedBillIds.size} selected
                 </span>
               )}
               <button
                 onClick={fetchPendingInvoices}
                 disabled={loadingPending}
-                className="flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-900 font-medium"
+                className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium"
               >
                 {loadingPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                 Refresh List
@@ -1955,13 +2008,13 @@ export default function ZohoBooksIntegration() {
             </div>
           </div>
 
-          {/* Pending Invoices Selection Table */}
+          {/* Not Pushed Invoices Selection Table */}
           {loadingPending ? (
             <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
-              <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+              <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
               <span className="ml-3 text-gray-500 text-sm">Loading pending invoices...</span>
             </div>
-          ) : filteredInvoices.length === 0 ? (
+          ) : filteredPendingInvoicesNew.length === 0 ? (
             <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
               <p className="text-gray-400 text-sm">No pending invoices match the current filters.</p>
             </div>
@@ -1974,7 +2027,7 @@ export default function ZohoBooksIntegration() {
                       <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide w-10">
                         <input
                           type="checkbox"
-                          checked={filteredInvoices.length > 0 && filteredInvoices.every(inv => selectedBillIds.has(inv.bill_id))}
+                          checked={filteredPendingInvoicesNew.length > 0 && filteredPendingInvoicesNew.every(inv => selectedBillIds.has(inv.bill_id))}
                           onChange={toggleSelectAll}
                           className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                         />
@@ -1987,11 +2040,11 @@ export default function ZohoBooksIntegration() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredInvoices.map((inv) => {
+                    {filteredPendingInvoicesNew.map((inv) => {
                       const isSelected = selectedBillIds.has(inv.bill_id);
                       const isFiled = isInFiledGstPeriod(inv.bill_date);
                       return (
-                        <tr key={inv.bill_id} className={`hover:bg-gray-50 ${isSelected ? 'bg-emerald-50/50' : ''}`}>
+                        <tr key={inv.bill_id} className={`hover:bg-gray-50 ${isSelected ? 'bg-amber-50/50' : ''}`}>
                           <td className="px-4 py-2">
                             <input
                               type="checkbox"
@@ -2041,11 +2094,11 @@ export default function ZohoBooksIntegration() {
             </button>
             <button
               onClick={handlePushAllFiltered}
-              disabled={pushing || filteredInvoices.length === 0}
+              disabled={pushing || filteredPendingInvoicesNew.length === 0}
               className="flex items-center gap-2 px-5 py-2.5 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {pushing ? <Loader2 className="w-4 h-4 animate-spin" /> : dryRunOnly ? <Eye className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-              {pushing ? 'Processing...' : dryRunOnly ? `Preview All ${filteredInvoices.length}` : `Push All ${filteredInvoices.length} Filtered`}
+              {pushing ? 'Processing...' : dryRunOnly ? `Preview All ${filteredPendingInvoicesNew.length}` : `Push All ${filteredPendingInvoicesNew.length} Filtered`}
             </button>
             {selectedBillIds.size > 0 && (
               <button
@@ -2056,33 +2109,6 @@ export default function ZohoBooksIntegration() {
                 Clear Selection
               </button>
             )}
-          </div>
-
-          {/* Info Banner */}
-          <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200 mb-4">
-            <h4 className="text-sm font-semibold text-emerald-900 mb-2">How invoice push works</h4>
-            <ul className="space-y-1.5 text-sm text-emerald-800">
-              <li className="flex items-start gap-2">
-                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                Use the filters above to narrow down pending invoices by bill type and/or date range
-              </li>
-              <li className="flex items-start gap-2">
-                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                Select specific invoices using the checkboxes, or push all filtered results at once
-              </li>
-              <li className="flex items-start gap-2">
-                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                Invoices marked with <AlertTriangle className="w-3 h-3 inline" /> may fall within an already-filed GST period
-              </li>
-              <li className="flex items-start gap-2">
-                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                Each bill is created as a Zoho Books invoice linked to the synced customer contact
-              </li>
-              <li className="flex items-start gap-2">
-                <ArrowRight className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                Use Dry Run to preview which bills would be pushed without creating anything
-              </li>
-            </ul>
           </div>
           </>
           )}
@@ -2380,12 +2406,76 @@ export default function ZohoBooksIntegration() {
               </div>
             )}
 
+            {/* Sub-tabs: Not Pushed / Pushed */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setThcSubTab('not_pushed')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  thcSubTab === 'not_pushed'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                Not Pushed ({pendingTHCs.filter(t => t.zoho_sync_status !== 'synced').length})
+              </button>
+              <button
+                onClick={() => setThcSubTab('pushed')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  thcSubTab === 'pushed'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                Pushed ({pendingTHCs.filter(t => t.zoho_sync_status === 'synced').length})
+              </button>
+            </div>
+
+            {/* Search + Date Filter Bar */}
+            <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50/50">
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+                  <label className="text-xs font-medium text-gray-600">Search</label>
+                  <input
+                    type="text"
+                    value={thcSearch}
+                    onChange={(e) => setThcSearch(e.target.value)}
+                    placeholder="THC no, LR no, vendor, Zoho ID..."
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={thcDateFilter.start}
+                    onChange={(e) => setThcDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={thcDateFilter.end}
+                    onChange={(e) => setThcDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Summary bar */}
             <div className="flex items-center justify-between flex-wrap gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200 mb-4">
               <div className="flex items-center gap-3">
                 <FileText className="w-4 h-4 text-emerald-600" />
                 <p className="text-sm font-medium text-emerald-900">
-                  <strong>{pendingTHCs.length}</strong> {thcFilter === 'all' ? 'total' : thcFilter} THCs{thcFilter === 'pushed' ? ' pushed to Zoho' : thcFilter === 'pending' ? ' pending push' : thcFilter === 'failed' ? ' with errors' : ' loaded'}
+                  Showing <strong>{filteredTHCsBySubTab.length}</strong> {thcSubTab === 'pushed' ? 'pushed' : 'not-pushed'} THCs
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -2405,15 +2495,15 @@ export default function ZohoBooksIntegration() {
               </div>
             </div>
 
-            {/* Pending THCs table */}
+            {/* THCs table */}
             {loadingPendingTHCs ? (
               <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
                 <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
                 <span className="ml-3 text-gray-500 text-sm">Loading THCs...</span>
               </div>
-            ) : pendingTHCs.length === 0 ? (
+            ) : filteredTHCsBySubTab.length === 0 ? (
               <div className="flex items-center justify-center py-12 border border-gray-200 rounded-lg">
-                <p className="text-gray-400 text-sm">No THCs in this category.</p>
+                <p className="text-gray-400 text-sm">No THCs match the current filters.</p>
               </div>
             ) : (
               <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
@@ -2421,14 +2511,16 @@ export default function ZohoBooksIntegration() {
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-white border-b border-gray-200 z-10">
                       <tr>
-                        <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide w-10">
-                          <input
-                            type="checkbox"
-                            checked={pendingTHCs.length > 0 && pendingTHCs.every(t => selectedTHCIds.has(t.thc_id))}
-                            onChange={toggleSelectAllTHCs}
-                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                          />
-                        </th>
+                        {thcSubTab === 'not_pushed' && (
+                          <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide w-10">
+                            <input
+                              type="checkbox"
+                              checked={filteredTHCsBySubTab.length > 0 && filteredTHCsBySubTab.every(t => selectedTHCIds.has(t.thc_id))}
+                              onChange={toggleSelectAllTHCs}
+                              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                            />
+                          </th>
+                        )}
                         <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">THC No.</th>
                         <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">LR No.</th>
                         <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">THC ID</th>
@@ -2439,19 +2531,21 @@ export default function ZohoBooksIntegration() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {pendingTHCs.map((t) => {
+                      {filteredTHCsBySubTab.map((t) => {
                         const isSelected = selectedTHCIds.has(t.thc_id);
                         const status = t.zoho_sync_status || 'not_synced';
                         return (
                           <tr key={t.thc_id} className={`hover:bg-gray-50 ${isSelected ? 'bg-emerald-50/50' : ''}`}>
-                            <td className="px-4 py-2">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleTHCSelection(t.thc_id)}
-                                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                              />
-                            </td>
+                            {thcSubTab === 'not_pushed' && (
+                              <td className="px-4 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleTHCSelection(t.thc_id)}
+                                  className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                />
+                              </td>
+                            )}
                             <td className="px-4 py-2 text-gray-700 font-mono text-xs">{t.thc_number || '-'}</td>
                             <td className="px-4 py-2 text-gray-700 font-mono text-xs">{t.lr_number || '-'}</td>
                             <td className="px-4 py-2 text-gray-600 font-mono text-xs">{t.thc_id_number || '-'}</td>
@@ -2477,6 +2571,7 @@ export default function ZohoBooksIntegration() {
             )}
 
             {/* Push buttons */}
+            {thcSubTab === 'not_pushed' && (
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <button
                 onClick={() => handlePushPurchases()}
@@ -2487,12 +2582,12 @@ export default function ZohoBooksIntegration() {
                 {pushingPurchases ? 'Processing...' : `Push ${selectedTHCIds.size} Selected`}
               </button>
               <button
-                onClick={() => handlePushPurchases(pendingTHCs.map(t => t.thc_id))}
-                disabled={pushingPurchases || pendingTHCs.length === 0}
+                onClick={() => handlePushPurchases(filteredTHCsBySubTab.map(t => t.thc_id))}
+                disabled={pushingPurchases || filteredTHCsBySubTab.length === 0}
                 className="flex items-center gap-2 px-5 py-2.5 bg-gray-700 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {pushingPurchases ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                {pushingPurchases ? 'Processing...' : `Push All ${pendingTHCs.length} ${thcFilter === 'all' ? 'Loaded' : thcFilter === 'pushed' ? 'Pushed' : thcFilter === 'failed' ? 'Failed' : 'Pending'}`}
+                {pushingPurchases ? 'Processing...' : `Push All ${filteredTHCsBySubTab.length} Filtered`}
               </button>
               {selectedTHCIds.size > 0 && (
                 <button
@@ -2504,6 +2599,7 @@ export default function ZohoBooksIntegration() {
                 </button>
               )}
             </div>
+            )}
 
             {/* Info banner */}
             <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200 mb-4">
@@ -2695,12 +2791,12 @@ export default function ZohoBooksIntegration() {
             <div className="flex items-center gap-6">
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Total Records</p>
-                <p className="text-xl font-bold text-gray-900">{athRecords.length}</p>
+                <p className="text-xl font-bold text-gray-900">{filteredAthBySubTab.length}</p>
               </div>
               <div className="h-8 w-px bg-gray-200" />
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Total Advance Amount</p>
-                <p className="text-xl font-bold text-gray-900">₹{athTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                <p className="text-xl font-bold text-gray-900">₹{filteredAthBySubTab.reduce((s, r) => s + (r.thc_advance_amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
             <button
@@ -2711,6 +2807,70 @@ export default function ZohoBooksIntegration() {
               <RefreshCw className={`w-4 h-4 ${loadingAth ? 'animate-spin' : ''}`} />
               Refresh
             </button>
+          </div>
+
+          {/* Sub-tabs: Not Pushed / Pushed */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setAthSubTab('not_pushed')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                athSubTab === 'not_pushed'
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Not Pushed ({athRecords.filter(r => r.zoho_ath_sync_status !== 'synced').length})
+            </button>
+            <button
+              onClick={() => setAthSubTab('pushed')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                athSubTab === 'pushed'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Pushed ({athRecords.filter(r => r.zoho_ath_sync_status === 'synced').length})
+            </button>
+          </div>
+
+          {/* Search + Date Filter Bar */}
+          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/50">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+                <label className="text-xs font-medium text-gray-600">Search</label>
+                <input
+                  type="text"
+                  value={athSearch}
+                  onChange={(e) => setAthSearch(e.target.value)}
+                  placeholder="THC no, LR no, vendor, vehicle, route, Zoho ID..."
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  value={athDateFilter.start}
+                  onChange={(e) => setAthDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  value={athDateFilter.end}
+                  onChange={(e) => setAthDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
           </div>
 
           {athError && (
@@ -2724,11 +2884,10 @@ export default function ZohoBooksIntegration() {
             <div className="flex items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
               <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             </div>
-          ) : athRecords.length === 0 ? (
+          ) : filteredAthBySubTab.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
               <Wallet className="w-12 h-12 text-gray-300 mb-3" />
-              <p className="text-gray-500 font-medium">No ATH payment records found</p>
-              <p className="text-sm text-gray-400 mt-1">Records processed through "Generate Advance Bank File" will appear here.</p>
+              <p className="text-gray-500 font-medium">No {athSubTab === 'pushed' ? 'pushed' : 'not-pushed'} ATH payment records match the current filters</p>
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -2750,7 +2909,7 @@ export default function ZohoBooksIntegration() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {athRecords.map((record) => (
+                    {filteredAthBySubTab.map((record) => (
                       <tr key={record.thc_id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 font-medium text-gray-900">{record.thc_id_number}</td>
                         <td className="px-4 py-3 text-gray-600">{record.lr_number || '-'}</td>
@@ -2956,12 +3115,12 @@ export default function ZohoBooksIntegration() {
             <div className="flex items-center gap-6">
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Total Records</p>
-                <p className="text-xl font-bold text-gray-900">{bthRecords.length}</p>
+                <p className="text-xl font-bold text-gray-900">{filteredBthBySubTab.length}</p>
               </div>
               <div className="h-8 w-px bg-gray-200" />
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Total Balance Payable</p>
-                <p className="text-xl font-bold text-gray-900">₹{bthTotalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                <p className="text-xl font-bold text-gray-900">₹{filteredBthBySubTab.reduce((s, r) => s + (r.thc_balance_amount || 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
             <button
@@ -2972,6 +3131,70 @@ export default function ZohoBooksIntegration() {
               <RefreshCw className={`w-4 h-4 ${loadingBth ? 'animate-spin' : ''}`} />
               Refresh
             </button>
+          </div>
+
+          {/* Sub-tabs: Not Pushed / Pushed */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBthSubTab('not_pushed')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                bthSubTab === 'not_pushed'
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Not Pushed ({bthRecords.filter(r => r.zoho_bth_sync_status !== 'synced').length})
+            </button>
+            <button
+              onClick={() => setBthSubTab('pushed')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                bthSubTab === 'pushed'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              Pushed ({bthRecords.filter(r => r.zoho_bth_sync_status === 'synced').length})
+            </button>
+          </div>
+
+          {/* Search + Date Filter Bar */}
+          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/50">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-col gap-1 flex-1 min-w-[200px]">
+                <label className="text-xs font-medium text-gray-600">Search</label>
+                <input
+                  type="text"
+                  value={bthSearch}
+                  onChange={(e) => setBthSearch(e.target.value)}
+                  placeholder="THC no, LR no, vendor, vehicle, route, Zoho ID..."
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  value={bthDateFilter.start}
+                  onChange={(e) => setBthDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  value={bthDateFilter.end}
+                  onChange={(e) => setBthDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+            </div>
           </div>
 
           {bthError && (
@@ -2985,11 +3208,10 @@ export default function ZohoBooksIntegration() {
             <div className="flex items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
               <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
             </div>
-          ) : bthRecords.length === 0 ? (
+          ) : filteredBthBySubTab.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl shadow-sm border border-gray-200">
               <Wallet className="w-12 h-12 text-gray-300 mb-3" />
-              <p className="text-gray-500 font-medium">No BTH payment records found</p>
-              <p className="text-sm text-gray-400 mt-1">Records with status "Financially Close" and a balance payment date will appear here.</p>
+              <p className="text-gray-500 font-medium">No {bthSubTab === 'pushed' ? 'pushed' : 'not-pushed'} BTH payment records match the current filters</p>
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -3012,7 +3234,7 @@ export default function ZohoBooksIntegration() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {bthRecords.map((record) => (
+                    {filteredBthBySubTab.map((record) => (
                       <tr key={record.thc_id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 font-medium text-gray-900">{record.thc_id_number}</td>
                         <td className="px-4 py-3 text-gray-600">{record.lr_number || '-'}</td>
@@ -3103,7 +3325,7 @@ export default function ZohoBooksIntegration() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                          {record.zoho_bth_payment_id || record.zoho_ath_payment_id || '-'}
+                          {record.zoho_bth_payment_id || '-'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {record.zoho_ath_sync_status === 'synced' ? (
