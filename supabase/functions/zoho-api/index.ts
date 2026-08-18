@@ -2166,7 +2166,7 @@ Deno.serve(async (req: Request) => {
         : new Date().toISOString().split('T')[0];
 
       const lrNumber = (thc as any).lr_number || (thc as any).thc_number || '';
-      const refNumber = (thc as any).thc_id_number || (thc as any).thc_number || thcId;
+      const refNumber = lrNumber || (thc as any).thc_id_number || thcId;
       const storedBillId = (thc as any).zoho_books_id || null;
       const billSyncStatus = (thc as any).zoho_sync_status || 'not_synced';
 
@@ -2229,7 +2229,7 @@ Deno.serve(async (req: Request) => {
         date: paymentDate,
         paid_through_account_id: bankAccount.account_id,
         reference_number: refNumber,
-        description: `Advance Payment (ATH) — ${refNumber}`,
+        description: `Advance Payment (ATH) — ${(thc as any).thc_id_number || refNumber}`,
         bills: [{ bill_id: billId, amount_applied: advanceAmount }],
       });
 
@@ -2510,7 +2510,7 @@ Deno.serve(async (req: Request) => {
         : new Date().toISOString().split('T')[0];
 
       const lrNumber = (thc as any).lr_number || (thc as any).thc_number || '';
-      const refNumber = (thc as any).thc_id_number || (thc as any).thc_number || thcId;
+      const refNumber = lrNumber || (thc as any).thc_id_number || thcId;
       const storedBillId = (thc as any).zoho_books_id || null;
 
       // Use the stored Zoho bill ID from the purchases push if available
@@ -2574,7 +2574,7 @@ Deno.serve(async (req: Request) => {
         date: paymentDate,
         paid_through_account_id: bankAccount.account_id,
         reference_number: utrDetails || refNumber,
-        description: `Balance Payment (BTH) — ${refNumber}`,
+        description: `Balance Payment (BTH) — ${(thc as any).thc_id_number || refNumber}`,
         bills: [{ bill_id: billId, amount_applied: balanceAmount }],
       });
 

@@ -2732,6 +2732,7 @@ export default function ZohoBooksIntegration() {
                       <th className="px-4 py-3 text-right font-semibold text-gray-700">Advance</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">ATH Date</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Bank Account</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Zoho Payment ID</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">Zoho Status</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
                     </tr>
@@ -2819,6 +2820,9 @@ export default function ZohoBooksIntegration() {
                               <div className="text-gray-400">{record.ven_act_bank || ''} {record.ven_act_ifsc || ''}</div>
                             </div>
                           )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                          {record.zoho_ath_payment_id || '-'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {record.zoho_ath_sync_status === 'synced' ? (
@@ -2908,6 +2912,7 @@ export default function ZohoBooksIntegration() {
                     <div><p className="text-xs text-gray-500 uppercase">THC Amount</p><p className="font-medium text-gray-900">₹{(viewingAth.thc_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
                     <div><p className="text-xs text-gray-500 uppercase">Advance Amount</p><p className="font-medium text-gray-900">₹{(viewingAth.thc_advance_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
                     <div><p className="text-xs text-gray-500 uppercase">Net Payable</p><p className="font-medium text-gray-900">₹{(viewingAth.thc_net_payable_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p></div>
+                    <div><p className="text-xs text-gray-500 uppercase">Zoho Payment ID</p><p className="font-medium text-gray-900 font-mono text-xs">{viewingAth.zoho_ath_payment_id || '-'}</p></div>
                   </div>
                   <div className="border-t border-gray-200 pt-4">
                     <p className="text-xs text-gray-500 uppercase mb-2">Bank Account Details</p>
@@ -2988,6 +2993,7 @@ export default function ZohoBooksIntegration() {
                       <th className="px-4 py-3 text-right font-semibold text-gray-700">Balance Amount</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Balance Pmt Date</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-700">Bank Account</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">Zoho Payment ID</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">ATH Status</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">BTH Status</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
@@ -3083,6 +3089,9 @@ export default function ZohoBooksIntegration() {
                               <div className="text-gray-400">{record.ven_act_bank || ''} {record.ven_act_ifsc || ''}</div>
                             </div>
                           )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                          {record.zoho_bth_payment_id || record.zoho_ath_payment_id || '-'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {record.zoho_ath_sync_status === 'synced' ? (
@@ -3257,10 +3266,16 @@ export default function ZohoBooksIntegration() {
                       <div>
                         <p className="text-xs text-gray-400">ATH Payment</p>
                         <p className="font-medium text-gray-900">{viewingBth.zoho_ath_sync_status || 'not_synced'}</p>
+                        {viewingBth.zoho_ath_payment_id && (
+                          <p className="text-xs text-gray-500 font-mono mt-0.5">{viewingBth.zoho_ath_payment_id}</p>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs text-gray-400">BTH Payment</p>
                         <p className="font-medium text-gray-900">{viewingBth.zoho_bth_sync_status || 'not_synced'}</p>
+                        {viewingBth.zoho_bth_payment_id && (
+                          <p className="text-xs text-gray-500 font-mono mt-0.5">{viewingBth.zoho_bth_payment_id}</p>
+                        )}
                       </div>
                     </div>
                   </div>
