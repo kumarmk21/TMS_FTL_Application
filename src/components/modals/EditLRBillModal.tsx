@@ -14,6 +14,7 @@ interface SACCode {
   sac_id: string;
   sac_code: string;
   sac_description: string;
+  gst_rate: number;
 }
 
 interface State {
@@ -64,6 +65,16 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
     sac_code: '',
     remarks: ''
   });
+  const [gstInfo, setGstInfo] = useState({
+    sub_total: 0,
+    gst_percentage: 0,
+    gst_charge_type: 'IGST' as string,
+    igst_amount: 0,
+    cgst_amount: 0,
+    sgst_amount: 0,
+    bill_amount: 0
+  });
+  const [companyGSTNumber, setCompanyGSTNumber] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -105,6 +116,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           bill_to_address: gstData.bill_to_address || '',
           bill_to_gstin: gstData.gstin || ''
         }));
+        setTimeout(() => recalculateGST(), 0);
       }
     } catch (error) {
       console.error('Error fetching bill address:', error);
@@ -134,6 +146,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
         setBillingPartyCode(bill.billing_party_code || '');
         setBillingPartyName(bill.billing_party_name || '');
         setLrBillNumber(bill.lr_bill_number || '');
+        setCompanyGSTNumber(bill.company_gst_number || '');
         setFormData({
           lr_bill_date: bill.lr_bill_date || '',
           lr_bill_due_date: bill.lr_bill_due_date || '',
@@ -148,6 +161,15 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           sac_code: bill.sac_code || '',
           remarks: bill.cancellation_reason || ''
         });
+        setGstInfo({
+          sub_total: Number(bill.sub_total || 0),
+          gst_percentage: Number(bill.gst_percentage || 0),
+          gst_charge_type: bill.gst_charge_type || 'IGST',
+          igst_amount: Number(bill.igst_amount || 0),
+          cgst_amount: Number(bill.cgst_amount || 0),
+          sgst_amount: Number(bill.sgst_amount || 0),
+          bill_amount: Number(bill.bill_amount || 0)
+        });
 
         setInitialLoad(false);
       }
@@ -155,6 +177,37 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
       console.error('Error fetching data:', error);
       alert('Error loading bill data');
     }
+  };
+
+  const recalculateGST = () => {
+    const subTotal = gstInfo.sub_total;
+    const selectedSAC = sacCodes.find(s => s.sac_code === formData.sac_code);
+    const gstRate = selectedSAC && selectedSAC.sac_code !== '996791' ? (Number(selectedSAC.gst_rate) || 18) : 0;
+    if (gstRate === 0) {
+      setGstInfo(prev => ({ ...prev, gst_percentage: 0, gst_charge_type: 'IGST', igst_amount: 0, cgst_amount: 0, sgst_amount: 0, bill_amount: subTotal }));
+      return;
+    }
+
+    const companyState = companyGSTNumber?.substring(0, 2);
+    const customerState = formData.bill_to_gstin?.substring(0, 2);
+    const isInterstate = companyState !== customerState;
+
+    let igst = 0, cgst = 0, sgst = 0;
+    if (isInterstate) {
+      igst = (subTotal * gstRate) / 100;
+    } else {
+      cgst = (subTotal * gstRate) / 200;
+      sgst = (subTotal * gstRate) / 200;
+    }
+    setGstInfo(prev => ({
+      ...prev,
+      gst_percentage: gstRate,
+      gst_charge_type: isInterstate ? 'IGST' : 'CGST+SGST',
+      igst_amount: igst,
+      cgst_amount: cgst,
+      sgst_amount: sgst,
+      bill_amount: subTotal + igst + cgst + sgst
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -173,6 +226,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
     setLoading(true);
 
     try {
+      const totalGST = gstInfo.igst_amount + gstInfo.cgst_amount + gstInfo.sgst_amount;
       const { error: updateError } = await supabase
         .from('lr_bill')
         .update({
@@ -187,6 +241,12 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           lr_bill_sub_type: formData.lr_bill_sub_type || null,
           lr_bill_sub_details: formData.lr_bill_sub_details || null,
           sac_code: formData.sac_code || null,
+          gst_percentage: gstInfo.gst_percentage,
+          gst_charge_type: gstInfo.gst_charge_type,
+          igst_amount: gstInfo.igst_amount,
+          cgst_amount: gstInfo.cgst_amount,
+          sgst_amount: gstInfo.sgst_amount,
+          bill_amount: gstInfo.bill_amount,
           cancellation_reason: formData.remarks || null
         })
         .eq('bill_id', billId);
@@ -204,6 +264,9 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
         bill_to_state: formData.bill_to_state || null,
         bill_to_address: formData.bill_to_address || null,
         bill_to_gstin: formData.bill_to_gstin || null,
+        bill_amount: gstInfo.bill_amount,
+        gst_amount: totalGST,
+        gst_charge_type: gstInfo.gst_charge_type,
       };
 
       let bookingUpdateError = null;
@@ -334,7 +397,10 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
               </label>
               <select
                 value={formData.sac_code}
-                onChange={(e) => setFormData({ ...formData, sac_code: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, sac_code: e.target.value });
+                  setTimeout(() => recalculateGST(), 0);
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select SAC Code</option>
@@ -407,6 +473,42 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
               </select>
             </div>
           </div>
+
+            <div className="md:col-span-2 bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">GST Breakdown</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Sub Total</label>
+                  <span className="text-sm font-semibold text-gray-900">₹{gstInfo.sub_total.toFixed(2)}</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">GST %</label>
+                  <span className="text-sm font-semibold text-gray-900">{gstInfo.gst_percentage}%</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">GST Type</label>
+                  <span className="text-sm font-semibold text-gray-900">{gstInfo.gst_charge_type}</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Total Amount</label>
+                  <span className="text-sm font-bold text-green-600">₹{gstInfo.bill_amount.toFixed(2)}</span>
+                </div>
+              </div>
+              {(gstInfo.igst_amount > 0 || gstInfo.cgst_amount > 0 || gstInfo.sgst_amount > 0) && (
+                <div className="mt-3 pt-3 border-t border-gray-200 flex flex-wrap gap-4 text-sm">
+                  {gstInfo.igst_amount > 0 && (
+                    <span className="text-gray-700">IGST: <span className="font-semibold">₹{gstInfo.igst_amount.toFixed(2)}</span></span>
+                  )}
+                  {gstInfo.cgst_amount > 0 && (
+                    <span className="text-gray-700">CGST: <span className="font-semibold">₹{gstInfo.cgst_amount.toFixed(2)}</span></span>
+                  )}
+                  {gstInfo.sgst_amount > 0 && (
+                    <span className="text-gray-700">SGST: <span className="font-semibold">₹{gstInfo.sgst_amount.toFixed(2)}</span></span>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-2">GST is auto-recalculated when SAC code or Bill To State is changed</p>
+            </div>
 
           <div className="border-t pt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Bill Submission Details</h3>

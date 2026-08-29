@@ -50,6 +50,11 @@ interface BillDetails {
   sac_description: string | null;
   tran_id: string | null;
   company_gst_number: string | null;
+  gst_percentage: number | null;
+  gst_charge_type: string | null;
+  igst_amount: number | null;
+  cgst_amount: number | null;
+  sgst_amount: number | null;
 }
 
 interface LRDetails {
@@ -448,6 +453,30 @@ export function BillPrintPreview({ billId, onClose }: BillPrintPreviewProps) {
               <div className="flex justify-end mb-2">
                 <div className="w-64 border border-gray-300 rounded overflow-hidden">
                   <div className="bg-gray-100 px-2 py-1.5 flex justify-between items-center">
+                    <span className="font-semibold text-xs text-gray-900">Sub Total</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      ₹{(bill?.sub_total || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  {bill && bill.igst_amount && bill.igst_amount > 0 && (
+                    <div className="px-2 py-1.5 flex justify-between items-center border-t border-gray-200">
+                      <span className="text-xs text-gray-700">IGST @ {bill.gst_percentage}%</span>
+                      <span className="text-xs font-semibold text-gray-900">₹{bill.igst_amount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {bill && bill.cgst_amount && bill.cgst_amount > 0 && (
+                    <div className="px-2 py-1.5 flex justify-between items-center border-t border-gray-200">
+                      <span className="text-xs text-gray-700">CGST @ {(Number(bill.gst_percentage) / 2).toFixed(2)}%</span>
+                      <span className="text-xs font-semibold text-gray-900">₹{bill.cgst_amount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {bill && bill.sgst_amount && bill.sgst_amount > 0 && (
+                    <div className="px-2 py-1.5 flex justify-between items-center border-t border-gray-200">
+                      <span className="text-xs text-gray-700">SGST @ {(Number(bill.gst_percentage) / 2).toFixed(2)}%</span>
+                      <span className="text-xs font-semibold text-gray-900">₹{bill.sgst_amount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="bg-gray-100 px-2 py-1.5 flex justify-between items-center border-t border-gray-300">
                     <span className="font-semibold text-xs text-gray-900">Total Amount</span>
                     <span className="text-base font-bold text-gray-900">
                       ₹{(bill?.bill_amount || 0).toFixed(2)}

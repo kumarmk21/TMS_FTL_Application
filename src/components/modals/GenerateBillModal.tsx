@@ -22,6 +22,7 @@ interface SACCode {
   sac_id: string;
   sac_code: string;
   sac_description: string;
+  gst_rate: number;
 }
 
 interface LRData {
@@ -120,7 +121,7 @@ export default function GenerateBillModal({
     try {
       const { data, error } = await supabase
         .from('sac_code_master')
-        .select('sac_id, sac_code, sac_description')
+        .select('sac_id, sac_code, sac_description, gst_rate')
         .eq('is_active', true)
         .order('sac_code');
 
@@ -236,6 +237,34 @@ export default function GenerateBillModal({
     return selectedLRs.reduce((sum, lr) => sum + (lr.lr_total_amount || lr.freight_amount || 0), 0);
   };
 
+  const calculateGST = () => {
+    const subTotal = calculateSubTotal();
+    const selectedSAC = sacCodes.find(s => s.sac_code === formData.sac_code);
+    const gstRate = selectedSAC && selectedSAC.sac_code !== '996791' ? (Number(selectedSAC.gst_rate) || 18) : 0;
+    if (gstRate === 0) return { gstPercentage: 0, gstChargeType: 'IGST', igst: 0, cgst: 0, sgst: 0, totalAmount: subTotal };
+
+    const companyGST = companyGSTNumbers.find(g => g.id === selectedCompanyGSTId);
+    const companyState = companyGST?.gst_number?.substring(0, 2);
+    const customerState = formData.bill_to_gstin?.substring(0, 2);
+    const isInterstate = companyState !== customerState;
+
+    let igst = 0, cgst = 0, sgst = 0;
+    if (isInterstate) {
+      igst = (subTotal * gstRate) / 100;
+    } else {
+      cgst = (subTotal * gstRate) / 200;
+      sgst = (subTotal * gstRate) / 200;
+    }
+    return {
+      gstPercentage: gstRate,
+      gstChargeType: isInterstate ? 'IGST' : 'CGST+SGST',
+      igst,
+      cgst,
+      sgst,
+      totalAmount: subTotal + igst + cgst + sgst,
+    };
+  };
+
   const handleGSTChange = (gstId: string) => {
     const selectedGST = customerGSTOptions.find((gst) => gst.id === gstId);
     if (selectedGST) {
@@ -285,7 +314,9 @@ export default function GenerateBillModal({
     setLoading(true);
     try {
       const subTotal = calculateSubTotal();
-      const billAmount = subTotal;
+      const gst = calculateGST();
+      const billAmount = gst.totalAmount;
+      const totalGST = gst.igst + gst.cgst + gst.sgst;
 
       const selectedCompanyGST = companyGSTNumbers.find(g => g.id === selectedCompanyGSTId);
 
@@ -306,6 +337,11 @@ export default function GenerateBillModal({
         sac_code: formData.sac_code || null,
         sac_description: formData.sac_description || null,
         company_gst_number: selectedCompanyGST?.gst_number || null,
+        gst_percentage: gst.gstPercentage,
+        gst_charge_type: gst.gstChargeType,
+        igst_amount: gst.igst,
+        cgst_amount: gst.cgst,
+        sgst_amount: gst.sgst,
         lr_bill_status: 'Generated',
         bill_status: 'Active',
         created_by: user?.id,
@@ -327,6 +363,8 @@ export default function GenerateBillModal({
             bill_date: formData.bill_date,
             bill_due_date: formData.bill_due_date,
             bill_amount: billAmount,
+            gst_amount: totalGST,
+            gst_charge_type: gst.gstChargeType,
             lr_financial_status: 'Bill Generated',
           })
           .eq('tran_id', lr.tran_id);
@@ -606,6 +644,38 @@ export default function GenerateBillModal({
                   ₹{calculateSubTotal().toFixed(2)}
                 </span>
               </div>
+              {(() => {
+                const gst = calculateGST();
+                if (gst.gstPercentage === 0) return null;
+                return (
+                  <>
+                    <div className="mt-2 pt-2 border-t border-blue-200 space-y-1">
+                      {gst.igst > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">IGST @ {gst.gstPercentage}%:</span>
+                          <span className="font-semibold text-gray-800">₹{gst.igst.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {gst.cgst > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">CGST @ {(gst.gstPercentage / 2).toFixed(2)}%:</span>
+                          <span className="font-semibold text-gray-800">₹{gst.cgst.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {gst.sgst > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">SGST @ {(gst.gstPercentage / 2).toFixed(2)}%:</span>
+                          <span className="font-semibold text-gray-800">₹{gst.sgst.toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-blue-200 flex items-center justify-between">
+                      <span className="text-lg font-semibold text-gray-700">Total Bill Amount:</span>
+                      <span className="text-2xl font-bold text-green-600">₹{gst.totalAmount.toFixed(2)}</span>
+                    </div>
+                  </>
+                );
+              })()}
               <div className="mt-2 text-sm text-gray-600">
                 Based on {selectedLRs.length} selected LR(s)
               </div>
