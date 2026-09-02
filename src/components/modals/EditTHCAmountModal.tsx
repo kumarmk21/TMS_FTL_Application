@@ -21,14 +21,53 @@ export function EditTHCAmountModal({
 }: EditTHCAmountModalProps) {
   const [amount, setAmount] = useState(currentAmount);
   const [loading, setLoading] = useState(false);
+  const [existing, setExisting] = useState({
+    thc_loading_charges: 0,
+    thc_detention_charges: 0,
+    thc_advance_amount: 0,
+    thc_tds_amount: 0,
+  thc_gross_amount: 0,
+    thc_net_payable_amount: 0,
+    thc_balance_amount: 0,
+  });
 
   useEffect(() => {
     if (isOpen) {
       setAmount(currentAmount);
+      fetchExistingRecord();
     }
-  }, [isOpen, currentAmount]);
+  }, [isOpen, currentAmount, thcId]);
+
+  const fetchExistingRecord = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('thc_details')
+        .select('thc_loading_charges, thc_detention_charges, thc_advance_amount, thc_tds_amount, thc_gross_amount, thc_net_payable_amount, thc_balance_amount')
+        .eq('thc_id', thcId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setExisting({
+          thc_loading_charges: Number(data.thc_loading_charges || 0),
+          thc_detention_charges: Number(data.thc_detention_charges || 0),
+          thc_advance_amount: Number(data.thc_advance_amount || 0),
+          thc_tds_amount: Number(data.thc_tds_amount || 0),
+          thc_gross_amount: Number(data.thc_gross_amount || 0),
+          thc_net_payable_amount: Number(data.thc_net_payable_amount || 0),
+          thc_balance_amount: Number(data.thc_balance_amount || 0),
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching existing THC record:', error);
+    }
+  };
 
   if (!isOpen) return null;
+
+  const newGrossAmount = amount + existing.thc_loading_charges + existing.thc_detention_charges;
+  const newNetPayable = newGrossAmount;
+  const newBalance = newGrossAmount - existing.thc_advance_amount - existing.thc_tds_amount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +81,12 @@ export function EditTHCAmountModal({
     try {
       const { error } = await supabase
         .from('thc_details')
-        .update({ thc_gross_amount: amount })
+        .update({
+          thc_amount: amount,
+          thc_gross_amount: newGrossAmount,
+          thc_net_payable_amount: newNetPayable,
+          thc_balance_amount: newBalance,
+        })
         .eq('thc_id', thcId);
 
       if (error) throw error;
@@ -101,6 +145,26 @@ export function EditTHCAmountModal({
             <p className="text-xs text-gray-500 mt-1">
               Current amount: ₹{currentAmount.toFixed(2)}
             </p>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5">
+            <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Recalculated Values</p>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Gross Amount:</span>
+              <span className="font-medium text-gray-900">₹{newGrossAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Net Payable:</span>
+              <span className="font-medium text-gray-900">₹{newNetPayable.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Balance Amount:</span>
+              <span className="font-medium text-gray-900">₹{newBalance.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Advance Amount (unchanged):</span>
+              <span className="font-medium text-gray-900">₹{existing.thc_advance_amount.toFixed(2)}</span>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
