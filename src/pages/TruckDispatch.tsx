@@ -12,9 +12,11 @@ import {
   XCircle,
   Circle,
   ExternalLink,
+  Pencil,
 } from 'lucide-react';
 import { ViewLRModal } from '../components/modals/ViewLRModal';
 import { GenerateTHCModal } from '../components/modals/GenerateTHCModal';
+import { EditTHCAmountModal } from '../components/modals/EditTHCAmountModal';
 import { THCPrintPreview } from '../components/THCPrintPreview';
 import {
   PushToZohoConfirmModal,
@@ -58,6 +60,8 @@ export function TruckDispatch() {
   const [selectedTHCIds, setSelectedTHCIds] = useState<Set<string>>(new Set());
   const [isPushModalOpen, setIsPushModalOpen] = useState(false);
   const [pushItems, setPushItems] = useState<PushToZohoItem[]>([]);
+  const [editTHC, setEditTHC] = useState<{ thcId: string; thcNumber: string; amount: number } | null>(null);
+  const [isEditTHCModalOpen, setIsEditTHCModalOpen] = useState(false);
 
   useEffect(() => {
     fetchVendors();
@@ -138,6 +142,7 @@ export function TruckDispatch() {
           pay_basis: row.pay_basis,
           thc_no: row.thc_no,
           thc_id: thcJoin?.thc_id || null,
+          thc_gross_amount: thcJoin?.thc_gross_amount || null,
           zoho_sync_status: thcJoin?.zoho_sync_status || 'not_synced',
           vendor_name: thcJoin?.vendor_master?.vendor_name || null,
         };
@@ -193,6 +198,15 @@ export function TruckDispatch() {
   const handleViewTHC = (thcId: string) => {
     setSelectedTHCId(thcId);
     setIsTHCPrintOpen(true);
+  };
+
+  const handleEditTHCAmount = (record: LRRecord) => {
+    setEditTHC({
+      thcId: record.thc_id!,
+      thcNumber: record.thc_no!,
+      amount: record.thc_gross_amount || 0,
+    });
+    setIsEditTHCModalOpen(true);
   };
 
   const toggleSelectTHC = (thcId: string) => {
@@ -525,6 +539,11 @@ export function TruckDispatch() {
                   </th>
                   {viewMode === 'prepared' && (
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      THC Amount
+                    </th>
+                  )}
+                  {viewMode === 'prepared' && (
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Zoho Status
                     </th>
                   )}
@@ -583,6 +602,13 @@ export function TruckDispatch() {
                       )}
                     </td>
                     {viewMode === 'prepared' && (
+                      <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                        {record.thc_gross_amount != null
+                          ? `₹${Number(record.thc_gross_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '-'}
+                      </td>
+                    )}
+                    {viewMode === 'prepared' && (
                       <td className="px-4 py-3 text-sm">
                         {getZohoBadge(record.zoho_sync_status)}
                       </td>
@@ -603,6 +629,15 @@ export function TruckDispatch() {
                             title="Generate THC"
                           >
                             Generate
+                          </button>
+                        )}
+                        {viewMode === 'prepared' && record.thc_id && (
+                          <button
+                            onClick={() => handleEditTHCAmount(record)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Edit THC Amount"
+                          >
+                            <Pencil className="w-4 h-4" />
                           </button>
                         )}
                       </div>
@@ -660,9 +695,25 @@ export function TruckDispatch() {
         onPushComplete={() => {
           setIsPushModalOpen(false);
           setSelectedTHCIds(new Set());
-          fetchRecords();
+          fetchLRRecords();
         }}
       />
+
+      {editTHC && (
+        <EditTHCAmountModal
+          isOpen={isEditTHCModalOpen}
+          onClose={() => {
+            setIsEditTHCModalOpen(false);
+            setEditTHC(null);
+          }}
+          onSuccess={() => {
+            fetchLRRecords();
+          }}
+          thcId={editTHC.thcId}
+          thcNumber={editTHC.thcNumber}
+          currentAmount={editTHC.amount}
+        />
+      )}
     </div>
   );
 }

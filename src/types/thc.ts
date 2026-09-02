@@ -24,6 +24,7 @@ export interface LRRecord {
   pay_basis: string;
   thc_no: string | null;
   thc_id?: string | null;
+  thc_gross_amount?: number | null;
   zoho_sync_status?: ZohoSyncStatus;
   vendor_name?: string | null;
 }
