@@ -1145,6 +1145,186 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // ── Update an existing Zoho invoice (e.g. when company GST changes) ──
+    if (action === 'update-invoice') {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const orgId = await getOrganizationId(accessToken, apiDomain);
+
+      const body = await req.json().catch(() => ({}));
+      const billType = (body as { bill_type?: string }).bill_type || 'lr';
+      const billId = (body as { bill_id?: string }).bill_id;
+      const zohoInvoiceId = (body as { zoho_invoice_id?: string }).zoho_invoice_id;
+
+      if (!billId || !zohoInvoiceId) {
+        return new Response(JSON.stringify({
+          status: 'error',
+          detail: 'Missing bill_id or zoho_invoice_id',
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Fetch the bill from the appropriate table
+      const tableName = billType === 'warehouse' ? 'warehouse_bill' : 'lr_bill';
+      const { data: bill, error: billError } = await supabase
+        .from(tableName)
+        .select('*')
+        .eq('bill_id', billId)
+        .maybeSingle();
+
+      if (billError || !bill) {
+        return new Response(JSON.stringify({
+          status: 'error',
+          detail: `Could not fetch bill: ${billError?.message || 'not found'}`,
+        }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Fetch customer
+      const { data: customer } = await supabase
+        .from('customer_master')
+        .select('id, customer_id, zoho_customer_id, customer_name, gstin, customer_email, customer_phone, customer_city, customer_state, customer_address')
+        .eq('customer_id', bill.billing_party_code)
+        .maybeSingle();
+
+      if (!customer || !customer.zoho_customer_id) {
+        return new Response(JSON.stringify({
+          status: 'skipped',
+          detail: `Customer "${bill.billing_party_code}" is not linked to any Zoho contact.`,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Build the updated invoice payload
+      const billDate = bill.lr_bill_date || bill.bill_date;
+      const dueDate = bill.lr_bill_due_date || bill.bill_due_date;
+      const billNumber = bill.lr_bill_number || bill.bill_number;
+      const sacCode = bill.sac_code || '';
+      const sacDesc = bill.sac_description || '';
+      const subTotal = parseFloat(bill.sub_total || bill.bill_amount || '0');
+
+      const lineItems: Record<string, any>[] = [];
+      if (billType === 'warehouse') {
+        if (parseFloat(bill.warehouse_charges || '0') > 0) {
+          lineItems.push({
+            name: bill.service_type || 'Warehousing Services',
+            description: bill.service_type || sacDesc || 'Warehouse charges',
+            rate: parseFloat(bill.warehouse_charges),
+            quantity: 1,
+            item_order: 1,
+            ...(sacCode ? { sac_code: sacCode } : {}),
+          });
+        }
+        if (parseFloat(bill.other_charges || '0') > 0) {
+          lineItems.push({ name: 'Other Charges', description: 'Other charges', rate: parseFloat(bill.other_charges), quantity: 1, item_order: 2 });
+        }
+        if (parseFloat(bill.unloading_charges || '0') > 0) {
+          lineItems.push({ name: 'Unloading Charges', description: 'Unloading charges', rate: parseFloat(bill.unloading_charges), quantity: 1, item_order: 3 });
+        }
+        if (lineItems.length === 0) {
+          lineItems.push({ name: sacDesc || 'Warehousing Services', description: sacDesc || 'Service charges', rate: subTotal, quantity: 1, item_order: 1, ...(sacCode ? { sac_code: sacCode } : {}) });
+        }
+      } else {
+        lineItems.push({
+          name: sacDesc || 'Goods Transport Agency (GTA) Services',
+          description: sacDesc || 'Freight charges',
+          rate: subTotal,
+          quantity: 1,
+          item_order: 1,
+          ...(sacCode ? { sac_code: sacCode } : {}),
+        });
+      }
+
+      const billToGstin = (bill.bill_to_gstin || '').trim();
+      const companyGSTState = (bill.company_gst_number || '').substring(0, 2);
+      const customerGSTState = billToGstin.substring(0, 2);
+      const isInterState = companyGSTState !== customerGSTState;
+
+      let gstTreatment = 'business_gst';
+      if (!billToGstin) gstTreatment = 'consumer';
+
+      const gstChargeType = bill.gst_charge_type || '';
+      const isRCM = gstChargeType.toLowerCase().includes('rcm');
+      const gstRate = parseFloat(bill.gst_percentage || '0');
+
+      const updatePayload: Record<string, any> = {
+        customer_id: customer.zoho_customer_id,
+        date: billDate ? new Date(billDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        ...(dueDate ? { due_date: new Date(dueDate).toISOString().split('T')[0] } : {}),
+        reference_number: billNumber,
+        is_inclusive_tax: false,
+        line_items: lineItems,
+      };
+
+      // LR bills: attach custom fields and reverse charge
+      if (billType === 'lr') {
+        let booking: Record<string, any> | null = null;
+        if (bill.tran_id) {
+          const { data: bk } = await supabase
+            .from('booking_lr')
+            .select('tran_id, manual_lr_no, vehicle_number, lr_date, from_city, to_city')
+            .eq('tran_id', bill.tran_id)
+            .maybeSingle();
+          booking = bk;
+        }
+
+        const lrn = booking?.manual_lr_no || billNumber || '';
+        const origin = booking?.from_city || '';
+        const destination = booking?.to_city || '';
+        const vehicleNumber = booking?.vehicle_number || '';
+        const lrDate = booking?.lr_date
+          ? new Date(booking.lr_date).toISOString().split('T')[0]
+          : (billDate ? new Date(billDate).toISOString().split('T')[0] : '');
+
+        const customFields: Array<{ label: string; value: string }> = [];
+        const addField = (label: string, value: string) => { if (value) customFields.push({ label, value }); };
+        addField('Origin', origin);
+        addField('Destination', destination);
+        addField('LRN', lrn);
+        addField('Vehicle Number', vehicleNumber);
+        addField('LR Date', lrDate);
+        if (customFields.length > 0) updatePayload.custom_fields = customFields;
+        updatePayload.is_reverse_charge_applied = true;
+      }
+
+      if (!isRCM && gstRate > 0 && isInterState) {
+        updatePayload.tax_id = '';
+      }
+
+      // PUT to update the existing Zoho invoice
+      const updateUrl = new URL(`${apiDomain}/books/v3/invoices/${zohoInvoiceId}`);
+      updateUrl.searchParams.set('organization_id', orgId);
+
+      const updateRes = await fetch(updateUrl.toString(), {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Zoho-oauthtoken ${accessToken}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `JSONString=${encodeURIComponent(JSON.stringify(updatePayload))}`,
+      });
+
+      const updateData = await updateRes.json();
+
+      if (updateData.code === 0 && updateData.invoice) {
+        // Update local record with new Zoho sync timestamp
+        await supabase
+          .from(tableName)
+          .update({
+            zoho_synced_at: new Date().toISOString(),
+          })
+          .eq('bill_id', billId);
+
+        return new Response(JSON.stringify({
+          status: 'updated',
+          zoho_invoice_id: updateData.invoice.invoice_id,
+          zoho_invoice_number: updateData.invoice.invoice_number,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      console.error('[Zoho] Invoice update failed:', JSON.stringify(updateData));
+      return new Response(JSON.stringify({
+        status: 'error',
+        detail: updateData.message || 'Unknown Zoho API error',
+      }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // ── Fetch invoice sync stats ──
     if (action === 'invoice-sync-stats') {
       const supabase = createClient(supabaseUrl, supabaseKey);

@@ -73,6 +73,9 @@ export function EditWarehouseBillModal({ billId, onClose, onSuccess }: EditWareh
   const [customerRates, setCustomerRates] = useState<CustomerRate[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [originalCompanyGSTId, setOriginalCompanyGSTId] = useState('');
+  const [zohoInvoiceId, setZohoInvoiceId] = useState<string | null>(null);
+  const [zohoSyncing, setZohoSyncing] = useState(false);
 
   const [formData, setFormData] = useState({
     bill_date: '',
@@ -229,6 +232,8 @@ export function EditWarehouseBillModal({ billId, onClose, onSuccess }: EditWareh
 
         const matchedGST = (companyGSTData.data || []).find((g: any) => g.gst_number === bill.company_gst_number);
         if (matchedGST) setSelectedCompanyGSTId(matchedGST.id);
+        setOriginalCompanyGSTId(matchedGST ? matchedGST.id : '');
+        setZohoInvoiceId(bill.zoho_invoice_id || null);
 
         setInitialLoad(false);
       }
@@ -409,6 +414,9 @@ export function EditWarehouseBillModal({ billId, onClose, onSuccess }: EditWareh
     setLoading(true);
 
     try {
+      const newCompanyGST = companyGSTNumbers.find(g => g.id === selectedCompanyGSTId)?.gst_number || null;
+      const companyGSTChanged = selectedCompanyGSTId !== originalCompanyGSTId;
+
       const { error: updateError } = await supabase
         .from('warehouse_bill')
         .update({
@@ -445,7 +453,7 @@ export function EditWarehouseBillModal({ billId, onClose, onSuccess }: EditWareh
           tds_applicable: formData.tds_applicable,
           tds_amount: formData.tds_amount,
           remarks: formData.remarks,
-          company_gst_number: companyGSTNumbers.find(g => g.id === selectedCompanyGSTId)?.gst_number || null
+          company_gst_number: newCompanyGST
         })
         .eq('bill_id', billId);
 
@@ -456,7 +464,56 @@ export function EditWarehouseBillModal({ billId, onClose, onSuccess }: EditWareh
         return;
       }
 
-      alert('Warehouse bill updated successfully!');
+      if (companyGSTChanged) {
+        const oldGST = companyGSTNumbers.find(g => g.id === originalCompanyGSTId)?.gst_number || null;
+        await supabase.from('bill_billing_party_changes').insert({
+          bill_id: billId,
+          bill_number: formData.billing_party_code || billId,
+          old_company_gst_number: oldGST,
+          new_company_gst_number: newCompanyGST,
+          bill_type: 'Warehouse',
+          change_reason: 'Company GST number changed via Customer Bill Edit',
+        });
+      }
+
+      let zohoMessage = 'Warehouse bill updated successfully!';
+      if (companyGSTChanged && zohoInvoiceId) {
+        setZohoSyncing(true);
+        try {
+          const zohoRes = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api?action=update-invoice`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                bill_type: 'warehouse',
+                bill_id: billId,
+                zoho_invoice_id: zohoInvoiceId,
+              }),
+            }
+          );
+          if (zohoRes.ok) {
+            const zohoData = await zohoRes.json();
+            if (zohoData.status === 'updated') {
+              zohoMessage = `Warehouse bill updated and Zoho invoice ${zohoData.zoho_invoice_number || ''} updated successfully!`;
+            } else {
+              zohoMessage = `Warehouse bill saved locally. Zoho update: ${zohoData.detail || zohoData.status || 'unknown result'}`;
+            }
+          } else {
+            zohoMessage = 'Warehouse bill saved locally. Zoho update failed — check Zoho Books Integration page.';
+          }
+        } catch (zohoErr: any) {
+          console.error('Zoho update error:', zohoErr);
+          zohoMessage = 'Warehouse bill saved locally. Zoho update failed — check Zoho Books Integration page.';
+        } finally {
+          setZohoSyncing(false);
+        }
+      }
+
+      alert(zohoMessage);
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -979,7 +1036,7 @@ export function EditWarehouseBillModal({ billId, onClose, onSuccess }: EditWareh
               className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
-              {loading ? 'Updating...' : 'Update Bill'}
+              {zohoSyncing ? 'Updating Zoho...' : loading ? 'Updating...' : 'Update Bill'}
             </button>
           </div>
         </form>

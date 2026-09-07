@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, Save, UserCog } from 'lucide-react';
+import { X, Save, UserCog, Building2 } from 'lucide-react';
 import { ChangeBillingPartyModal } from './ChangeBillingPartyModal';
+
+interface CompanyGSTNumber {
+  id: string;
+  gst_number: string;
+  label: string | null;
+  custom_fields: { label: string; value: string }[];
+}
 
 interface Branch {
   id: string;
@@ -75,6 +82,11 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
     bill_amount: 0
   });
   const [companyGSTNumber, setCompanyGSTNumber] = useState('');
+  const [companyGSTNumbers, setCompanyGSTNumbers] = useState<CompanyGSTNumber[]>([]);
+  const [selectedCompanyGSTId, setSelectedCompanyGSTId] = useState('');
+  const [originalCompanyGSTNumber, setOriginalCompanyGSTNumber] = useState('');
+  const [zohoInvoiceId, setZohoInvoiceId] = useState<string | null>(null);
+  const [zohoSyncing, setZohoSyncing] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -125,12 +137,16 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
 
   const fetchData = async () => {
     try {
-      const [billData, sacCodesData, branchesData, statesData] = await Promise.all([
+      const [billData, sacCodesData, branchesData, statesData, companyGSTData] = await Promise.all([
         supabase.from('lr_bill').select('*').eq('bill_id', billId).maybeSingle(),
         supabase.from('sac_code_master').select('*').eq('is_active', true).order('sac_code'),
         supabase.from('branch_master').select('*').eq('is_active', true).order('branch_name'),
-        supabase.from('state_master').select('*').order('state_name')
+        supabase.from('state_master').select('*').order('state_name'),
+        supabase.from('company_gst_numbers').select('id, gst_number, label, custom_fields').order('created_at', { ascending: true })
       ]);
+
+      if (companyGSTData.error) throw companyGSTData.error;
+      setCompanyGSTNumbers((companyGSTData.data || []) as CompanyGSTNumber[]);
 
       if (billData.error) throw billData.error;
       if (sacCodesData.error) throw sacCodesData.error;
@@ -147,6 +163,10 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
         setBillingPartyName(bill.billing_party_name || '');
         setLrBillNumber(bill.lr_bill_number || '');
         setCompanyGSTNumber(bill.company_gst_number || '');
+        setOriginalCompanyGSTNumber(bill.company_gst_number || '');
+        setZohoInvoiceId(bill.zoho_invoice_id || null);
+        const matchedGST = (companyGSTData.data || []).find((g: any) => g.gst_number === bill.company_gst_number);
+        if (matchedGST) setSelectedCompanyGSTId(matchedGST.id);
         setFormData({
           lr_bill_date: bill.lr_bill_date || '',
           lr_bill_due_date: bill.lr_bill_due_date || '',
@@ -227,6 +247,9 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
 
     try {
       const totalGST = gstInfo.igst_amount + gstInfo.cgst_amount + gstInfo.sgst_amount;
+      const newCompanyGST = companyGSTNumbers.find(g => g.id === selectedCompanyGSTId)?.gst_number || companyGSTNumber;
+      const companyGSTChanged = newCompanyGST !== originalCompanyGSTNumber;
+
       const { error: updateError } = await supabase
         .from('lr_bill')
         .update({
@@ -247,6 +270,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
           cgst_amount: gstInfo.cgst_amount,
           sgst_amount: gstInfo.sgst_amount,
           bill_amount: gstInfo.bill_amount,
+          company_gst_number: newCompanyGST || null,
           cancellation_reason: formData.remarks || null
         })
         .eq('bill_id', billId);
@@ -292,7 +316,56 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
         return;
       }
 
-      alert('LR bill updated successfully!');
+      if (companyGSTChanged) {
+        await supabase.from('bill_billing_party_changes').insert({
+          bill_id: billId,
+          bill_number: lrBillNumber,
+          tran_id: tranId && tranId !== 'null' ? tranId : null,
+          old_company_gst_number: originalCompanyGSTNumber || null,
+          new_company_gst_number: newCompanyGST || null,
+          bill_type: 'LR',
+          change_reason: 'Company GST number changed via Customer Bill Edit',
+        });
+      }
+
+      let zohoMessage = 'LR bill updated successfully!';
+      if (companyGSTChanged && zohoInvoiceId) {
+        setZohoSyncing(true);
+        try {
+          const zohoRes = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-api?action=update-invoice`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({
+                bill_type: 'lr',
+                bill_id: billId,
+                zoho_invoice_id: zohoInvoiceId,
+              }),
+            }
+          );
+          if (zohoRes.ok) {
+            const zohoData = await zohoRes.json();
+            if (zohoData.status === 'updated') {
+              zohoMessage = `LR bill updated and Zoho invoice ${zohoData.zoho_invoice_number || ''} updated successfully!`;
+            } else {
+              zohoMessage = `LR bill saved locally. Zoho update: ${zohoData.detail || zohoData.status || 'unknown result'}`;
+            }
+          } else {
+            zohoMessage = 'LR bill saved locally. Zoho update failed — check Zoho Books Integration page.';
+          }
+        } catch (zohoErr: any) {
+          console.error('Zoho update error:', zohoErr);
+          zohoMessage = 'LR bill saved locally. Zoho update failed — check Zoho Books Integration page.';
+        } finally {
+          setZohoSyncing(false);
+        }
+      }
+
+      alert(zohoMessage);
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -589,7 +662,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
               className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
-              {loading ? 'Updating...' : 'Update Bill'}
+              {zohoSyncing ? 'Updating Zoho...' : loading ? 'Updating...' : 'Update Bill'}
             </button>
           </div>
         </form>
