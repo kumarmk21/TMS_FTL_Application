@@ -394,7 +394,7 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-blue-900 mb-1">Editable Fields</h3>
-                <p className="text-xs text-blue-700">You can edit the following fields: Bill Date, Bill To State, SAC Code, and Bill Generation Branch</p>
+                <p className="text-xs text-blue-700">You can edit Bill Date, Company GST Number, Bill To State, SAC Code, and Bill Generation Branch</p>
               </div>
               <button
                 type="button"
@@ -419,6 +419,34 @@ export function EditLRBillModal({ billId, tranId, onClose, onSuccess }: EditLRBi
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Company GST Number
+              </label>
+              <select
+                value={selectedCompanyGSTId}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  setSelectedCompanyGSTId(nextId);
+                  const selected = companyGSTNumbers.find(gst => gst.id === nextId);
+                  const nextNumber = selected?.gst_number || '';
+                  setCompanyGSTNumber(nextNumber);
+                  setTimeout(() => recalculateGST(), 0);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select Company GST Number</option>
+                {companyGSTNumbers.map((gst) => (
+                  <option key={gst.id} value={gst.id}>
+                    {gst.label ? `${gst.label} - ${gst.gst_number}` : gst.gst_number}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                This GST number will be saved with the bill and synced to Zoho when applicable.
+              </p>
             </div>
 
             <div>
