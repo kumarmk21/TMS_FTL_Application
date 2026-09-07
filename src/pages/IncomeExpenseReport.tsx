@@ -12,6 +12,7 @@ interface IncomeExpenseRecord {
   billing_party_name: string | null;
   lr_total_amount: number | null;
   bill_no: string | null;
+  company_gst_number: string | null;
   thc_number: string | null;
   vehicle_number: string | null;
   vendor_name: string | null;
@@ -81,14 +82,20 @@ export default function IncomeExpenseReport() {
 
       if (lrError) throw lrError;
 
-      const { data: cancelledBills, error: billError } = await supabase
+      const { data: lrBills, error: billError } = await supabase
         .from('lr_bill')
-        .select('lr_bill_number')
-        .eq('bill_status', 'Cancelled');
+        .select('lr_bill_number, company_gst_number, bill_status');
 
       if (billError) throw billError;
 
-      const cancelledBillNumbers = new Set(cancelledBills?.map(b => b.lr_bill_number) || []);
+      const cancelledBillNumbers = new Set(
+        (lrBills || [])
+          .filter(bill => bill.bill_status === 'Cancelled')
+          .map(bill => bill.lr_bill_number)
+      );
+      const companyGSTByBillNumber = new Map(
+        (lrBills || []).map(bill => [bill.lr_bill_number, bill.company_gst_number])
+      );
 
       const data = (lrData || []).filter(lr => !lr.bill_no || !cancelledBillNumbers.has(lr.bill_no));
 
@@ -108,6 +115,7 @@ export default function IncomeExpenseReport() {
           billing_party_name: record.billing_party_name,
           lr_total_amount: subTotal,
           bill_no: record.bill_no,
+          company_gst_number: record.bill_no ? companyGSTByBillNumber.get(record.bill_no) || null : null,
           thc_number: thc?.thc_number,
           vehicle_number: thc?.vehicle_number,
           vendor_name: vendor?.vendor_name,
@@ -192,6 +200,7 @@ export default function IncomeExpenseReport() {
       'Billing Party': record.billing_party_name || '',
       'Sub Total': record.lr_total_amount || 0,
       'Bill Number': record.bill_no || '',
+      'Company GST Number': record.company_gst_number || '',
       'THC Number': record.thc_number || '',
       'Vehicle Number': record.vehicle_number || '',
       'Vendor': record.vendor_name ? `${record.vendor_name} (${record.vendor_code})` : '',
@@ -209,9 +218,9 @@ export default function IncomeExpenseReport() {
 
     const colWidths = [
       { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
-      { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+      { wch: 25 }, { wch: 15 }, { wch: 22 }, { wch: 15 },
       { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 12 },
-      { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 12 }
+      { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }
     ];
     ws['!cols'] = colWidths;
 
