@@ -72,6 +72,7 @@ import ConsolidatedBTHFile from '../pages/ConsolidatedBTHFile';
 import ZohoBooksIntegration from '../pages/ZohoBooksIntegration';
 import { VehicleTracking } from '../pages/VehicleTracking';
 import { BillCollection } from '../pages/BillCollection';
+import CancelledBillsReport from '../pages/CancelledBillsReport';
 
 export interface MenuItem {
   id: string;
@@ -188,6 +189,7 @@ const menuItems: MenuItem[] = [
       { id: 'party-wise-sales', label: 'Party Wise Sales' },
       { id: 'bill-payment-report', label: 'Bill Payment Report' },
       { id: 'unbilled-report', label: 'Unbilled Report' },
+      { id: 'cancelled-bills-report', label: 'Cancelled Bills Report' },
       { id: 'lr-pending-fin-edit', label: 'LR Pending for Fin Edit' },
     ],
   },
@@ -323,6 +325,8 @@ export function Layout() {
         return <APReport />;
       case 'unbilled-report':
         return <UnbilledReport />;
+      case 'cancelled-bills-report':
+        return <CancelledBillsReport />;
       case 'lr-pending-fin-edit':
         return <LRPendingFinEditReport />;
       case 'ar-report':
