@@ -50,8 +50,7 @@ export default function CancelledBillsReport() {
             bill_amount,
             cancellation_reason,
             cancelled_at,
-            cancelled_by,
-            profiles:cancelled_by (full_name)
+            cancelled_by
           `)
           .eq('bill_status', 'Cancelled')
           .order('lr_bill_date', { ascending: false }),
@@ -66,8 +65,7 @@ export default function CancelledBillsReport() {
             total_amount,
             cancellation_reason,
             cancelled_at,
-            cancelled_by,
-            profiles:cancelled_by (full_name)
+            cancelled_by
           `)
           .eq('bill_status', 'Cancelled')
           .order('bill_date', { ascending: false }),
@@ -75,6 +73,26 @@ export default function CancelledBillsReport() {
 
       if (lrBills.error) throw lrBills.error;
       if (warehouseBills.error) throw warehouseBills.error;
+
+      const cancelledByIds = [...new Set([
+        ...(lrBills.data || []).map((bill: any) => bill.cancelled_by),
+        ...(warehouseBills.data || []).map((bill: any) => bill.cancelled_by),
+      ].filter(Boolean))];
+      const profileNames = new Map<string, string>();
+
+      if (cancelledByIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', cancelledByIds);
+
+        if (profilesError) {
+          console.error('Error fetching cancellation user names:', profilesError);
+        }
+        (profiles || []).forEach((profile) => {
+          profileNames.set(profile.id, profile.full_name || '');
+        });
+      }
 
       const lrRecords: CancelledBillRecord[] = (lrBills.data || []).map((bill: any) => ({
         bill_type: 'Transportation (LR)',
@@ -85,7 +103,7 @@ export default function CancelledBillsReport() {
         customer_code: bill.billing_party_code,
         bill_amount: bill.bill_amount || 0,
         cancellation_reason: bill.cancellation_reason,
-        cancelled_by_name: bill.profiles?.full_name || null,
+        cancelled_by_name: bill.cancelled_by ? profileNames.get(bill.cancelled_by) || null : null,
         cancelled_at: bill.cancelled_at,
       }));
 
@@ -98,7 +116,7 @@ export default function CancelledBillsReport() {
         customer_code: bill.billing_party_code,
         bill_amount: bill.total_amount || 0,
         cancellation_reason: bill.cancellation_reason,
-        cancelled_by_name: bill.profiles?.full_name || null,
+        cancelled_by_name: bill.cancelled_by ? profileNames.get(bill.cancelled_by) || null : null,
         cancelled_at: bill.cancelled_at,
       }));
 
