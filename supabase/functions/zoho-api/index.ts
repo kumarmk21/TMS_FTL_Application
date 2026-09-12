@@ -951,6 +951,30 @@ Deno.serve(async (req: Request) => {
           return { status: 'dry run - would push', detail: validationDetail || undefined };
         }
 
+        // ── Proactive duplicate check: search Zoho for an existing invoice with this number ──
+        // This prevents creating duplicate invoices when a bill was previously pushed (or manually
+        // created in Zoho) but the TMS record was not linked.
+        if (billNumber) {
+          try {
+            const preSearchUrl = new URL(`${apiDomain}/books/v3/invoices`);
+            preSearchUrl.searchParams.set('organization_id', orgId);
+            preSearchUrl.searchParams.set('invoice_number', billNumber);
+            const preSearchRes = await fetch(preSearchUrl.toString(), {
+              headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+            });
+            const preSearchData = await preSearchRes.json();
+            const preFound = (preSearchData.invoices || []) as Record<string, any>[];
+            if (preFound.length > 0) {
+              return {
+                zoho_invoice_id: preFound[0].invoice_id as string,
+                zoho_invoice_number: preFound[0].invoice_number as string,
+                status: 'pushed',
+                detail: `Invoice already existed in Zoho (linked to existing invoice ${preFound[0].invoice_number}).${validationDetail ? ' ' + validationDetail : ''}`,
+              };
+            }
+          } catch (_) { /* best-effort; if search fails, fall through to create attempt */ }
+        }
+
         const createUrl = new URL(`${apiDomain}/books/v3/invoices`);
         createUrl.searchParams.set('organization_id', orgId);
 
@@ -982,7 +1006,13 @@ Deno.serve(async (req: Request) => {
         if (msgLower.includes('customer') && (msgLower.includes('inactive') || msgLower.includes('not found'))) {
           return { status: 'customer-inactive', detail: zohoMsg };
         }
-        if (msgLower.includes('duplicate') || msgLower.includes('already exists')) {
+        // Zoho error code 36026 = duplicate invoice number; also catch message-based detection
+        const isDuplicate =
+          createData.code === 36026 ||
+          msgLower.includes('duplicate') ||
+          msgLower.includes('already exist') ||
+          msgLower.includes('invoice number');
+        if (isDuplicate) {
           // The invoice already exists in Zoho — search for it by invoice_number
           // so we can link TMS to the existing Zoho invoice and mark it as pushed.
           try {
