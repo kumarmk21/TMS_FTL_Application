@@ -2169,12 +2169,13 @@ export default function ZohoBooksIntegration() {
                       <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
                       <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Zoho Invoice</th>
                       <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
+                      <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wide">Detail</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredInvoiceDetails.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                        <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                           No records in this category
                         </td>
                       </tr>
@@ -2202,6 +2203,7 @@ export default function ZohoBooksIntegration() {
                               {d.status}
                             </span>
                           </td>
+                          <td className="px-4 py-2 text-xs text-gray-500 max-w-xs">{d.detail || '-'}</td>
                         </tr>
                       ))
                     )}

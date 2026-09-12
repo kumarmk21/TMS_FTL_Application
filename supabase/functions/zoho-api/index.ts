@@ -375,6 +375,42 @@ async function fetchActiveZohoContacts(
   return allContacts;
 }
 
+async function findInvoiceByNumber(
+  accessToken: string,
+  apiDomain: string,
+  orgId: string,
+  invoiceNumber: string,
+): Promise<Record<string, any> | null> {
+  const target = invoiceNumber.trim().toLowerCase();
+  if (!target) return null;
+
+  for (let page = 1; page <= 50; page++) {
+    const url = new URL(`${apiDomain}/books/v3/invoices`);
+    url.searchParams.set('organization_id', orgId);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('per_page', '200');
+
+    const res = await fetch(url.toString(), {
+      headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
+    });
+    const data = await res.json();
+    if (data.code !== undefined && data.code !== 0) {
+      throw new Error(`Invoice lookup failed (code ${data.code}): ${data.message || 'Unknown error'}`);
+    }
+
+    const match = (data.invoices || []).find((invoice: Record<string, any>) =>
+      [invoice.invoice_number, invoice.reference_number]
+        .some(value => String(value || '').trim().toLowerCase() === target),
+    );
+    if (match) return match;
+
+    const pageContext = data.page_context || {};
+    if (!(pageContext.has_more_page || pageContext.has_more)) break;
+  }
+
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -956,20 +992,13 @@ Deno.serve(async (req: Request) => {
         // created in Zoho) but the TMS record was not linked.
         if (billNumber) {
           try {
-            const preSearchUrl = new URL(`${apiDomain}/books/v3/invoices`);
-            preSearchUrl.searchParams.set('organization_id', orgId);
-            preSearchUrl.searchParams.set('invoice_number', billNumber);
-            const preSearchRes = await fetch(preSearchUrl.toString(), {
-              headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-            });
-            const preSearchData = await preSearchRes.json();
-            const preFound = (preSearchData.invoices || []) as Record<string, any>[];
-            if (preFound.length > 0) {
+            const existingInvoice = await findInvoiceByNumber(accessToken, apiDomain, orgId, billNumber);
+            if (existingInvoice) {
               return {
-                zoho_invoice_id: preFound[0].invoice_id as string,
-                zoho_invoice_number: preFound[0].invoice_number as string,
+                zoho_invoice_id: existingInvoice.invoice_id as string,
+                zoho_invoice_number: existingInvoice.invoice_number as string,
                 status: 'pushed',
-                detail: `Invoice already existed in Zoho (linked to existing invoice ${preFound[0].invoice_number}).${validationDetail ? ' ' + validationDetail : ''}`,
+                detail: `Invoice already existed in Zoho (linked to existing invoice ${existingInvoice.invoice_number}).${validationDetail ? ' ' + validationDetail : ''}`,
               };
             }
           } catch (_) { /* best-effort; if search fails, fall through to create attempt */ }
@@ -1008,28 +1037,21 @@ Deno.serve(async (req: Request) => {
         }
         // Zoho error code 36026 = duplicate invoice number; also catch message-based detection
         const isDuplicate =
-          createData.code === 36026 ||
+          String(createData.code) === '1001' ||
+          String(createData.code) === '36026' ||
           msgLower.includes('duplicate') ||
-          msgLower.includes('already exist') ||
-          msgLower.includes('invoice number');
+          msgLower.includes('already exist');
         if (isDuplicate) {
           // The invoice already exists in Zoho — search for it by invoice_number
           // so we can link TMS to the existing Zoho invoice and mark it as pushed.
           try {
-            const searchUrl = new URL(`${apiDomain}/books/v3/invoices`);
-            searchUrl.searchParams.set('organization_id', orgId);
-            searchUrl.searchParams.set('invoice_number', billNumber);
-            const searchRes = await fetch(searchUrl.toString(), {
-              headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` },
-            });
-            const searchData = await searchRes.json();
-            const found = (searchData.invoices || []) as Record<string, any>[];
-            if (found.length > 0) {
+            const existingInvoice = await findInvoiceByNumber(accessToken, apiDomain, orgId, billNumber);
+            if (existingInvoice) {
               return {
-                zoho_invoice_id: found[0].invoice_id as string,
-                zoho_invoice_number: found[0].invoice_number as string,
+                zoho_invoice_id: existingInvoice.invoice_id as string,
+                zoho_invoice_number: existingInvoice.invoice_number as string,
                 status: 'pushed',
-                detail: `Invoice already existed in Zoho (linked to existing invoice ${found[0].invoice_number}).${validationDetail ? ' ' + validationDetail : ''}`,
+                detail: `Invoice already existed in Zoho (linked to existing invoice ${existingInvoice.invoice_number}).${validationDetail ? ' ' + validationDetail : ''}`,
               };
             }
           } catch (_) { /* best-effort */ }
@@ -1038,7 +1060,7 @@ Deno.serve(async (req: Request) => {
         if (msgLower.includes('auth') || msgLower.includes('token') || msgLower.includes('unauthorized')) {
           return { status: 'auth-error', detail: zohoMsg };
         }
-        return { status: 'api-error', detail: zohoMsg };
+        return { status: 'api-error', detail: `[Zoho code ${createData.code}] ${zohoMsg}` };
       }
 
       // ── Process LR Bills ──
