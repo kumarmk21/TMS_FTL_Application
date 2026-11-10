@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { FileText, Search, Printer, Mail } from 'lucide-react';
 import { BillPrintPreview } from '../components/BillPrintPreview';
 import { WarehouseBillPrintPreview } from '../components/WarehouseBillPrintPreview';
+import { sendBillEmail } from '../lib/sendBillEmail';
 
 interface BillingParty {
   billing_party_code: string;
@@ -157,35 +158,8 @@ export default function BillPrint() {
   const handleSendEmail = async (bill: Bill) => {
     setSendingEmail(bill.bill_id);
     try {
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-bill-email`;
-
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const headers = {
-        'Authorization': `Bearer ${session?.access_token}`,
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json',
-      };
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          billId: bill.bill_id,
-          billType: bill.bill_type
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        console.error('Email send failed:', response.status, result);
-        const errorMsg = result.details ? `${result.error}\n\nDetails: ${result.details}` : (result.error || `Failed to send email (Status: ${response.status})`);
-        throw new Error(errorMsg);
-      }
-
-      console.log('Email sent successfully:', result);
-      alert(`Email sent successfully to customer!\n\n${result.message}`);
+      const message = await sendBillEmail(bill.bill_id, bill.bill_type);
+      alert(`Email sent successfully to customer!\n\n${message}`);
     } catch (error) {
       console.error('Error sending email:', error);
       alert(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);

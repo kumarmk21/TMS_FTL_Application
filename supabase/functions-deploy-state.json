@@ -1,0 +1,33 @@
+{
+  "projectId": "61922222",
+  "functions": {
+    "add-freight-tiger-trip": {
+      "hasChanged": false,
+      "hash": "0f7613f22b77b9dc525c91faac45f79451fcf591b52431695d41c76975b6b3e3"
+    },
+    "freight-tiger-webhook": {
+      "hasChanged": false,
+      "hash": "b9e3949dc3dc98fd3cbc7cdbad6ece1007ab198ae43d6c0bb8fcc0e6d750134a"
+    },
+    "get-location-by-trip-id": {
+      "hasChanged": false,
+      "hash": "94dd58843951de6ebdf586734fbece22c2de1f791cc77ecab781e47a7efe262f"
+    },
+    "get-vehicle-location": {
+      "hasChanged": false,
+      "hash": "7d7b0dfbab38ddd9a34de5786985604bae489ed218174af9bfad127bb7a3ea95"
+    },
+    "send-bill-email": {
+      "hasChanged": false,
+      "hash": "a342113372a563fb81761d5d1821464efad3c5ca956b86a2840de30f646dd859"
+    },
+    "zoho-api": {
+      "hasChanged": false,
+      "hash": "cec8753fa34da522db12b6e5180243b7417df186aebdef36b07e152e6f64fe7b"
+    },
+    "zoho-oauth": {
+      "hasChanged": false,
+      "hash": "a62de1e98e9d314beac93c585f1801afe6e349100d1747a58ec05fe4edae3a17"
+    }
+  }
+}

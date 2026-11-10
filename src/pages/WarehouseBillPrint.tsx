@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { FileText, Search, Printer, Filter, Edit } from 'lucide-react';
+import { FileText, Search, Printer, Filter, Edit, Mail, Check } from 'lucide-react';
 import { WarehouseBillPrintPreview } from '../components/WarehouseBillPrintPreview';
 import { EditWarehouseBillModal } from '../components/modals/EditWarehouseBillModal';
+import { sendBillEmail } from '../lib/sendBillEmail';
 
 interface BillingParty {
   billing_party_code: string;
@@ -16,6 +17,7 @@ interface WarehouseBill {
   billing_party_name: string;
   total_amount: number;
   bill_status: string;
+  email_sent_at: string | null;
 }
 
 export default function WarehouseBillPrint() {
@@ -30,6 +32,7 @@ export default function WarehouseBillPrint() {
   const [showResults, setShowResults] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const [editBillId, setEditBillId] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBillingParties();
@@ -66,7 +69,7 @@ export default function WarehouseBillPrint() {
     try {
       let query = supabase
         .from('warehouse_bill')
-        .select('bill_id, bill_number, bill_date, billing_party_name, total_amount, bill_status');
+        .select('bill_id, bill_number, bill_date, billing_party_name, total_amount, bill_status, email_sent_at');
 
       if (billNumber) {
         query = query.ilike('bill_number', `%${billNumber}%`);
@@ -108,6 +111,20 @@ export default function WarehouseBillPrint() {
 
   const handleEdit = (bill: WarehouseBill) => {
     setEditBillId(bill.bill_id);
+  };
+
+  const handleSendEmail = async (bill: WarehouseBill) => {
+    setSendingEmail(bill.bill_id);
+    try {
+      const message = await sendBillEmail(bill.bill_id, 'warehouse');
+      alert(`Email sent successfully to customer!\n\n${message}`);
+      handleSearch();
+    } catch (error) {
+      console.error('Error sending email:', error);
+      alert(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setSendingEmail(null);
+    }
   };
 
   const handleEditSuccess = () => {
@@ -327,6 +344,12 @@ export default function WarehouseBillPrint() {
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(bill.bill_status)}`}>
                             {bill.bill_status}
                           </span>
+                          {bill.email_sent_at && (
+                            <div className="flex items-center gap-1 mt-1 text-xs text-green-700">
+                              <Check className="w-3 h-3" />
+                              Mailed {formatDate(bill.email_sent_at)}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center gap-3">
@@ -344,6 +367,16 @@ export default function WarehouseBillPrint() {
                               <Printer className="w-4 h-4" />
                               Print
                             </button>
+                            {bill.bill_status !== 'Cancelled' && (
+                              <button
+                                onClick={() => handleSendEmail(bill)}
+                                disabled={sendingEmail === bill.bill_id}
+                                className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                              >
+                                <Mail className="w-4 h-4" />
+                                {sendingEmail === bill.bill_id ? 'Sending...' : 'Send Mail'}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

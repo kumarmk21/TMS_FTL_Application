@@ -404,6 +404,14 @@ Deno.serve(async (req: Request) => {
     console.log('Email sent successfully!');
     console.log('Message ID:', info.messageId);
 
+    if (billType === 'warehouse') {
+      const { error: stampError } = await supabase
+        .from('warehouse_bill')
+        .update({ email_sent_at: new Date().toISOString() })
+        .eq('bill_id', billId);
+      if (stampError) console.error('Failed to record email sent time:', stampError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
