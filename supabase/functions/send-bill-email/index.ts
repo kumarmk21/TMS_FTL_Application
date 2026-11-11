@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.7';
+import { PDFDocument, StandardFonts, rgb } from 'npm:pdf-lib@1.17.1';
+import { Buffer } from 'node:buffer';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +12,153 @@ const corsHeaders = {
 interface BillEmailRequest {
   billId: string;
   billType?: 'lr' | 'warehouse';
+}
+
+const toPdfText = (value: unknown) => String(value ?? '-').replace(/[^\x20-\x7E\xA0-\xFF]/g, '');
+
+const formatPdfAmount = (value: number | null | undefined) => (Number(value) || 0).toFixed(2);
+
+const formatPdfDate = (dateString: string | null) =>
+  dateString ? new Date(dateString).toLocaleDateString('en-IN') : '-';
+
+async function buildWarehouseBillPdf(bill: any, company: any): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([595, 842]);
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const dark = rgb(0.12, 0.16, 0.22);
+  const muted = rgb(0.42, 0.45, 0.5);
+  const left = 40;
+  const right = 555;
+
+  const write = (value: unknown, x: number, y: number, size = 10, font = regular, color = dark) =>
+    page.drawText(toPdfText(value), { x, y, size, font, color });
+
+  const writeRight = (value: unknown, xRight: number, y: number, size = 10, font = regular) => {
+    const str = toPdfText(value);
+    page.drawText(str, { x: xRight - font.widthOfTextAtSize(str, size), y, size, font, color: dark });
+  };
+
+  const rule = (y: number) =>
+    page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 0.6, color: rgb(0.8, 0.82, 0.85) });
+
+  let y = 800;
+  write(company?.company_name || 'DLS Logistics', left, y, 16, bold);
+  y -= 16;
+  if (company?.company_tagline) {
+    write(company.company_tagline, left, y, 9, regular, muted);
+    y -= 14;
+  }
+  const contactLine = [company?.company_address, company?.city, company?.state, company?.pin_code]
+    .filter(Boolean)
+    .join(', ');
+  if (contactLine) {
+    write(contactLine, left, y, 9, regular, muted);
+    y -= 12;
+  }
+  const contacts = [
+    company?.contact_number && `Phone: ${company.contact_number}`,
+    company?.email && `Email: ${company.email}`,
+    company?.gstin && `GSTIN: ${company.gstin}`,
+  ].filter(Boolean).join('   |   ');
+  if (contacts) {
+    write(contacts, left, y, 9, regular, muted);
+    y -= 12;
+  }
+  y -= 8;
+  rule(y);
+
+  y -= 28;
+  const title = 'TAX INVOICE - WAREHOUSE SERVICES';
+  page.drawText(title, {
+    x: (595 - bold.widthOfTextAtSize(title, 13)) / 2,
+    y,
+    size: 13,
+    font: bold,
+    color: dark,
+  });
+
+  y -= 32;
+  const detailsTop = y;
+  const details: [string, unknown][] = [
+    ['Bill Number', bill.bill_number],
+    ['Bill Date', formatPdfDate(bill.bill_date)],
+    ['Due Date', formatPdfDate(bill.bill_due_date)],
+    ['Bill Period', bill.bill_period],
+    ['Service Type', bill.service_type],
+  ];
+  details.forEach(([label, value], index) => {
+    if (value === undefined || value === null || value === '') return;
+    write(`${label}:`, left, detailsTop - index * 16, 10, bold);
+    write(value, left + 90, detailsTop - index * 16, 10);
+  });
+
+  const partyX = 320;
+  write('Billed To', partyX, detailsTop, 10, bold);
+  write(bill.billing_party_name || '-', partyX, detailsTop - 16, 10, bold);
+  write(bill.bill_to_address || '-', partyX, detailsTop - 32, 9);
+  write(`State: ${bill.bill_to_state || '-'}`, partyX, detailsTop - 46, 9);
+  if (bill.bill_to_gstin) write(`GSTIN: ${bill.bill_to_gstin}`, partyX, detailsTop - 60, 9);
+
+  y = detailsTop - 96;
+  page.drawRectangle({ x: left, y: y - 4, width: right - left, height: 22, color: rgb(0.95, 0.96, 0.97) });
+  write('Description', left + 8, y + 3, 10, bold);
+  write('SAC Code', 370, y + 3, 10, bold);
+  writeRight('Amount (Rs.)', right - 8, y + 3, 10, bold);
+  y -= 26;
+
+  const charges: [string, unknown, unknown][] = [
+    [bill.sac_description || 'Warehousing Charges', bill.sac_code, bill.warehouse_charges],
+    ['Other Charges', bill.sac_code, bill.other_charges],
+    ['Unloading Charges', bill.sac_code, bill.unloading_charges],
+  ];
+  let subTotal = 0;
+  charges.forEach(([description, sac, amount]) => {
+    if (!(Number(amount) > 0)) return;
+    subTotal += Number(amount);
+    write(description, left + 8, y, 10);
+    write(sac || '-', 370, y, 10);
+    writeRight(formatPdfAmount(Number(amount)), right - 8, y, 10);
+    y -= 18;
+    rule(y + 8);
+  });
+
+  y -= 10;
+  const totals: [string, string][] = [['Sub Total', formatPdfAmount(subTotal)]];
+  if (Number(bill.igst_amount) > 0) totals.push([`IGST @ ${bill.gst_percentage}%`, formatPdfAmount(bill.igst_amount)]);
+  if (Number(bill.cgst_amount) > 0) totals.push([`CGST @ ${(Number(bill.gst_percentage) / 2).toFixed(2)}%`, formatPdfAmount(bill.cgst_amount)]);
+  if (Number(bill.sgst_amount) > 0) totals.push([`SGST @ ${(Number(bill.gst_percentage) / 2).toFixed(2)}%`, formatPdfAmount(bill.sgst_amount)]);
+  totals.forEach(([label, value]) => {
+    write(label, 340, y, 10);
+    writeRight(value, right - 8, y, 10);
+    y -= 18;
+  });
+
+  y -= 6;
+  page.drawRectangle({ x: 340, y: y - 8, width: right - 340, height: 26, color: rgb(0.94, 0.98, 0.96) });
+  write('Total Amount', 348, y + 1, 11, bold);
+  writeRight(`Rs. ${formatPdfAmount(bill.total_amount)}`, right - 8, y + 1, 11, bold);
+  y -= 50;
+
+  if (company?.bank_name) {
+    write('Bank Details for Payment', left, y, 10, bold);
+    y -= 16;
+    const bankLines = [
+      `Bank: ${company.bank_name}`,
+      `Account Number: ${company.account_number || '-'}`,
+      `IFSC Code: ${company.ifsc_code || '-'}`,
+      `Branch: ${company.bank_branch || '-'}`,
+    ];
+    bankLines.forEach((lineText) => {
+      write(lineText, left, y, 9);
+      y -= 14;
+    });
+  }
+
+  write('This is a system-generated invoice.', left, 60, 8, regular, muted);
+  write(`For ${company?.company_name || 'DLS Logistics'}`, 380, 60, 9, bold);
+
+  return await pdf.save();
 }
 
 Deno.serve(async (req: Request) => {
@@ -397,6 +546,17 @@ Deno.serve(async (req: Request) => {
 
     if (company?.email) {
       mailOptions.cc = company.email;
+    }
+
+    if (billType === 'warehouse') {
+      const pdfBytes = await buildWarehouseBillPdf(bill, company);
+      mailOptions.attachments = [
+        {
+          filename: `${String(billNumber).replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`,
+          content: Buffer.from(pdfBytes),
+          contentType: 'application/pdf',
+        },
+      ];
     }
 
     const info = await transporter.sendMail(mailOptions);

@@ -63,6 +63,7 @@ import ATHPaidReport from '../pages/ATHPaidReport';
 import BillPaymentReport from '../pages/BillPaymentReport';
 import PartyWiseSalesReport from '../pages/PartyWiseSalesReport';
 import APReport from '../pages/APReport';
+import VendorLedger from '../pages/VendorLedger';
 import UnbilledReport from '../pages/UnbilledReport';
 import LRPendingFinEditReport from '../pages/LRPendingFinEditReport';
 import AdminExpenses from '../pages/AdminExpenses';
@@ -184,6 +185,7 @@ const menuItems: MenuItem[] = [
       { id: 'pending-pod', label: 'Pending POD' },
       { id: 'ar-report', label: 'AR Report' },
       { id: 'ap-report', label: 'AP Report' },
+      { id: 'vendor-ledger', label: 'Vendor Ledger' },
       { id: 'bth-paid-report', label: 'BTH Paid Report' },
       { id: 'ath-paid-report', label: 'ATH Paid Report' },
       { id: 'party-wise-sales', label: 'Party Wise Sales' },
@@ -323,6 +325,8 @@ export function Layout() {
         return <PartyWiseSalesReport />;
       case 'ap-report':
         return <APReport />;
+      case 'vendor-ledger':
+        return <VendorLedger />;
       case 'unbilled-report':
         return <UnbilledReport />;
       case 'cancelled-bills-report':
