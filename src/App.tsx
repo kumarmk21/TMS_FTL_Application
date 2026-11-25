@@ -7,7 +7,13 @@ import ZohoCallback from './pages/ZohoCallback';
 function AppContent() {
   const { user } = useAuth();
 
-  if (window.location.pathname === '/auth/zoho/callback') {
+  // Zoho always appends both `code` and `location` params on its redirect;
+  // requiring both avoids clashing with other flows that use only `code`.
+  const zohoParams = new URLSearchParams(window.location.search);
+  const zohoRedirect =
+    zohoParams.get('code') !== null && zohoParams.get('location') !== null;
+
+  if (window.location.pathname === '/auth/zoho/callback' || zohoRedirect) {
     return <ZohoCallback />;
   }
 

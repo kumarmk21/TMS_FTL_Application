@@ -43,7 +43,7 @@ export default function ZohoCallback() {
         setStatus('success');
         setMessage('Connected to Zoho Books! Redirecting...');
         setTimeout(() => {
-          window.location.href = '/?zoho=connected';
+          window.location.href = '/?zoho=connected&open=zoho-books-integration';
         }, 1500);
       } catch (err: any) {
         setStatus('error');

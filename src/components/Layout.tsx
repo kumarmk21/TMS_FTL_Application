@@ -208,11 +208,22 @@ export function Layout() {
     return true;
   });
 
-  const defaultMenu = 'dashboard';
-  const defaultSubItem = 'dashboard';
+  const initialOpenItem = new URLSearchParams(window.location.search).get('open');
+  const validOpenItem =
+    initialOpenItem &&
+    menuItems.some(
+      (item) => item.id === initialOpenItem || item.subItems?.some((sub) => sub.id === initialOpenItem)
+    )
+      ? initialOpenItem
+      : null;
+  const parentMenuId = validOpenItem
+    ? menuItems.find(
+        (item) => item.id === validOpenItem || item.subItems?.some((sub) => sub.id === validOpenItem)
+      )?.id ?? null
+    : null;
 
-  const [expandedMenu, setExpandedMenu] = useState<string | null>(defaultMenu);
-  const [activeSubItem, setActiveSubItem] = useState<string>(defaultSubItem);
+  const [expandedMenu, setExpandedMenu] = useState<string | null>(parentMenuId ?? 'dashboard');
+  const [activeSubItem, setActiveSubItem] = useState<string>(validOpenItem ?? 'dashboard');
 
   const toggleMenu = (menuId: string, hasSubItems: boolean) => {
     if (!hasSubItems) {
