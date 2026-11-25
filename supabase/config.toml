@@ -3,3 +3,6 @@ verify_jwt = true
 
 [functions.send-bill-email]
 verify_jwt = true
+
+[functions.zoho-oauth]
+verify_jwt = true

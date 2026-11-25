@@ -7,10 +7,11 @@ import VendorPaymentSettings from './VendorPaymentSettings';
 
 interface ConnectionStatus {
   connected: boolean;
-  connected_at?: string;
-  expires_at?: string;
-  api_domain?: string;
-  location?: string;
+  needs_reconnect?: boolean;
+  connected_at?: string | null;
+  expires_at?: string | null;
+  api_domain?: string | null;
+  location?: string | null;
 }
 
 interface SyncResult {
@@ -941,6 +942,13 @@ export default function ZohoBooksIntegration() {
     }
   };
 
+  const markReconnectRequired = (message: string) => {
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('reconnect zoho books') || lowerMessage.includes('access denied')) {
+      setStatus(prev => prev ? { ...prev, connected: false, needs_reconnect: true } : prev);
+    }
+  };
+
   const handlePushInvoices = useCallback(async (billIds?: string[]) => {
     setPushing(true);
     setError('');
@@ -974,13 +982,15 @@ export default function ZohoBooksIntegration() {
       await fetchPendingInvoices();
       await fetchProcessedInvoices();
     } catch (err: any) {
-      setError(err.message || 'Failed to push invoices');
+      const message = err.message || 'Failed to push invoices';
+      markReconnectRequired(message);
+      setError(message);
     } finally {
       setPushing(false);
     }
   }, [apiUrl, billTypeFilter, dryRunOnly, fetchInvoiceStats, fetchPendingInvoices, fetchProcessedInvoices]);
 
-  const formatDate = (dateStr?: string) => {
+  const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString('en-IN', {
       day: '2-digit',
@@ -1269,7 +1279,9 @@ export default function ZohoBooksIntegration() {
       await fetchPurchaseStats();
       await fetchPendingTHCs();
     } catch (err: any) {
-      setError(err.message || 'Failed to push purchases');
+      const message = err.message || 'Failed to push purchases';
+      markReconnectRequired(message);
+      setError(message);
     } finally {
       setPushingPurchases(false);
     }
@@ -1433,6 +1445,32 @@ export default function ZohoBooksIntegration() {
                 Refresh Status
               </button>
             </div>
+          </div>
+        ) : status?.needs_reconnect ? (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="p-2 bg-amber-100 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-amber-900">Reconnect Required</h3>
+                <p className="text-sm text-amber-800">Your Zoho authorization has expired. Reconnect to resume invoice pushing.</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="text-sm font-semibold text-blue-900 mb-2">Your existing links are safe</h4>
+              <p className="text-sm text-blue-800">Reconnecting will not remove invoices already linked to Zoho Books. Only invoices that have not been pushed will remain available for syncing.</p>
+            </div>
+
+            <button
+              onClick={handleConnect}
+              disabled={connecting}
+              className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {connecting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Link2 className="w-5 h-5" />}
+              {connecting ? 'Reconnecting...' : 'Reconnect Zoho Books'}
+            </button>
           </div>
         ) : (
           <div className="space-y-6">

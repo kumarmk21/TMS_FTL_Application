@@ -57,6 +57,15 @@ async function getValidAccessToken(): Promise<{ accessToken: string; apiDomain: 
   const refreshData = await refreshRes.json();
 
   if (refreshData.error) {
+    const { error: invalidateError } = await supabase
+      .from('zoho_oauth_tokens')
+      .update({
+        access_token: null,
+        expires_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', 1);
+    if (invalidateError) console.error('[Zoho] Failed to mark connection for reconnection:', invalidateError);
     throw new Error(`Token refresh failed: ${refreshData.error}. Please reconnect Zoho Books.`);
   }
 

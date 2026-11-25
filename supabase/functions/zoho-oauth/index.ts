@@ -83,6 +83,11 @@ Deno.serve(async (req: Request) => {
       }
 
       const supabase = createClient(supabaseUrl, supabaseKey);
+      const { data: existingToken } = await supabase
+        .from('zoho_oauth_tokens')
+        .select('refresh_token')
+        .eq('id', 1)
+        .maybeSingle();
       const expiresIn = tokenData.expires_in_sec || tokenData.expires_in || 3600;
       const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
@@ -91,7 +96,7 @@ Deno.serve(async (req: Request) => {
         .upsert({
           id: 1,
           access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
+          refresh_token: tokenData.refresh_token || existingToken?.refresh_token || null,
           expires_at: expiresAt,
           api_domain: tokenData.api_domain || null,
           location: tokenData.location || null,
@@ -114,24 +119,25 @@ Deno.serve(async (req: Request) => {
       const supabase = createClient(supabaseUrl, supabaseKey);
       const { data, error } = await supabase
         .from('zoho_oauth_tokens')
-        .select('connected_at, expires_at, api_domain, location, access_token')
+        .select('connected_at, expires_at, api_domain, location, access_token, refresh_token')
         .eq('id', 1)
         .maybeSingle();
 
       if (error) throw error;
 
-      if (!data || !data.access_token) {
-        return new Response(JSON.stringify({ connected: false }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      const hasAccessToken = Boolean(data?.access_token);
+      const hasRefreshToken = Boolean(data?.refresh_token);
+      const expiresAt = data?.expires_at ? new Date(data.expires_at).getTime() : 0;
+      const connected = hasAccessToken && expiresAt > Date.now();
+      const needsReconnect = !connected && hasRefreshToken;
 
       return new Response(JSON.stringify({
-        connected: true,
-        connected_at: data.connected_at,
-        expires_at: data.expires_at,
-        api_domain: data.api_domain,
-        location: data.location,
+        connected,
+        needs_reconnect: needsReconnect,
+        connected_at: data?.connected_at || null,
+        expires_at: data?.expires_at || null,
+        api_domain: data?.api_domain || null,
+        location: data?.location || null,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
